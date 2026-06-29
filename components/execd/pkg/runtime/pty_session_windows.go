@@ -20,6 +20,7 @@ package runtime
 import (
 	"errors"
 	"io"
+	"time"
 )
 
 // ptySession is an opaque stub on Windows (real type in pty_session.go, !windows).
@@ -32,6 +33,9 @@ type ptySession struct{}
 type PTYSession interface {
 	LockWS() bool
 	UnlockWS()
+	TakeoverWS(timeout time.Duration) bool
+	SetEvictHandler(fn func()) uint64
+	ClearEvictHandler(gen uint64)
 	IsRunning() bool
 	IsPTY() bool
 	ExitCode() int
@@ -54,7 +58,7 @@ func IsPTYSessionSupported() bool { return false }
 func NewPTYSessionID() string { return "" }
 
 // CreatePTYSession is not supported on Windows.
-func (c *Controller) CreatePTYSession(id, cwd string) (PTYSession, error) { return nil, nil } //nolint:revive
+func (c *Controller) CreatePTYSession(id, cwd, command string) (PTYSession, error) { return nil, nil } //nolint:revive
 
 // GetPTYSession is not supported on Windows.
 func (c *Controller) GetPTYSession(id string) PTYSession { return nil } //nolint:revive
@@ -73,6 +77,9 @@ func (c *Controller) GetPTYSessionStatus(id string) (bool, int64, error) { //nol
 
 func (s *ptySession) LockWS() bool                                 { return false }
 func (s *ptySession) UnlockWS()                                    {}
+func (s *ptySession) TakeoverWS(_ time.Duration) bool              { return false }
+func (s *ptySession) SetEvictHandler(_ func()) uint64              { return 0 }
+func (s *ptySession) ClearEvictHandler(_ uint64)                   {}
 func (s *ptySession) IsRunning() bool                              { return false }
 func (s *ptySession) IsPTY() bool                                  { return false }
 func (s *ptySession) ExitCode() int                                { return -1 }

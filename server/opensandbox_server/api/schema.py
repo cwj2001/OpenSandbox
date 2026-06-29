@@ -120,6 +120,24 @@ class NetworkPolicy(BaseModel):
         populate_by_name = True
 
 
+class CredentialProxyConfig(BaseModel):
+    """
+    Credential proxy startup options.
+    """
+
+    enabled: bool = Field(
+        False,
+        description=(
+            "When true, the server enables transparent MITM support required by "
+            "Credential Vault injection. Plain egress network policy does not enable "
+            "transparent MITM unless this option is set."
+        ),
+    )
+
+    class Config:
+        populate_by_name = True
+
+
 # ============================================================================
 # Volume Definitions
 # ============================================================================
@@ -180,9 +198,9 @@ class PVC(BaseModel):
         description=(
             "When true, the volume is automatically removed when the sandbox is "
             "deleted. Only applies to volumes that were auto-created by the server "
-            "(Docker only). Pre-existing volumes are never removed. Has no effect "
-            "on Kubernetes PVCs, whose lifecycle is managed by the StorageClass "
-            "reclaim policy."
+            "on this request; pre-existing volumes are never removed. For "
+            "Kubernetes, the resulting PVC delete then triggers the bound PV's "
+            "StorageClass reclaim policy (Retain/Delete)."
         ),
     )
 
@@ -406,7 +424,16 @@ class CreateSandboxRequest(BaseModel):
     resource_limits: Optional[ResourceLimits] = Field(
         None,
         alias="resourceLimits",
-        description="Runtime resource constraints for the sandbox instance. Optional when poolRef is provided.",
+        description="Runtime resource constraints (hard caps) for the sandbox instance. Optional when poolRef is provided.",
+    )
+    resource_requests: Optional[ResourceLimits] = Field(
+        None,
+        alias="resourceRequests",
+        description=(
+            "Resource reservations (guaranteed minimums) for the sandbox instance. "
+            "When provided, used as Kubernetes resource requests, enabling Burstable QoS. "
+            "When omitted, resourceLimits values are used for both limits and requests."
+        ),
     )
     env: Optional[Dict[str, Optional[str]]] = Field(
         None,
@@ -432,6 +459,14 @@ class CreateSandboxRequest(BaseModel):
         description=(
             "Optional outbound network policy. Shape matches the egress sidecar /policy endpoint. "
             "Empty/omitted means allow-all until updated."
+        ),
+    )
+    credential_proxy: Optional[CredentialProxyConfig] = Field(
+        None,
+        alias="credentialProxy",
+        description=(
+            "Optional Credential Vault proxy startup settings. Set enabled=true to "
+            "enable transparent MITM support for credential injection."
         ),
     )
     secure_access: bool = Field(
@@ -464,11 +499,16 @@ class CreateSandboxRequest(BaseModel):
             # Reject conflicting fields that would be ignored in pool mode
             if bool((self.snapshot_id or "").strip()):
                 raise ValueError("snapshotId cannot be used together with poolRef.")
+            if self.credential_proxy and self.credential_proxy.enabled:
+                raise ValueError("credentialProxy.enabled cannot be used together with poolRef.")
             # Normalize blank snapshotId so downstream code won't see
             # a truthy whitespace string (e.g. "   ") as a real value.
             if self.snapshot_id is not None and not self.snapshot_id.strip():
                 self.snapshot_id = None
             return self
+
+        if self.credential_proxy and self.credential_proxy.enabled and self.network_policy is None:
+            raise ValueError("credentialProxy.enabled requires networkPolicy.")
 
         has_image = self.image is not None and bool(self.image.uri.strip())
         has_snapshot = bool((self.snapshot_id or "").strip())

@@ -41,7 +41,7 @@ spec:
             - NET_RAW
           privileged: true
         volumeMounts:
-        - mountPath: /opt/opensandbox/bin
+        - mountPath: /opt/opensandbox
           name: opensandbox-bin
         - mountPath: /oem
           name: opensandbox-win-oem
@@ -58,10 +58,10 @@ spec:
         command:
         - /bin/sh
         - -c
-        image: sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/execd:v1.0.18
+        image: sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/execd:v1.0.20
         name: execd-installer
         volumeMounts:
-        - mountPath: /opt/opensandbox/bin
+        - mountPath: /opt/opensandbox
           name: opensandbox-bin
         - mountPath: /oem
           name: opensandbox-win-oem

@@ -1531,6 +1531,74 @@ func TestSearchFiles(t *testing.T) {
 	}
 }
 
+func TestListDirectoryDefault(t *testing.T) {
+	want := []FileInfo{
+		{Path: "/sandbox/src", Type: "directory", Size: 0, Owner: "root", Group: "root", Mode: 755},
+		{Path: "/sandbox/README.md", Type: "file", Size: 256, Owner: "root", Group: "root", Mode: 644},
+	}
+
+	_, client := newExecdServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			assert.Fail(t, fmt.Sprintf("expected GET, got %s", r.Method))
+		}
+		if r.URL.Path != "/directories/list" {
+			assert.Fail(t, fmt.Sprintf("expected /directories/list, got %s", r.URL.Path))
+		}
+		if r.URL.Query().Get("path") != "/sandbox" {
+			assert.Fail(t, fmt.Sprintf("expected path=/sandbox, got %s", r.URL.Query().Get("path")))
+		}
+		// ListDirectory should not pin a depth value; the server applies the
+		// default. Sending depth=... here would be a regression.
+		if _, ok := r.URL.Query()["depth"]; ok {
+			assert.Fail(t, fmt.Sprintf("expected depth to be omitted, got %q", r.URL.Query().Get("depth")))
+		}
+
+		jsonResponse(w, http.StatusOK, want)
+	})
+
+	got, err := client.ListDirectory(context.Background(), "/sandbox")
+	require.NoErrorf(t, err, "ListDirectory")
+	require.Len(t, got, 2)
+	require.Equal(t, "directory", got[0].Type)
+	require.Equal(t, "file", got[1].Type)
+}
+
+func TestListDirectoryWithDepth(t *testing.T) {
+	want := []FileInfo{
+		{Path: "/sandbox/src", Type: "directory", Size: 0, Owner: "root", Group: "root", Mode: 755},
+	}
+
+	_, client := newExecdServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("depth") != "2" {
+			assert.Fail(t, fmt.Sprintf("expected depth=2, got %s", r.URL.Query().Get("depth")))
+		}
+
+		jsonResponse(w, http.StatusOK, want)
+	})
+
+	got, err := client.ListDirectoryWithDepth(context.Background(), "/sandbox", 2)
+	require.NoErrorf(t, err, "ListDirectoryWithDepth")
+	require.Len(t, got, 1)
+	require.Equal(t, "directory", got[0].Type)
+}
+
+func TestListDirectoryWithDepthZero(t *testing.T) {
+	_, client := newExecdServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/directories/list" {
+			assert.Fail(t, fmt.Sprintf("expected /directories/list, got %s", r.URL.Path))
+		}
+		if r.URL.Query().Get("depth") != "0" {
+			assert.Fail(t, fmt.Sprintf("expected depth=0, got %s", r.URL.Query().Get("depth")))
+		}
+
+		jsonResponse(w, http.StatusOK, []FileInfo{})
+	})
+
+	got, err := client.ListDirectoryWithDepth(context.Background(), "/sandbox", 0)
+	require.NoErrorf(t, err, "ListDirectoryWithDepth")
+	require.Len(t, got, 0)
+}
+
 func TestSetPermissions(t *testing.T) {
 	_, client := newExecdServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

@@ -39,6 +39,8 @@ from fastapi import HTTPException, status
 
 from opensandbox_server.extensions import (
     ACCESS_RENEW_EXTEND_SECONDS_METADATA_KEY,
+    BOOTSTRAP_EXECD_ISOLATION_KEY,
+    ISOLATION_UPPER_MOUNT_PATH,
 )
 from opensandbox_server.api.schema import (
     CreateSandboxRequest,
@@ -83,6 +85,9 @@ from opensandbox_server.services.docker.windows_profile import (
 )
 from opensandbox_server.services.extension_service import ExtensionService
 from opensandbox_server.services.constants import (
+    OPENSANDBOX_EGRESS_MITMPROXY_SSL_INSECURE,
+    OPENSANDBOX_EGRESS_MITMPROXY_TRANSPARENT,
+    OPENSANDBOX_RUNTIME_MOUNT_PATH,
     SANDBOX_EGRESS_AUTH_TOKEN_METADATA_KEY,
     SANDBOX_EMBEDDING_PROXY_PORT_LABEL,
     SANDBOX_EXPIRES_AT_LABEL,
@@ -100,6 +105,7 @@ from opensandbox_server.services.endpoint_auth import (
 from opensandbox_server.services.helpers import (
     matches_filter,
     parse_timestamp,
+    split_egress_env,
 )
 from opensandbox_server.services.docker.ossfs_mixin import OSSFSMixin
 from opensandbox_server.services.sandbox_service import SandboxService
@@ -154,6 +160,8 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
         self.execd_image = runtime_config.execd_image
         self.network_mode = (self.app_config.docker.network_mode or HOST_NETWORK_MODE).lower()
         self._execd_archive_cache: Dict[str, bytes] = {}
+        self._bootstrap_script_cache: Dict[str, bytes] = {}
+        self._bwrap_archive_cache: Dict[str, bytes] = {}
         self._windows_profile_cache: Dict[str, bytes] = {}
         self._daemon_platform: Optional[PlatformSpec] = None
         self._metadata_store = DockerMetadataStore()
@@ -198,6 +206,7 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
             )
         self._expiration_lock = Lock()
         self._execd_archive_lock = Lock()
+        self._bootstrap_script_lock = Lock()
         self._sandbox_expirations: Dict[str, datetime] = {}
         self._expiration_timers: Dict[str, Timer] = {}
         self._pending_sandboxes: Dict[str, PendingSandbox] = {}
@@ -398,11 +407,18 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
         except DockerException as exc:
             logger.warning("Failed to remove expired sandbox %s: %s", sandbox_id, exc)
 
+        managed_volumes_raw = labels.get(SANDBOX_MANAGED_VOLUMES_LABEL, "[]")
+        try:
+            managed_volumes: list[str] = json.loads(managed_volumes_raw)
+        except (TypeError, json.JSONDecodeError):
+            managed_volumes = []
+
         self._remove_expiration_tracking(sandbox_id)
         # Ensure sidecar is also cleaned up on expiration
         self._cleanup_egress_sidecar(sandbox_id)
         self._cleanup_windows_oem_volume(sandbox_id, labels)
         self._release_ossfs_mounts(mount_keys)
+        self._cleanup_managed_volumes(sandbox_id, managed_volumes)
         self._metadata_store.delete(sandbox_id)
 
     def _restore_existing_sandboxes(self) -> None:
@@ -626,11 +642,33 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
         self._ensure_secure_access_support(request)
         self._ensure_network_policy_support(request)
         self._validate_network_exists()
+
+        try:
+            sandbox_env, egress_env = split_egress_env(request.env)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": SandboxErrorCodes.INVALID_PARAMETER,
+                    "message": str(e),
+                },
+            ) from e
+
         pvc_inspect_cache, auto_created_volumes = self._validate_volumes(request)
         sandbox_id, created_at, expires_at = self._prepare_creation_context(request)
-        return self._provision_sandbox(
-            sandbox_id, request, created_at, expires_at, pvc_inspect_cache, auto_created_volumes,
-        )
+        try:
+            return self._provision_sandbox(
+                sandbox_id, request, created_at, expires_at, pvc_inspect_cache, auto_created_volumes,
+                sandbox_env=sandbox_env, egress_env=egress_env,
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": SandboxErrorCodes.INVALID_PARAMETER,
+                    "message": str(e),
+                },
+            ) from e
 
     def _async_provision_worker(
         self,
@@ -757,8 +795,13 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
         expires_at: Optional[datetime],
         pvc_inspect_cache: Optional[dict[str, dict]] = None,
         auto_created_volumes: Optional[list[str]] = None,
+        sandbox_env: Optional[Dict[str, Optional[str]]] = None,
+        egress_env: Optional[Dict[str, Optional[str]]] = None,
     ) -> CreateSandboxResponse:
-        labels, environment = self._build_labels_and_env(sandbox_id, request, expires_at)
+        if sandbox_env is None and egress_env is None:
+            sandbox_env, egress_env = split_egress_env(request.env)
+        patched_request = request.model_copy(update={"env": sandbox_env or None})
+        labels, environment = self._build_labels_and_env(sandbox_id, patched_request, expires_at)
         if auto_created_volumes:
             labels[SANDBOX_MANAGED_VOLUMES_LABEL] = json.dumps(
                 auto_created_volumes, separators=(",", ":"),
@@ -767,6 +810,25 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
         mem_limit, nano_cpus, gpu_count = self._resolve_resource_limits(request)
         egress_token: Optional[str] = None
         requested_windows_profile = is_windows_platform(request.platform)
+
+        credential_proxy_enabled = bool(
+            request.credential_proxy and request.credential_proxy.enabled
+        )
+
+        if credential_proxy_enabled and egress_env.get(OPENSANDBOX_EGRESS_MITMPROXY_SSL_INSECURE):
+            raise ValueError(
+                f"'{OPENSANDBOX_EGRESS_MITMPROXY_SSL_INSECURE}' cannot be set when credential proxy is enabled"
+            )
+
+        if egress_env and not request.network_policy:
+            dropped_keys = sorted(egress_env.keys())
+            logger.warning(
+                "Sandbox %s has OPENSANDBOX_EGRESS_ env vars %s but no networkPolicy; "
+                "these variables will be ignored because no egress sidecar is created",
+                sandbox_id,
+                dropped_keys,
+            )
+            egress_env = {}
 
         if requested_windows_profile:
             validate_windows_resource_limits((request.resource_limits.root if request.resource_limits else None) or {})
@@ -781,6 +843,7 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
             )
 
         sidecar_container = None
+        runtime_volume_name: Optional[str] = None
         try:
             # For dockur/windows profile, resourceLimits are translated to
             # guest envs (RAM_SIZE/CPU_CORES/DISK_SIZE). Avoid applying
@@ -806,11 +869,34 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
             container_exposed_ports: Optional[list[str]] = exposed_ports
 
             if request.network_policy:
+                runtime_volume_name = f"opensandbox-runtime-{sandbox_id}"
+                with self._docker_operation(
+                    "create egress runtime volume", sandbox_id
+                ):
+                    self.docker_client.volumes.create(
+                        name=runtime_volume_name,
+                        labels={SANDBOX_MANAGED_VOLUMES_LABEL: "server"},
+                    )
+                auto_created_volumes = list(auto_created_volumes or [])
+                auto_created_volumes.append(runtime_volume_name)
+                labels[SANDBOX_MANAGED_VOLUMES_LABEL] = json.dumps(
+                    auto_created_volumes,
+                    separators=(",", ":"),
+                )
+                if credential_proxy_enabled:
+                    environment = [
+                        entry
+                        for entry in environment
+                        if not entry.startswith(f"{OPENSANDBOX_EGRESS_MITMPROXY_TRANSPARENT}=")
+                    ]
+                    environment.append(f"{OPENSANDBOX_EGRESS_MITMPROXY_TRANSPARENT}=true")
+
                 egress_token = generate_egress_token()
                 labels[SANDBOX_EGRESS_AUTH_TOKEN_METADATA_KEY] = egress_token
-                sidecar_port_bindings = allocate_port_bindings(exposed_ports)
+                sidecar_port_bindings = allocate_port_bindings([*exposed_ports, "18080"])
                 host_execd_port = sidecar_port_bindings["44772"][1]
                 host_http_port = sidecar_port_bindings["8080"][1]
+                egress_api_binding = sidecar_port_bindings.get("18080")
                 extra_sidecar_port_bindings = {
                     port: binding
                     for port, binding in sidecar_port_bindings.items()
@@ -823,6 +909,12 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
                     host_execd_port=host_execd_port,
                     host_http_port=host_http_port,
                     extra_port_bindings=extra_sidecar_port_bindings,
+                    egress_api_host_port=(
+                        egress_api_binding[1] if egress_api_binding is not None else None
+                    ),
+                    runtime_volume_name=runtime_volume_name,
+                    credential_proxy_enabled=credential_proxy_enabled,
+                    extra_env=egress_env or None,
                 )
                 labels[SANDBOX_EMBEDDING_PROXY_PORT_LABEL] = str(host_execd_port)
                 labels[SANDBOX_HTTP_PORT_LABEL] = str(host_http_port)
@@ -854,6 +946,17 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
                     exposed_ports = None
 
             # Inject volume bind mounts into Docker host config
+            if runtime_volume_name:
+                runtime_mount_suffix = f":{OPENSANDBOX_RUNTIME_MOUNT_PATH}:"
+                runtime_mount_end = f":{OPENSANDBOX_RUNTIME_MOUNT_PATH}"
+                has_runtime_mount = any(
+                    runtime_mount_suffix in bind or bind.endswith(runtime_mount_end)
+                    for bind in volume_binds
+                )
+                if not has_runtime_mount:
+                    volume_binds.append(
+                        f"{runtime_volume_name}:{OPENSANDBOX_RUNTIME_MOUNT_PATH}:rw"
+                    )
             if volume_binds:
                 host_config_kwargs["binds"] = volume_binds
             if requested_windows_profile:
@@ -866,6 +969,26 @@ class DockerSandboxService(DockerDiagnosticsMixin, DockerRuntimeMixin, DockerVol
                     (request.resource_limits.root if request.resource_limits else None) or {},
                 )
                 environment = inject_windows_user_ports(environment, exposed_ports)
+
+            # Inject CAP_SYS_ADMIN + unconfined AppArmor when bwrap isolation is requested.
+            # bwrap needs pivot_root/mount which require CAP_SYS_ADMIN and are blocked
+            # by Docker's default AppArmor profile.
+            if (request.extensions or {}).get(BOOTSTRAP_EXECD_ISOLATION_KEY) == "enable":
+                cap_add = set(host_config_kwargs.get("cap_add") or [])
+                cap_add.add("SYS_ADMIN")
+                host_config_kwargs["cap_add"] = sorted(cap_add)
+                security_opt = list(host_config_kwargs.get("security_opt") or [])
+                security_opt = [s for s in security_opt if not s.startswith(("apparmor=", "seccomp="))]
+                security_opt.append("apparmor=unconfined")
+                security_opt.append("seccomp=unconfined")
+                host_config_kwargs["security_opt"] = security_opt
+                tmpfs = dict(host_config_kwargs.get("tmpfs") or {})
+                tmpfs[ISOLATION_UPPER_MOUNT_PATH] = ""
+                host_config_kwargs["tmpfs"] = tmpfs
+                logger.warning(
+                    "sandbox %s: granting CAP_SYS_ADMIN + apparmor/seccomp=unconfined + tmpfs for bwrap isolation (bootstrap.execd.isolation=enable)",
+                    sandbox_id,
+                )
 
             created_container = self._create_and_start_container(
                 sandbox_id,

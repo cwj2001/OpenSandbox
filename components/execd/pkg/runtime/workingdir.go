@@ -15,7 +15,9 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"github.com/alibaba/opensandbox/execd/pkg/util/pathutil"
@@ -31,8 +33,8 @@ func ValidateWorkingDir(cwd string) error {
 	}
 	fi, err := os.Stat(resolvedCwd)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("working directory does not exist: %s", cwd)
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("working directory does not exist: %s: %w", cwd, err)
 		}
 		return fmt.Errorf("cannot access working directory %q: %w", cwd, err)
 	}

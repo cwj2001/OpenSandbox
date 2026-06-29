@@ -255,6 +255,34 @@ func (e *ExecdClient) SearchFiles(ctx context.Context, dir string, pattern strin
 	return result, err
 }
 
+// ListDirectory lists the immediate children of the given directory using the
+// server-side default depth (1). Use ListDirectoryWithDepth to override.
+func (e *ExecdClient) ListDirectory(ctx context.Context, path string) ([]FileInfo, error) {
+	return e.listDirectory(ctx, path, nil)
+}
+
+// ListDirectoryWithDepth lists directory contents up to the given depth.
+// depth=0 returns an empty slice (the directory itself is not listed).
+// depth=1 returns the immediate children. Larger values include descendants
+// up to that many levels below path. Negative values are rejected by the
+// server.
+func (e *ExecdClient) ListDirectoryWithDepth(ctx context.Context, path string, depth int) ([]FileInfo, error) {
+	d := depth
+	return e.listDirectory(ctx, path, &d)
+}
+
+func (e *ExecdClient) listDirectory(ctx context.Context, path string, depth *int) ([]FileInfo, error) {
+	var result []FileInfo
+	params := url.Values{}
+	params.Set("path", path)
+	if depth != nil {
+		params.Set("depth", strconv.Itoa(*depth))
+	}
+	reqPath := "/directories/list?" + params.Encode()
+	err := e.client.doRequest(ctx, http.MethodGet, reqPath, nil, &result)
+	return result, err
+}
+
 // ReplaceInFiles performs text replacement in the specified files.
 func (e *ExecdClient) ReplaceInFiles(ctx context.Context, req ReplaceRequest) error {
 	return e.client.doRequest(ctx, http.MethodPost, "/files/replace", req, nil)
@@ -381,12 +409,29 @@ func (e *ExecdClient) newUploadFilesRequest(ctx context.Context, entries []Uploa
 	return req, pr, nil
 }
 
+// DownloadFileOptions configures line-based reading for DownloadFile.
+type DownloadFileOptions struct {
+	// Offset is the starting line number (1-based). Mutually exclusive with Range header.
+	Offset int
+	// Limit is the number of lines to return. Mutually exclusive with Range header.
+	Limit int
+}
+
 // DownloadFile downloads a file from the sandbox. The caller must close the
 // returned io.ReadCloser. Pass rangeHeader (e.g. "bytes=0-1023") for partial
-// content, or empty string for the full file.
-func (e *ExecdClient) DownloadFile(ctx context.Context, remotePath string, rangeHeader string) (io.ReadCloser, error) {
+// content, or empty string for the full file. Use opts for line-based reading.
+func (e *ExecdClient) DownloadFile(ctx context.Context, remotePath string, rangeHeader string, opts ...DownloadFileOptions) (io.ReadCloser, error) {
 	params := url.Values{}
 	params.Set("path", remotePath)
+	if len(opts) > 0 {
+		o := opts[0]
+		if o.Offset > 0 {
+			params.Set("offset", strconv.Itoa(o.Offset))
+		}
+		if o.Limit > 0 {
+			params.Set("limit", strconv.Itoa(o.Limit))
+		}
+	}
 	reqPath := "/files/download?" + params.Encode()
 
 	var resp *http.Response

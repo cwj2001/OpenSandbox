@@ -15,15 +15,18 @@
 #
 # Pre-start hook for opensandbox-supervisor wrapping the egress worker.
 # Reaps any mitmdump left over from a previous crashed egress so the next
-# launch can bind the transparent-MITM listen port (default 18081).
+# launch can bind the transparent-MITM listen port (default 18081), and
+# tears down stale iptables DNS redirect rules so DNS queries reach the
+# real nameserver while the new egress process is still initializing.
 #
-# Scope is deliberately narrow:
-#   * iptables NAT rules are NOT torn down here. The egress sidecar shares
-#     a network namespace with the workload it protects; tearing rules
-#     down between crashes would leave the workload with unfiltered egress
-#     for the full backoff window. Egress's own SetupRedirect is additive
-#     and tolerates pre-existing rules (first match wins).
-#   * The `inet opensandbox` nft table is NOT touched here either. The
+# Scope:
+#   * iptables NAT OUTPUT rules for port 53 ARE removed here. Without
+#     this, a crashed egress leaves REDIRECT rules pointing at a dead
+#     proxy (127.0.0.1:15353), causing DNS resolution failure for the
+#     entire restart window. The new egress process re-installs them
+#     after its DNS proxy is listening, so the unfiltered window is
+#     limited to the startup duration (~200ms).
+#   * The `inet opensandbox` nft table is NOT touched here. The
 #     egress nftables manager already prepends `delete table inet
 #     opensandbox` to its ruleset script, so ApplyStatic is idempotent.
 #
@@ -39,6 +42,30 @@ log() { printf '[egress-cleanup] %s\n' "$*" >&2; }
 # Wraps a command so non-zero exit is silently absorbed. Output goes to
 # stderr so it shows up in container logs without polluting the event log.
 try() { "$@" 2>&1 | sed 's/^/  /' >&2; return 0; }
+
+# ─── stale iptables rules (DNS redirect + mitmproxy transparent) ────
+# When egress crashes, iptables REDIRECT rules survive in the shared
+# network namespace. DNS rules point port 53 at a dead proxy (15353);
+# mitmproxy rules point 80/443 at a dead mitmdump. Remove both so
+# traffic flows normally until the new egress re-installs them.
+remove_stale_iptables() {
+  for cmd in iptables ip6tables; do
+    command -v "$cmd" >/dev/null 2>&1 || continue
+    # Delete all nat/OUTPUT rules that redirect port 53 (DNS proxy).
+    "$cmd" -t nat -S OUTPUT 2>/dev/null \
+      | awk '/--dport 53/ {sub(/^-A/,"-D"); print}' \
+      | while IFS= read -r rule; do
+          eval "$cmd -t nat $rule" 2>/dev/null || true
+        done
+    # Delete all nat/OUTPUT rules that redirect ports 80,443 (mitmproxy transparent).
+    "$cmd" -t nat -S OUTPUT 2>/dev/null \
+      | awk '/--dports 80,443/ {sub(/^-A/,"-D"); print}' \
+      | while IFS= read -r rule; do
+          eval "$cmd -t nat $rule" 2>/dev/null || true
+        done
+  done
+  log "stale iptables rules removed (best-effort)"
+}
 
 # ─── stray mitmdump (orphaned after hard crash) ──────────────────────
 kill_stray_mitmdump() {
@@ -57,6 +84,7 @@ kill_stray_mitmdump() {
 
 main() {
   log "starting (worker_exit_code=${WORKER_EXIT_CODE:-?} signal=${WORKER_SIGNAL:-?} attempt=${WORKER_ATTEMPT:-?})"
+  remove_stale_iptables
   kill_stray_mitmdump
   log "done"
   exit 0

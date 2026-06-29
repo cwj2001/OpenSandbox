@@ -52,6 +52,9 @@ class WorkloadProvider(ABC):
         annotations: Optional[Dict[str, str]] = None,
         egress_auth_token: Optional[str] = None,
         egress_mode: str = EGRESS_MODE_DNS,
+        credential_proxy_enabled: bool = False,
+        resource_requests: Optional[Dict[str, str]] = None,
+        egress_env: Optional[Dict[str, Optional[str]]] = None,
     ) -> Dict[str, Any]:
         """
         Create a new workload resource.
@@ -63,6 +66,7 @@ class WorkloadProvider(ABC):
             entrypoint: Container entrypoint command
             env: Environment variables
             resource_limits: Resource limits (cpu, memory)
+            resource_requests: Resource requests (guaranteed minimums). When omitted, limits are used.
             labels: Labels to apply to the workload
             expires_at: Expiration time, or None for manual cleanup (no TTL)
             execd_image: execd daemon image
@@ -72,6 +76,7 @@ class WorkloadProvider(ABC):
                 When provided, an egress sidecar container will be added to the Pod.
             egress_image: Optional egress sidecar image. Required when network_policy is provided.
             egress_mode: Sidecar ``OPENSANDBOX_EGRESS_MODE`` (from app ``[egress].mode`` when using network policy).
+            credential_proxy_enabled: Enable transparent MITM support required by Credential Vault injection.
             volumes: Optional list of volume mounts for the sandbox.
 
         Returns:

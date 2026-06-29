@@ -76,7 +76,7 @@ async def main() -> None:
     qwen_model_name = os.getenv("MODEL_NAME", "qwen3-coder-plus")
     image = os.getenv(
         "SANDBOX_IMAGE",
-        "sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/code-interpreter:v1.0.2",
+        "sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/code-interpreter:v1.1.0",
     )
 
     config = ConnectionConfig(

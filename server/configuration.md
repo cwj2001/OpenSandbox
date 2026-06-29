@@ -271,7 +271,7 @@ Optional **strong isolation** runtimes (gVisor, Kata, Firecracker).
 - If `type` is **`firecracker`**, **`k8s_runtime_class`** is **required** (`docker` runtime cannot use Firecracker).
 - If `type` is **`gvisor`** or **`kata`**, at least one of **`docker_runtime`** or **`k8s_runtime_class`** must be set.
 
-See [`docs/secure-container.md`](../docs/secure-container.md) for installation and node requirements.
+See [`docs/guides/secure-container.md`](../docs/guides/secure-container.md) for installation and node requirements.
 
 ---
 

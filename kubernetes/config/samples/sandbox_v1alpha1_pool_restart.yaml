@@ -24,42 +24,42 @@ spec:
             - /bin/sh
             - -c
             - |
-              exec /opt/opensandbox/bin/task-executor -listen-addr=0.0.0.0:5758 >/tmp/task-executor.log 2>&1
+              exec /opt/opensandbox/task-executor -listen-addr=0.0.0.0:5758 >/tmp/task-executor.log 2>&1
           env:
             - name: SANDBOX_MAIN_CONTAINER
               value: main
             - name: EXECD_ENVS
               value: /opt/opensandbox/.env
             - name: EXECD
-              value: /opt/opensandbox/bin/execd
-          image: sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/code-interpreter:v1.0.2
+              value: /opt/opensandbox/execd
+          image: sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/code-interpreter:v1.1.0
           name: sandbox
           volumeMounts:
             - mountPath: /var/lib/sandbox
               name: sandbox-storage
-            - mountPath: /opt/opensandbox/bin
+            - mountPath: /opt/opensandbox
               name: opensandbox-bin
       initContainers:
         - args:
-            - "cp /workspace/server /opt/opensandbox/bin/task-executor && \nchmod +x /opt/opensandbox/bin/task-executor\n"
+            - "cp /workspace/server /opt/opensandbox/task-executor && \nchmod +x /opt/opensandbox/task-executor\n"
           command:
             - /bin/sh
             - -c
           image: sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/task-executor:v0.1.0
           name: task-executor-installer
           volumeMounts:
-            - mountPath: /opt/opensandbox/bin
+            - mountPath: /opt/opensandbox
               name: opensandbox-bin
         - args:
-            - "cp ./execd /opt/opensandbox/bin/execd && \ncp ./bootstrap.sh /opt/opensandbox/bin/bootstrap.sh
-          &&\nchmod +x /opt/opensandbox/bin/execd &&\nchmod +x /opt/opensandbox/bin/bootstrap.sh\n"
+            - "cp ./execd /opt/opensandbox/execd && \ncp ./bootstrap.sh /opt/opensandbox/bootstrap.sh
+          &&\nchmod +x /opt/opensandbox/execd &&\nchmod +x /opt/opensandbox/bootstrap.sh\n"
           command:
             - /bin/sh
             - -c
-          image: sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/execd:v1.0.18
+          image: sandbox-registry.cn-zhangjiakou.cr.aliyuncs.com/opensandbox/execd:v1.0.20
           name: execd-installer
           volumeMounts:
-            - mountPath: /opt/opensandbox/bin
+            - mountPath: /opt/opensandbox
               name: opensandbox-bin
       tolerations:
         - operator: Exists

@@ -18,14 +18,14 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/gin-gonic/gin"
 
@@ -33,6 +33,9 @@ import (
 	"github.com/alibaba/opensandbox/execd/pkg/util/pathutil"
 	"github.com/alibaba/opensandbox/execd/pkg/web/model"
 )
+
+// TODO: migrate FilesystemController to use vfs.FS interface,
+// unifying the filesystem backend with IsolatedSessionController's file handlers.
 
 // FilesystemController handles file system operations
 type FilesystemController struct {
@@ -44,7 +47,7 @@ func NewFilesystemController(ctx *gin.Context) *FilesystemController {
 }
 
 func (c *FilesystemController) handleFileError(err error) {
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		c.RespondError(
 			http.StatusNotFound,
 			model.ErrorCodeFileNotFound,
@@ -219,6 +222,123 @@ func (c *FilesystemController) RemoveDirs() {
 	c.RespondSuccess(nil)
 }
 
+// ListDirectory lists directory contents with optional depth control
+func (c *FilesystemController) ListDirectory() {
+	rec := beginFilesystemMetric("listdir")
+	defer rec.Finish(c.basicController)
+
+	path := c.ctx.Query("path")
+	if path == "" {
+		c.RespondError(
+			http.StatusBadRequest,
+			model.ErrorCodeMissingQuery,
+			"missing query parameter 'path'",
+		)
+		return
+	}
+
+	depth := 1
+	if rawDepth := c.ctx.Query("depth"); rawDepth != "" {
+		parsedDepth, err := strconv.Atoi(rawDepth)
+		if err != nil || parsedDepth < 0 {
+			c.RespondError(
+				http.StatusBadRequest,
+				model.ErrorCodeInvalidRequest,
+				fmt.Sprintf("invalid query parameter 'depth': %s", rawDepth),
+			)
+			return
+		}
+		depth = parsedDepth
+	}
+
+	path, err := pathutil.ExpandAbsPath(path)
+	if err != nil {
+		c.RespondError(
+			http.StatusInternalServerError,
+			model.ErrorCodeRuntimeError,
+			fmt.Sprintf("error converting path %s to absolute. %v", path, err),
+		)
+		return
+	}
+
+	// Use Lstat so a symlink passed as the root is detected and rejected
+	// rather than silently followed: /directories/list never traverses
+	// symlinks (see the public spec), so listing through a symlink-as-root
+	// would expose a different subtree than the caller asked for.
+	info, err := os.Lstat(path)
+	if err != nil {
+		c.handleFileError(err)
+		return
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		c.RespondError(
+			http.StatusBadRequest,
+			model.ErrorCodeInvalidRequest,
+			fmt.Sprintf("path is a symbolic link, refusing to traverse: %s", path),
+		)
+		return
+	}
+	if !info.IsDir() {
+		c.RespondError(
+			http.StatusBadRequest,
+			model.ErrorCodeInvalidRequest,
+			fmt.Sprintf("path is not a directory: %s", path),
+		)
+		return
+	}
+
+	entries, err := listDirectoryEntries(path, depth)
+	if err != nil {
+		c.RespondError(
+			http.StatusInternalServerError,
+			model.ErrorCodeRuntimeError,
+			fmt.Sprintf("error listing directory %s. %v", path, err),
+		)
+		return
+	}
+
+	rec.MarkSuccess()
+	c.RespondSuccess(entries)
+}
+
+func listDirectoryEntries(root string, maxDepth int) ([]model.FileInfo, error) {
+	entries := make([]model.FileInfo, 0, 16)
+	if maxDepth == 0 {
+		return entries, nil
+	}
+
+	var walk func(string, int) error
+	walk = func(dir string, currentDepth int) error {
+		dirEntries, err := os.ReadDir(dir)
+		if err != nil {
+			return err
+		}
+
+		for _, entry := range dirEntries {
+			entryPath := filepath.Join(dir, entry.Name())
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+
+			entryInfo, err := buildFileInfo(entryPath, info)
+			if err != nil {
+				return err
+			}
+			entries = append(entries, entryInfo)
+
+			if entry.IsDir() && currentDepth+1 < maxDepth {
+				if err := walk(entryPath, currentDepth+1); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	return entries, walk(root, 0)
+}
+
 // SearchFiles searches for files matching a pattern in a directory
 func (c *FilesystemController) SearchFiles() {
 	rec := beginFilesystemMetric("search")
@@ -257,7 +377,7 @@ func (c *FilesystemController) SearchFiles() {
 
 	files := make([]model.FileInfo, 0, 16)
 	err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
 		if err != nil {
@@ -273,33 +393,11 @@ func (c *FilesystemController) SearchFiles() {
 		}
 
 		if match {
-			sys := info.Sys().(*syscall.Stat_t)
-
-			owner, err := user.LookupId(strconv.FormatUint(uint64(sys.Uid), 10))
+			fileInfo, err := buildFileInfo(filePath, info)
 			if err != nil {
-				return fmt.Errorf("error lookup owner for file %s: %w", filePath, err)
+				return err
 			}
-
-			group, err := user.LookupGroupId(strconv.FormatUint(uint64(sys.Gid), 10))
-			if err != nil {
-				return fmt.Errorf("error lookup group for file %s: %w", filePath, err)
-			}
-
-			files = append(files, model.FileInfo{
-				Path:       filePath,
-				Size:       info.Size(),
-				ModifiedAt: info.ModTime(),
-				CreatedAt:  getFileCreateTime(info),
-				Permission: model.Permission{
-					Owner: owner.Username,
-					Group: group.Name,
-					Mode: func() int {
-						mode := strconv.FormatInt(int64(info.Mode().Perm()), 8)
-						i, _ := strconv.Atoi(mode)
-						return i
-					}(),
-				},
-			})
+			files = append(files, fileInfo)
 		}
 
 		return nil

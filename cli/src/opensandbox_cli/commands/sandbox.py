@@ -22,6 +22,7 @@ from typing import Any
 
 import click
 from opensandbox.models.sandboxes import (
+    CredentialProxyConfig,
     NetworkPolicy,
     SandboxFilter,
     SandboxImageAuth,
@@ -107,6 +108,12 @@ def _normalize_sandbox_states(states: tuple[str, ...]) -> list[str] | None:
     help="Entrypoint argv item. Repeat to build the full entrypoint.",
 )
 @click.option("--network-policy-file", type=click.Path(exists=True), default=None, help="Network policy JSON file.")
+@click.option(
+    "--credential-proxy",
+    is_flag=True,
+    default=False,
+    help="Enable Credential Vault transparent proxy support. Requires --network-policy-file.",
+)
 @click.option("--volumes-file", type=click.Path(exists=True), default=None, help="Volumes JSON file (list of volume objects).")
 @click.option("--skip-health-check", is_flag=True, default=False, help="Skip waiting for sandbox readiness.")
 @click.option("--ready-timeout", type=DURATION, default=None, help="Max wait time for sandbox readiness (e.g. 30s).")
@@ -125,6 +132,7 @@ def sandbox_create(
     resources_kv: tuple[tuple[str, str], ...],
     entrypoint: tuple[str, ...],
     network_policy_file: str | None,
+    credential_proxy: bool,
     volumes_file: str | None,
     skip_health_check: bool,
     ready_timeout: timedelta | None,
@@ -144,6 +152,10 @@ def sandbox_create(
     if bool(image_auth_username) != bool(image_auth_password):
         raise click.ClickException(
             "Pass both --image-auth-username and --image-auth-password together."
+        )
+    if credential_proxy and not network_policy_file:
+        raise click.ClickException(
+            "--credential-proxy requires --network-policy-file because Credential Vault injection needs egress policy."
         )
 
     timeout: timedelta | None
@@ -191,6 +203,8 @@ def sandbox_create(
     if network_policy_file:
         with open(network_policy_file) as f:
             kwargs["network_policy"] = NetworkPolicy(**json.load(f))
+    if credential_proxy:
+        kwargs["credential_proxy"] = CredentialProxyConfig(enabled=True)
     if volumes_file:
         with open(volumes_file) as f:
             raw_volumes = json.load(f)

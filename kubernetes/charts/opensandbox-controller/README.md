@@ -266,7 +266,7 @@ kubectl auth can-i --as=system:serviceaccount:opensandbox-system:opensandbox-con
 
 - [OpenSandbox GitHub](https://github.com/alibaba/OpenSandbox)
 - [Documentation](https://github.com/alibaba/OpenSandbox/blob/main/kubernetes/README.md)
-- [Pause and Resume Guide](https://github.com/alibaba/OpenSandbox/blob/main/docs/pause-resume.md)
+- [Pause and Resume Guide](https://github.com/opensandbox-group/OpenSandbox/blob/main/docs/guides/pause-resume.md)
 - [Server Configuration Reference](https://github.com/alibaba/OpenSandbox/blob/main/server/configuration.md)
 - [Examples](https://github.com/alibaba/OpenSandbox/tree/main/kubernetes/config/samples)
 

@@ -114,9 +114,9 @@ class TestApplyWindowsProfileOverrides:
                     "name": "execd-installer",
                     "image": "execd:test",
                     "command": ["/bin/sh", "-c"],
-                    "args": ["cp ./execd /opt/opensandbox/bin/execd"],
+                    "args": ["cp ./execd /opt/opensandbox/execd"],
                     "volumeMounts": [
-                        {"name": "opensandbox-bin", "mountPath": "/opt/opensandbox/bin"}
+                        {"name": "opensandbox-bin", "mountPath": "/opt/opensandbox"}
                     ],
                 }
             ],
@@ -124,10 +124,10 @@ class TestApplyWindowsProfileOverrides:
                 {
                     "name": "sandbox",
                     "image": "dockurr/windows:latest",
-                    "command": ["/opt/opensandbox/bin/bootstrap.sh", "tail", "-f", "/dev/null"],
-                    "env": [{"name": "EXECD", "value": "/opt/opensandbox/bin/execd"}],
+                    "command": ["/opt/opensandbox/bootstrap.sh", "tail", "-f", "/dev/null"],
+                    "env": [{"name": "EXECD", "value": "/opt/opensandbox/execd"}],
                     "volumeMounts": [
-                        {"name": "opensandbox-bin", "mountPath": "/opt/opensandbox/bin"}
+                        {"name": "opensandbox-bin", "mountPath": "/opt/opensandbox"}
                     ],
                 }
             ],

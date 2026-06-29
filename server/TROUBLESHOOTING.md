@@ -1,7 +1,5 @@
 # Troubleshooting
 
-English | [中文](TROUBLESHOOTING_zh.md)
-
 ## `exec /opt/opensandbox/bootstrap.sh: operation not permitted`
 
 If sandbox logs show:

@@ -1,6 +1,5 @@
 # Alibaba Code Interpreter SDK for Kotlin
 
-English | [中文](README_zh.md)
 
 A powerful Kotlin SDK for executing code in secure, isolated sandboxes. This SDK provides a high-level API for running Python, Java, Go, TypeScript, and other languages safely, with support for code execution contexts.
 
@@ -55,8 +54,8 @@ public class QuickStart {
         // Use try-with-resources to ensure sandbox is closed
         try (Sandbox sandbox = Sandbox.builder()
                 .connectionConfig(config)
-                .image("opensandbox/code-interpreter:v1.0.2")
-                .entrypoint("/opt/opensandbox/code-interpreter.sh")
+                .image("opensandbox/code-interpreter:v1.1.0")
+                .entrypoint("/opt/code-interpreter/code-interpreter.sh")
                 .env("PYTHON_VERSION", "3.11") // Select specific language version
                 .build()) {
 
@@ -111,8 +110,8 @@ Code Interpreter entrypoint:
 
 ```java
 Sandbox sandbox = Sandbox.builder()
-    .image("opensandbox/code-interpreter:v1.0.2")
-    .entrypoint("/opt/opensandbox/code-interpreter.sh")
+    .image("opensandbox/code-interpreter:v1.1.0")
+    .entrypoint("/opt/code-interpreter/code-interpreter.sh")
     .env("PYTHON_VERSION", "3.11")
     .build();
 ```
@@ -137,8 +136,8 @@ You can specify the desired version of a programming language by setting the cor
 
 ```java
 Sandbox sandbox = Sandbox.builder()
-    .image("opensandbox/code-interpreter:v1.0.2")
-    .entrypoint("/opt/opensandbox/code-interpreter.sh")
+    .image("opensandbox/code-interpreter:v1.1.0")
+    .entrypoint("/opt/code-interpreter/code-interpreter.sh")
     .env("JAVA_VERSION", "17")
     .env("GO_VERSION", "1.23")
     .build();

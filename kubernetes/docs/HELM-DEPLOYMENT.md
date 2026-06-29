@@ -528,6 +528,6 @@ helm install test-release opensandbox-controller-*.tgz \
 
 ## References
 
-- [Helm Chart README](charts/opensandbox-controller/README.md) - Full parameter list
-- [OpenSandbox Documentation](README.md) - Project documentation
-- [Configuration Examples](config/samples/) - Resource configuration examples
+- [Helm Chart README](../charts/opensandbox-controller/README.md) - Full parameter list
+- [OpenSandbox Documentation](../README.md) - Project documentation
+- [Configuration Examples](../config/samples/) - Resource configuration examples

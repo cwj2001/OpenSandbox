@@ -362,6 +362,18 @@ class TestSkillsCommands:
         assert "Quick Start:" in result.output
         assert "osb egress patch" in result.output
 
+    def test_show_supports_credential_vault_skill(
+        self,
+        runner: CliRunner,
+        isolated_skill_targets: None,
+    ) -> None:
+        result = runner.invoke(skills_group, ["show", "credential-vault"])
+
+        assert result.exit_code == 0
+        assert "Skill: credential-vault" in result.output
+        assert "Credential Vault" in result.output
+        assert "osb credential-vault create" in result.output
+
     def test_show_surfaces_json_shapes_for_lifecycle_skill(
         self,
         runner: CliRunner,
@@ -582,7 +594,8 @@ class TestSkillCliAlignment:
 
         assert {
             "-i", "--image", "-t", "--timeout", "--entrypoint", "--network-policy-file",
-            "--volumes-file", "--skip-health-check", "--ready-timeout", "-o", "--output",
+            "--credential-proxy", "--volumes-file", "--skip-health-check",
+            "--ready-timeout", "-o", "--output",
         } <= _option_names(create_cmd)
         assert {"--skip-health-check", "--resume-timeout", "-o", "--output"} <= _option_names(resume_cmd)
         assert {"-p", "--port", "-o", "--output"} <= _option_names(endpoint_cmd)
@@ -618,6 +631,18 @@ class TestSkillCliAlignment:
         assert {"--tail", "-n", "--since", "-s", "-o", "--output"} <= _option_names(logs_cmd)
         assert {"--limit", "-l", "-o", "--output"} <= _option_names(events_cmd)
         assert {"--tail", "-n", "--event-limit", "-o", "--output"} <= _option_names(summary_cmd)
+
+    def test_credential_vault_skill_matches_cli(self) -> None:
+        vault_group = _command(["credential-vault"])
+        assert isinstance(vault_group, Group)
+        assert {"create", "get", "patch", "delete", "credential", "binding"} <= set(vault_group.commands)
+
+        assert {"--file", "-o", "--output"} <= _option_names(_command(["credential-vault", "create"]))
+        assert {"--file", "-o", "--output"} <= _option_names(_command(["credential-vault", "patch"]))
+        assert {"-o", "--output"} <= _option_names(_command(["credential-vault", "get"]))
+        assert {"-o", "--output"} <= _option_names(_command(["credential-vault", "delete"]))
+        assert {"-o", "--output"} <= _option_names(_command(["credential-vault", "credential", "list"]))
+        assert {"-o", "--output"} <= _option_names(_command(["credential-vault", "binding", "get"]))
 
     def test_skill_osb_examples_use_explicit_output_formats(self) -> None:
         allowed_without_output = {

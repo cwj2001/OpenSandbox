@@ -47,7 +47,17 @@ class TestRootCLI:
 
     def test_root_lists_commands(self, runner: CliRunner) -> None:
         result = runner.invoke(cli, ["--help"])
-        for cmd in ("sandbox", "command", "file", "egress", "config", "diagnostics", "devops", "skills"):
+        for cmd in (
+            "sandbox",
+            "command",
+            "file",
+            "egress",
+            "credential-vault",
+            "config",
+            "diagnostics",
+            "devops",
+            "skills",
+        ):
             assert cmd in result.output
 
 
@@ -128,6 +138,36 @@ class TestEgressHelp:
         result = runner.invoke(cli, ["egress", "--help"])
         assert result.exit_code == 0
         for subcmd in ("get", "patch"):
+            assert subcmd in result.output
+
+
+# ---------------------------------------------------------------------------
+# Credential Vault sub-commands
+# ---------------------------------------------------------------------------
+
+
+class TestCredentialVaultHelp:
+    def test_credential_vault_help(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["credential-vault", "--help"])
+        assert result.exit_code == 0
+        for subcmd in ("create", "get", "patch", "delete", "credential", "binding"):
+            assert subcmd in result.output
+
+    @pytest.mark.parametrize("subcmd", ["create", "get", "patch", "delete"])
+    def test_credential_vault_subcommand_help(self, runner: CliRunner, subcmd: str) -> None:
+        result = runner.invoke(cli, ["credential-vault", subcmd, "--help"])
+        assert result.exit_code == 0
+
+    def test_credential_vault_credential_help(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["credential-vault", "credential", "--help"])
+        assert result.exit_code == 0
+        for subcmd in ("list", "get"):
+            assert subcmd in result.output
+
+    def test_credential_vault_binding_help(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["credential-vault", "binding", "--help"])
+        assert result.exit_code == 0
+        for subcmd in ("list", "get"):
             assert subcmd in result.output
 
 

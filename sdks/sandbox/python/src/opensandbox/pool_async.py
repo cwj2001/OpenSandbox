@@ -35,9 +35,12 @@ from opensandbox.manager import SandboxManager
 from opensandbox.pool_types import (
     AcquirePolicy,
     AsyncPoolConfig,
+    AsyncPooledSandboxCreator,
     AsyncPoolStateStore,
     IdleEntry,
     PoolCreationSpec,
+    PooledSandboxCreateContext,
+    PooledSandboxCreateReason,
     PoolLifecycleState,
     PoolSnapshot,
     PoolState,
@@ -84,6 +87,7 @@ class SandboxPoolAsync:
             [ConnectionConfig], Awaitable[SandboxManager]
         ] = SandboxManager.create,
         sandbox_factory: type[Sandbox] = Sandbox,
+        sandbox_creator: AsyncPooledSandboxCreator | None = None,
     ) -> None:
         self._config = AsyncPoolConfig(
             pool_name=pool_name,
@@ -108,6 +112,7 @@ class SandboxPoolAsync:
             idle_timeout=idle_timeout,
             drain_timeout=drain_timeout,
             acquire_min_remaining_ttl=acquire_min_remaining_ttl,
+            sandbox_creator=sandbox_creator,
         )
         self._state_store = self._config.state_store
         self._connection_config = connection_config
@@ -163,7 +168,9 @@ class SandboxPoolAsync:
     ) -> Sandbox:
         if self._lifecycle_state != PoolLifecycleState.RUNNING:
             state = self._lifecycle_state
-            raise PoolNotRunningException(f"Cannot acquire when pool state is {state.value}")
+            raise PoolNotRunningException(
+                f"Cannot acquire when pool state is {state.value}"
+            )
         await self._begin_operation()
         try:
             if self._lifecycle_state != PoolLifecycleState.RUNNING:
@@ -388,7 +395,7 @@ class SandboxPoolAsync:
         if task is not None:
             self._warmup_tasks.add(task)  # type: ignore[arg-type]
         try:
-            sandbox = await self._build_sandbox_from_spec()
+            sandbox = await self._build_warmup_sandbox()
             try:
                 if self._config.warmup_sandbox_preparer is not None:
                     await self._config.warmup_sandbox_preparer(sandbox)
@@ -398,7 +405,7 @@ class SandboxPoolAsync:
                     except Exception:
                         pass
                     return None
-                # The server-side TTL has been ticking since `_build_sandbox_from_spec()`;
+                # The server-side TTL has been ticking since sandbox creation;
                 # readiness wait and `warmup_sandbox_preparer` can both consume meaningful time.
                 # Renew right before handing the id back to the reconciler so the store's
                 # stamped expiry actually matches what the server will honor — otherwise
@@ -418,7 +425,17 @@ class SandboxPoolAsync:
                 self._warmup_tasks.discard(task)  # type: ignore[arg-type]
             await self._end_operation()
 
-    async def _build_sandbox_from_spec(self) -> Sandbox:
+    async def _build_warmup_sandbox(self) -> Sandbox:
+        if self._config.sandbox_creator is not None:
+            return await self._build_sandbox_from_creator(
+                creator=self._config.sandbox_creator,
+                reason=PooledSandboxCreateReason.WARMUP,
+                ready_timeout=self._config.warmup_ready_timeout,
+                health_check_polling_interval=self._config.warmup_health_check_polling_interval,
+                skip_health_check=self._config.warmup_skip_health_check,
+                health_check=self._config.warmup_health_check,
+            )
+
         spec = self._creation_spec
         return await self._sandbox_factory.create(
             spec.image,
@@ -440,6 +457,26 @@ class SandboxPoolAsync:
         )
 
     async def _direct_create(self, sandbox_timeout: timedelta | None) -> Sandbox:
+        if self._config.sandbox_creator is not None:
+            sandbox = await self._build_sandbox_from_creator(
+                creator=self._config.sandbox_creator,
+                reason=PooledSandboxCreateReason.DIRECT_CREATE,
+                ready_timeout=self._config.acquire_ready_timeout,
+                health_check_polling_interval=self._config.acquire_health_check_polling_interval,
+                skip_health_check=self._config.acquire_skip_health_check,
+                health_check=self._config.acquire_health_check,
+            )
+            if sandbox_timeout is not None:
+                try:
+                    await sandbox.renew(sandbox_timeout)
+                except BaseException:
+                    try:
+                        await sandbox.kill()
+                    finally:
+                        await sandbox.close()
+                    raise
+            return sandbox
+
         spec = self._creation_spec
         sandbox = await self._sandbox_factory.create(
             spec.image,
@@ -470,6 +507,29 @@ class SandboxPoolAsync:
                 raise
         return sandbox
 
+    async def _build_sandbox_from_creator(
+        self,
+        *,
+        creator: AsyncPooledSandboxCreator,
+        reason: PooledSandboxCreateReason,
+        ready_timeout: timedelta,
+        health_check_polling_interval: timedelta,
+        skip_health_check: bool,
+        health_check: Callable[[Sandbox], Awaitable[bool]] | None,
+    ) -> Sandbox:
+        context = PooledSandboxCreateContext(
+            pool_name=self._config.pool_name,
+            owner_id=str(self._config.owner_id),
+            idle_timeout=self._config.idle_timeout,
+            reason=reason,
+            ready_timeout=ready_timeout,
+            health_check_polling_interval=health_check_polling_interval,
+            skip_health_check=skip_health_check,
+            health_check=health_check,
+            connection_config=self._connection_for_pool_resource(),
+        )
+        return await creator(context)
+
     async def _resolve_max_idle(self) -> int:
         shared = await self._state_store.get_max_idle(self._config.pool_name)
         return self._current_max_idle if shared is None else shared
@@ -478,7 +538,10 @@ class SandboxPoolAsync:
         return await self._sandbox_manager_factory(self._connection_for_pool_resource())
 
     def _connection_for_pool_resource(self) -> ConnectionConfig:
-        if self._connection_config.transport is not None and not self._connection_config._owns_transport:
+        if (
+            self._connection_config.transport is not None
+            and not self._connection_config._owns_transport
+        ):
             return self._connection_config
         config = self._connection_config.model_copy(update={"transport": None})
         config._owns_transport = True

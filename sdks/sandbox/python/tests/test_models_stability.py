@@ -32,7 +32,12 @@ from opensandbox.models.execd import (
     ExecutionResult,
     OutputMessage,
 )
-from opensandbox.models.filesystem import MoveEntry, WriteEntry
+from opensandbox.models.filesystem import (
+    DirectoryListEntry,
+    EntryInfo,
+    MoveEntry,
+    WriteEntry,
+)
 from opensandbox.models.sandboxes import (
     OSSFS,
     PVC,
@@ -144,6 +149,25 @@ def test_filesystem_models_aliases_and_validation() -> None:
     m = MoveEntry(source="/a", destination="/b")
     assert m.src == "/a"
     assert m.dest == "/b"
+
+    info = EntryInfo(
+        path="/workspace/file.txt",
+        type="file",
+        mode=644,
+        owner="root",
+        group="root",
+        size=1,
+        modified_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+    assert info.entry_type == "file"
+    assert info.model_dump(by_alias=True)["type"] == "file"
+
+    list_entry = DirectoryListEntry(path="/workspace", depth=2)
+    assert list_entry.depth == 2
+
+    with pytest.raises(ValueError):
+        DirectoryListEntry(path="/workspace", depth=-1)
 
     with pytest.raises(ValueError):
         WriteEntry(path="  ", data="x")

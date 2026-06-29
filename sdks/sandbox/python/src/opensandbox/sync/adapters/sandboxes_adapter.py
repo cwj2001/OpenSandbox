@@ -36,6 +36,7 @@ from opensandbox.api.lifecycle.types import UNSET
 from opensandbox.config.connection_sync import ConnectionConfigSync
 from opensandbox.models.sandboxes import (
     CreateSnapshotRequest,
+    CredentialProxyConfig,
     NetworkPolicy,
     PagedSandboxInfos,
     PagedSnapshotInfos,
@@ -104,6 +105,8 @@ class SandboxesAdapterSync(SandboxesSync):
         platform: PlatformSpec | None = None,
         secure_access: bool = False,
         snapshot_id: str | None = None,
+        credential_proxy: CredentialProxyConfig | None = None,
+        resource_requests: dict[str, str] | None = None,
     ) -> SandboxCreateResponse:
         logger.info(
             "Creating sandbox with startup source: %s",
@@ -124,10 +127,12 @@ class SandboxesAdapterSync(SandboxesSync):
                 resource=resource,
                 platform=platform,
                 network_policy=network_policy,
+                credential_proxy=credential_proxy,
                 extensions=extensions,
                 volumes=volumes,
                 secure_access=secure_access,
                 snapshot_id=snapshot_id,
+                resource_requests=resource_requests,
             )
             response_obj = post_sandboxes.sync_detailed(client=self._get_client(), body=create_request)
             handle_api_error(response_obj, "Create sandbox")

@@ -110,6 +110,7 @@ osb sandbox create --image python:3.12 --entrypoint python --entrypoint -m --ent
 osb sandbox create --image python:3.12 --extension storage.id=abc123 -o json
 osb sandbox create --image python:3.12 --ready-timeout 90s -o json
 osb sandbox create --image python:3.12 --network-policy-file network-policy.json -o json
+osb sandbox create --image python:3.12 --network-policy-file network-policy.json --credential-proxy -o json
 osb sandbox create --image python:3.12 --volumes-file volumes.json -o json
 ```
 
@@ -124,6 +125,7 @@ Use these options deliberately:
 - `--extension`: repeat for opaque extension key-value pairs that should be passed through as-is
 - `--ready-timeout`: increase this when the image or workload needs more startup time
 - `--skip-health-check`: use only when the user explicitly wants object creation without waiting for readiness; do not use it to mask startup problems
+- `--credential-proxy`: enable Credential Vault transparent proxy support; requires `--network-policy-file`
 
 If the user does not specify an image, recommend one that matches the runtime they need instead of guessing silently.
 

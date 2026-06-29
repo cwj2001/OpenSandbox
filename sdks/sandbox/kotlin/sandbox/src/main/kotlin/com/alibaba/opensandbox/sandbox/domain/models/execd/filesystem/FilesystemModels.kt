@@ -40,6 +40,7 @@ class EntryInfo(
     val size: Long,
     val modifiedAt: OffsetDateTime,
     val createdAt: OffsetDateTime,
+    val type: String? = null,
 )
 
 /**

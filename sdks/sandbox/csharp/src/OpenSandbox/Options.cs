@@ -76,6 +76,11 @@ public class SandboxCreateOptions
     public NetworkPolicy? NetworkPolicy { get; set; }
 
     /// <summary>
+    /// Gets or sets optional Credential Vault proxy startup settings.
+    /// </summary>
+    public CredentialProxyConfig? CredentialProxy { get; set; }
+
+    /// <summary>
     /// Gets or sets an optional runtime platform constraint for sandbox provisioning.
     /// </summary>
     public PlatformSpec? Platform { get; set; }
@@ -99,6 +104,12 @@ public class SandboxCreateOptions
     /// Gets or sets the resource limits.
     /// </summary>
     public IReadOnlyDictionary<string, string>? Resource { get; set; }
+
+    /// <summary>
+    /// Gets or sets the resource requests (guaranteed minimums).
+    /// When set, enables Kubernetes Burstable QoS (requests &lt; limits).
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? ResourceRequests { get; set; }
 
     /// <summary>
     /// Gets or sets the sandbox timeout in seconds.

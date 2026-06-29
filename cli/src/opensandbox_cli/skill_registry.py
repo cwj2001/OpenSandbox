@@ -90,6 +90,21 @@ BUILTIN_SKILLS: dict[str, SkillSpec] = {
         ),
         marker_id="opensandbox-network-egress",
     ),
+    "credential-vault": SkillSpec(
+        slug="credential-vault",
+        package_file="opensandbox-credential-vault.md",
+        title="OpenSandbox Credential Vault",
+        summary=(
+            "Create, inspect, patch, and delete sandbox-local Credential Vault "
+            "state without exposing plaintext secrets in shell flags."
+        ),
+        trigger_hint=(
+            "Use when the user needs outbound credential injection for tools "
+            "inside a sandbox, or wants to manage Credential Vault credentials "
+            "and bindings at runtime."
+        ),
+        marker_id="opensandbox-credential-vault",
+    ),
 }
 
 DEFAULT_SKILL = "sandbox-troubleshooting"

@@ -35,6 +35,17 @@ open class SandboxException(
         cause: Throwable?,
         error: SandboxError,
     ) : this(message = message, cause = cause, error = error, requestId = null)
+
+    override fun toString(): String {
+        val parts = mutableListOf(super.toString())
+        if (!error.message.isNullOrBlank()) {
+            parts += "[${error.code}] ${error.message}"
+        }
+        if (!requestId.isNullOrBlank()) {
+            parts += "request_id=$requestId"
+        }
+        return parts.joinToString(" | ")
+    }
 }
 
 /**
@@ -90,6 +101,18 @@ class SandboxReadyTimeoutException(
         message = message,
         cause = cause,
         error = SandboxError(SandboxError.READY_TIMEOUT, message),
+    )
+
+/**
+ * Thrown when a snapshot reaches the `Failed` state while waiting for it to become ready.
+ */
+class SnapshotFailedException(
+    message: String? = null,
+    cause: Throwable? = null,
+) : SandboxException(
+        message = message,
+        cause = cause,
+        error = SandboxError(SandboxError.SNAPSHOT_FAILED, message),
     )
 
 /**
@@ -179,6 +202,9 @@ data class SandboxError(
         const val UNHEALTHY = "UNHEALTHY"
         const val INVALID_ARGUMENT = "INVALID_ARGUMENT"
         const val UNEXPECTED_RESPONSE = "UNEXPECTED_RESPONSE"
+
+        /** A snapshot reached the `Failed` state while waiting for it to become ready. */
+        const val SNAPSHOT_FAILED = "SNAPSHOT_FAILED"
 
         /** The requested file or directory does not exist (server responds with HTTP 404). */
         const val FILE_NOT_FOUND = "FILE_NOT_FOUND"

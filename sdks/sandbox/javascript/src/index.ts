@@ -30,11 +30,29 @@ export { ConnectionConfig } from "./config/connection.js";
 export type { ConnectionConfigOptions, ConnectionProtocol } from "./config/connection.js";
 
 export type {
+  Credential,
+  CredentialAuth,
+  CredentialAuthMetadata,
+  CredentialBinding,
+  CredentialBindingListResponse,
+  CredentialBindingMetadata,
+  CredentialBindingMutationSet,
+  CredentialListResponse,
+  CredentialMatch,
+  CredentialMatchScheme,
+  CredentialMetadata,
+  CredentialMutationSet,
+  CredentialProxyConfig,
+  CredentialVaultCreateRequest,
+  CredentialVaultPatchRequest,
+  CredentialVaultState,
   CreateSnapshotRequest,
   CreateSandboxRequest,
   CreateSandboxResponse,
+  CustomHeaderEntry,
   Endpoint,
   Host,
+  InlineCredentialSource,
   ListSnapshotsParams,
   ListSnapshotsResponse,
   ListSandboxesParams,
@@ -57,6 +75,7 @@ export type {
 } from "./models/sandboxes.js";
 
 export type { Sandboxes } from "./services/sandboxes.js";
+export type { CredentialVault, Egress } from "./services/egress.js";
 
 export { SandboxManager } from "./manager.js";
 export type { SandboxFilter, SandboxManagerOptions } from "./manager.js";
@@ -64,6 +83,7 @@ export type { SandboxFilter, SandboxManagerOptions } from "./manager.js";
 export type { ExecdHealth } from "./services/execdHealth.js";
 export type { ExecdMetrics } from "./services/execdMetrics.js";
 export type {
+  FileEntryType,
   FileInfo,
   FileMetadata,
   Permission,
@@ -118,9 +138,20 @@ export { Sandbox } from "./sandbox.js";
 export type {
   ContentReplaceEntry,
   ContentReplaceResult,
+  DirectoryListEntry,
   MoveEntry,
   SearchEntry,
   SetPermissionEntry,
   WriteEntry,
 } from "./models/filesystem.js";
 export type { SandboxFiles } from "./services/filesystem.js";
+export type { IsolationService, IsolationSession } from "./services/isolatedSessions.js";
+export type {
+  CreateIsolatedSessionRequest,
+  IsolatedWorkspaceSpec,
+  EnvPassthroughSpec,
+  IsolatedSessionInfo,
+  IsolatedSessionState,
+  IsolatedRunOpts,
+  IsolatedCapabilities,
+} from "./models/isolated.js";

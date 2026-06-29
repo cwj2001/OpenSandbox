@@ -19,6 +19,7 @@ import type { paths as ExecdPaths } from "../api/execd.js";
 import type {
   ContentReplaceEntry,
   ContentReplaceResult,
+  DirectoryListEntry,
   FileInfo,
   FileMetadata,
   FilesInfoResponse,
@@ -211,6 +212,8 @@ export class FilesystemAdapter implements SandboxFiles {
       null as unknown as ExecdPaths["/files/search"]["get"]["responses"][200]["content"]["application/json"],
     FilesInfoOk:
       null as unknown as ExecdPaths["/files/info"]["get"]["responses"][200]["content"]["application/json"],
+    ListDirectoryOk:
+      null as unknown as ExecdPaths["/directories/list"]["get"]["responses"][200]["content"]["application/json"],
     MakeDirsRequest:
       null as unknown as ExecdPaths["/directories"]["post"]["requestBody"]["content"]["application/json"],
     SetPermissionsRequest:
@@ -245,12 +248,13 @@ export class FilesystemAdapter implements SandboxFiles {
     null as unknown as (typeof FilesystemAdapter.Api.SearchFilesOk)[number];
 
   private mapApiFileInfo(raw: typeof FilesystemAdapter._ApiFileInfo): FileInfo {
-    const { path, size, created_at, modified_at, mode, owner, group, ...rest } =
+    const { path, type, size, created_at, modified_at, mode, owner, group, ...rest } =
       raw;
 
     return {
       ...rest,
       path,
+      type,
       size,
       mode,
       owner,
@@ -314,6 +318,22 @@ export class FilesystemAdapter implements SandboxFiles {
       params: { query: { path: paths } },
     });
     throwOnOpenApiFetchError({ error, response }, "Delete directories failed");
+  }
+
+  async listDirectory(entry: DirectoryListEntry): Promise<FileInfo[]> {
+    const { data, error, response } = await this.client.GET("/directories/list", {
+      params: { query: { path: entry.path, depth: entry.depth } },
+    });
+    throwOnOpenApiFetchError({ error, response }, "List directory failed");
+
+    const ok = data as typeof FilesystemAdapter.Api.ListDirectoryOk | undefined;
+    if (!ok) return [];
+    if (!Array.isArray(ok)) {
+      throw new Error(
+        `List directory failed: unexpected response shape (expected array, got ${typeof ok})`
+      );
+    }
+    return ok.map((x) => this.mapApiFileInfo(x));
   }
 
   async setPermissions(entries: SetPermissionEntry[]): Promise<void> {
@@ -500,11 +520,13 @@ export class FilesystemAdapter implements SandboxFiles {
 
   async readBytes(
     path: string,
-    opts?: { range?: string }
+    opts?: { range?: string; offset?: number; limit?: number }
   ): Promise<Uint8Array> {
-    const url =
+    let url =
       joinUrl(this.opts.baseUrl, "/files/download") +
       `?path=${encodeURIComponent(path)}`;
+    if (opts?.offset != null) url += `&offset=${opts.offset}`;
+    if (opts?.limit != null) url += `&limit=${opts.limit}`;
     const res = await this.fetch(url, {
       method: "GET",
       headers: {
@@ -532,18 +554,20 @@ export class FilesystemAdapter implements SandboxFiles {
 
   readBytesStream(
     path: string,
-    opts?: { range?: string }
+    opts?: { range?: string; offset?: number; limit?: number }
   ): AsyncIterable<Uint8Array> {
     return this.downloadStream(path, opts);
   }
 
   private async *downloadStream(
     path: string,
-    opts?: { range?: string }
+    opts?: { range?: string; offset?: number; limit?: number }
   ): AsyncIterable<Uint8Array> {
-    const url =
+    let url =
       joinUrl(this.opts.baseUrl, "/files/download") +
       `?path=${encodeURIComponent(path)}`;
+    if (opts?.offset != null) url += `&offset=${opts.offset}`;
+    if (opts?.limit != null) url += `&limit=${opts.limit}`;
     const res = await this.fetch(url, {
       method: "GET",
       headers: {
@@ -578,9 +602,9 @@ export class FilesystemAdapter implements SandboxFiles {
 
   async readFile(
     path: string,
-    opts?: { encoding?: string; range?: string }
+    opts?: { encoding?: string; range?: string; offset?: number; limit?: number }
   ): Promise<string> {
-    const bytes = await this.readBytes(path, { range: opts?.range });
+    const bytes = await this.readBytes(path, { range: opts?.range, offset: opts?.offset, limit: opts?.limit });
     const encoding = opts?.encoding ?? "utf-8";
     return new TextDecoder(encoding).decode(bytes);
   }

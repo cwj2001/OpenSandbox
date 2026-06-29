@@ -36,6 +36,7 @@ from opensandbox.exceptions import (
 from opensandbox.models.diagnostics import DiagnosticContent
 from opensandbox.models.sandboxes import (
     CreateSnapshotRequest,
+    CredentialProxyConfig,
     NetworkPolicy,
     NetworkRule,
     PlatformSpec,
@@ -49,10 +50,12 @@ from opensandbox.models.sandboxes import (
 )
 from opensandbox.services import (
     Commands,
+    CredentialVault,
     Diagnostics,
     Egress,
     Filesystem,
     Health,
+    IsolationService,
     Metrics,
     Sandboxes,
 )
@@ -121,6 +124,7 @@ class Sandbox:
         egress_service: Egress,
         connection_config: ConnectionConfig,
         diagnostics_service: Diagnostics | None = None,
+        isolated_service: IsolationService | None = None,
         custom_health_check: Callable[["Sandbox"], Awaitable[bool]] | None = None,
     ) -> None:
         """
@@ -138,6 +142,16 @@ class Sandbox:
             connection_config
         ).create_diagnostics_service()
         self._custom_health_check = custom_health_check
+        self._isolated_service = isolated_service
+
+    @property
+    def isolation(self) -> IsolationService:
+        """Provides access to namespace-isolated session operations (OSEP-0013)."""
+        if self._isolated_service is None:
+            raise SandboxInternalException(
+                "isolated service not initialized"
+            )
+        return self._isolated_service
 
     @property
     def files(self) -> Filesystem:
@@ -165,6 +179,13 @@ class Sandbox:
         Allows retrieving resource usage statistics (CPU, memory) and other performance metrics.
         """
         return self._metrics_service
+
+    @property
+    def credential_vault(self) -> CredentialVault:
+        """
+        Provides access to sandbox-scoped Credential Vault operations.
+        """
+        return self._egress_service
 
     @property
     def diagnostics(self) -> Diagnostics:
@@ -477,8 +498,10 @@ class Sandbox:
         env: dict[str, str] | None = None,
         metadata: dict[str, str] | None = None,
         resource: dict[str, str] | None = None,
+        resource_requests: dict[str, str] | None = None,
         platform: PlatformSpec | None = None,
         network_policy: NetworkPolicy | None = None,
+        credential_proxy: CredentialProxyConfig | None = None,
         extensions: dict[str, str] | None = None,
         secure_access: bool = False,
         entrypoint: list[str] | None = None,
@@ -499,6 +522,7 @@ class Sandbox:
             metadata: Custom metadata for the sandbox
             resource: Resource limits (CPU, memory, etc.)
             network_policy: Optional outbound network policy (egress).
+            credential_proxy: Optional Credential Vault proxy startup settings.
             extensions: Opaque extension parameters passed through to the server as-is.
                 Prefer namespaced keys (e.g. ``storage.id``).
             secure_access: Whether to enable secured access for sandbox endpoints.
@@ -552,11 +576,13 @@ class Sandbox:
                 timeout=timeout,
                 resource=resource,
                 network_policy=network_policy,
+                credential_proxy=credential_proxy,
                 extensions=extensions,
                 volumes=volumes,
                 platform=platform,
                 secure_access=secure_access,
                 snapshot_id=snapshot_id,
+                resource_requests=resource_requests,
             )
             sandbox_id = response.id
 
@@ -576,6 +602,7 @@ class Sandbox:
                 metrics_service=factory.create_metrics_service(execd_endpoint),
                 egress_service=factory.create_egress_service(egress_endpoint),
                 diagnostics_service=factory.create_diagnostics_service(),
+                isolated_service=factory.create_isolated_session_service(execd_endpoint),
                 connection_config=config,
                 custom_health_check=health_check,
             )
@@ -673,6 +700,7 @@ class Sandbox:
                 metrics_service=factory.create_metrics_service(execd_endpoint),
                 egress_service=factory.create_egress_service(egress_endpoint),
                 diagnostics_service=factory.create_diagnostics_service(),
+                isolated_service=factory.create_isolated_session_service(execd_endpoint),
                 connection_config=config,
                 custom_health_check=health_check,
             )
@@ -749,6 +777,7 @@ class Sandbox:
                 metrics_service=factory.create_metrics_service(execd_endpoint),
                 egress_service=factory.create_egress_service(egress_endpoint),
                 diagnostics_service=factory.create_diagnostics_service(),
+                isolated_service=factory.create_isolated_session_service(execd_endpoint),
                 connection_config=config,
                 custom_health_check=health_check,
             )

@@ -95,6 +95,42 @@ class TakeIdleResult:
     discarded_alive_sandbox_ids: tuple[str, ...] = ()
 
 
+class PooledSandboxCreateReason(Enum):
+    """Why the pool is creating a sandbox."""
+
+    WARMUP = "WARMUP"
+    DIRECT_CREATE = "DIRECT_CREATE"
+
+
+@dataclass(frozen=True)
+class PooledSandboxCreateContext:
+    """Context passed to a sandbox creator when the pool needs a new sandbox."""
+
+    pool_name: str
+    owner_id: str
+    idle_timeout: timedelta
+    reason: PooledSandboxCreateReason
+    ready_timeout: timedelta
+    health_check_polling_interval: timedelta
+    skip_health_check: bool
+    health_check: (
+        Callable[[SandboxSync], bool] | Callable[[Sandbox], Awaitable[bool]] | None
+    )
+    connection_config: ConnectionConfigSync | ConnectionConfig
+
+
+class PooledSandboxCreator(Protocol):
+    """Creates a sandbox for the pool."""
+
+    def __call__(self, context: PooledSandboxCreateContext) -> SandboxSync: ...
+
+
+class AsyncPooledSandboxCreator(Protocol):
+    """Async counterpart of :class:`PooledSandboxCreator`."""
+
+    async def __call__(self, context: PooledSandboxCreateContext) -> Sandbox: ...
+
+
 @dataclass(frozen=True)
 class PoolSnapshot:
     state: PoolState
@@ -219,6 +255,7 @@ class PoolConfig:
     idle_timeout: timedelta = timedelta(hours=24)
     drain_timeout: timedelta = timedelta(seconds=30)
     acquire_min_remaining_ttl: timedelta | None = None
+    sandbox_creator: PooledSandboxCreator | None = None
 
     def __post_init__(self) -> None:
         owner_id = self.owner_id or f"pool-owner-{uuid4()}"
@@ -237,7 +274,9 @@ class PoolConfig:
         if self.degraded_threshold <= 0:
             raise ValueError("degraded_threshold must be positive")
         _require_positive(self.primary_lock_ttl, "primary_lock_ttl must be positive")
-        _require_positive(self.reconcile_interval, "reconcile_interval must be positive")
+        _require_positive(
+            self.reconcile_interval, "reconcile_interval must be positive"
+        )
         _require_positive(
             self.acquire_ready_timeout, "acquire_ready_timeout must be positive"
         )
@@ -291,6 +330,7 @@ class AsyncPoolConfig:
     idle_timeout: timedelta = timedelta(hours=24)
     drain_timeout: timedelta = timedelta(seconds=30)
     acquire_min_remaining_ttl: timedelta | None = None
+    sandbox_creator: AsyncPooledSandboxCreator | None = None
 
     def __post_init__(self) -> None:
         owner_id = self.owner_id or f"pool-owner-{uuid4()}"
@@ -309,7 +349,9 @@ class AsyncPoolConfig:
         if self.degraded_threshold <= 0:
             raise ValueError("degraded_threshold must be positive")
         _require_positive(self.primary_lock_ttl, "primary_lock_ttl must be positive")
-        _require_positive(self.reconcile_interval, "reconcile_interval must be positive")
+        _require_positive(
+            self.reconcile_interval, "reconcile_interval must be positive"
+        )
         _require_positive(
             self.acquire_ready_timeout, "acquire_ready_timeout must be positive"
         )
@@ -434,7 +476,11 @@ def _default_acquire_min_remaining_ttl(idle_timeout: timedelta) -> timedelta:
     a config-time error from a hidden 60s default.
     """
     half = idle_timeout / 2
-    return _DEFAULT_ACQUIRE_MIN_REMAINING_TTL_CAP if _DEFAULT_ACQUIRE_MIN_REMAINING_TTL_CAP < half else half
+    return (
+        _DEFAULT_ACQUIRE_MIN_REMAINING_TTL_CAP
+        if _DEFAULT_ACQUIRE_MIN_REMAINING_TTL_CAP < half
+        else half
+    )
 
 
 def _require_acquire_min_remaining_ttl(

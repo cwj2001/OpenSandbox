@@ -1,6 +1,5 @@
 # OpenSandbox Code Interpreter SDK for C#
 
-English | [中文](README_zh.md)
 
 A C# SDK for code interpretation with OpenSandbox. Provides high-level APIs for executing code in multiple languages (Python, JavaScript, TypeScript, Go, Java, Bash) within secure sandbox environments.
 
@@ -40,8 +39,8 @@ try
     await using var sandbox = await Sandbox.CreateAsync(new SandboxCreateOptions
     {
         ConnectionConfig = config,
-        Image = "opensandbox/code-interpreter:v1.0.2",
-        Entrypoint = new[] { "/opt/opensandbox/code-interpreter.sh" },
+        Image = "opensandbox/code-interpreter:v1.1.0",
+        Entrypoint = new[] { "/opt/code-interpreter/code-interpreter.sh" },
         Env = new Dictionary<string, string>
         {
             ["PYTHON_VERSION"] = "3.11",
@@ -88,8 +87,8 @@ using var loggerFactory = LoggerFactory.Create(builder =>
 await using var sandbox = await Sandbox.CreateAsync(new SandboxCreateOptions
 {
     ConnectionConfig = new ConnectionConfig(),
-    Image = "opensandbox/code-interpreter:v1.0.2",
-    Entrypoint = new[] { "/opt/opensandbox/code-interpreter.sh" },
+    Image = "opensandbox/code-interpreter:v1.1.0",
+    Entrypoint = new[] { "/opt/code-interpreter/code-interpreter.sh" },
     Diagnostics = new SdkDiagnosticsOptions
     {
         LoggerFactory = loggerFactory

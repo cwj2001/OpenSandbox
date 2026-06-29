@@ -104,10 +104,9 @@ func startMitmproxyTransparentIfEnabled() (*mitmTransparent, error) {
 	}
 
 	cfg := mitmproxy.Config{
-		ListenPort: mpPort,
-		UserName:   mitmproxy.RunAsUser,
-		ConfDir:    strings.TrimSpace(os.Getenv(constants.EnvMitmproxyConfDir)),
-		ScriptPath: strings.TrimSpace(os.Getenv(constants.EnvMitmproxyScript)),
+		ListenPort:  mpPort,
+		UserName:    mitmproxy.RunAsUser,
+		ScriptPaths: parseScriptPaths(os.Getenv(constants.EnvMitmproxyScript)),
 	}
 	// Buffer absorbs OnExit events from a retry storm so OnExit goroutines
 	// don't all park waiting for the watcher to drain. Correctness does not
@@ -131,8 +130,7 @@ func startMitmproxyTransparentIfEnabled() (*mitmTransparent, error) {
 	}
 	log.Infof("mitmproxy: transparent intercept active (OUTPUT tcp 80,443 -> %d; trust mitm CA in clients)", mpPort)
 
-	confDir := strings.TrimSpace(os.Getenv(constants.EnvMitmproxyConfDir))
-	if err := mitmproxy.SyncRootCA(confDir, mpHome); err != nil {
+	if err := mitmproxy.SyncRootCA("", mpHome); err != nil {
 		return nil, fmt.Errorf("mitm CA export: %w", err)
 	}
 	return &mitmTransparent{
@@ -242,4 +240,18 @@ func (m *mitmTransparent) restartWithBackoff(ctx context.Context, gate *mitmprox
 			}
 		}
 	}
+}
+
+func parseScriptPaths(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if s := strings.TrimSpace(p); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }

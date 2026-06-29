@@ -52,6 +52,25 @@ func (s *Sandbox) SearchFiles(ctx context.Context, dir, pattern string) ([]FileI
 	return s.execd.SearchFiles(ctx, dir, pattern)
 }
 
+// ListDirectory lists the immediate children of the given directory using
+// the server-side default depth (1). Use ListDirectoryWithDepth to override.
+func (s *Sandbox) ListDirectory(ctx context.Context, path string) ([]FileInfo, error) {
+	if s.execd == nil {
+		return nil, fmt.Errorf("opensandbox: execd client not initialized")
+	}
+	return s.execd.ListDirectory(ctx, path)
+}
+
+// ListDirectoryWithDepth lists directory contents up to the given depth.
+// depth=0 returns an empty slice; depth=1 lists immediate children; larger
+// values include descendants up to that many levels below path.
+func (s *Sandbox) ListDirectoryWithDepth(ctx context.Context, path string, depth int) ([]FileInfo, error) {
+	if s.execd == nil {
+		return nil, fmt.Errorf("opensandbox: execd client not initialized")
+	}
+	return s.execd.ListDirectoryWithDepth(ctx, path, depth)
+}
+
 // SetPermissions changes file permissions.
 func (s *Sandbox) SetPermissions(ctx context.Context, req PermissionsRequest) error {
 	if s.execd == nil {
@@ -77,11 +96,11 @@ func (s *Sandbox) UploadFiles(ctx context.Context, entries []UploadFileEntry) er
 }
 
 // DownloadFile downloads a file from the sandbox.
-func (s *Sandbox) DownloadFile(ctx context.Context, remotePath, rangeHeader string) (io.ReadCloser, error) {
+func (s *Sandbox) DownloadFile(ctx context.Context, remotePath, rangeHeader string, opts ...DownloadFileOptions) (io.ReadCloser, error) {
 	if s.execd == nil {
 		return nil, fmt.Errorf("opensandbox: execd client not initialized")
 	}
-	return s.execd.DownloadFile(ctx, remotePath, rangeHeader)
+	return s.execd.DownloadFile(ctx, remotePath, rangeHeader, opts...)
 }
 
 // CreateDirectory creates a directory in the sandbox.

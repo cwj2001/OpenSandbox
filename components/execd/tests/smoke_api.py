@@ -224,6 +224,18 @@ def filesystem_smoke():
     info = session.get(f"{BASE_URL}/files/info", params={"path": [file_path]}, timeout=10)
     expect(info.status_code == 200, f"info failed: {info.status_code} {info.text}")
 
+    # list directory contents
+    listed = session.get(f"{BASE_URL}/directories/list", params={"path": sub_dir}, timeout=10)
+    expect(listed.status_code == 200, f"list directory failed: {listed.status_code} {listed.text}")
+    listed_file = None
+    for entry in listed.json():
+        p = entry.get("path")
+        if p and pathlib.Path(p).resolve() == pathlib.Path(file_path).resolve():
+            listed_file = entry
+            break
+    expect(listed_file is not None, "directory list did not find file")
+    expect(listed_file.get("type") == "file", f"directory list file type mismatch: {listed_file}")
+
     # search
     search = session.get(f"{BASE_URL}/files/search", params={"path": base_dir, "pattern": "*.txt"}, timeout=10)
     expect(search.status_code == 200, f"search failed: {search.status_code} {search.text}")

@@ -25,7 +25,10 @@ import json
 import logging
 import os
 import socket
-from typing import Any, Optional
+import time
+import urllib.error
+import urllib.request
+from typing import Any, Dict, Optional
 
 from docker.errors import DockerException, NotFound as DockerNotFound
 from fastapi import HTTPException, status
@@ -34,7 +37,9 @@ from opensandbox_server.api.schema import Endpoint, NetworkPolicy
 from opensandbox_server.services.constants import (
     EGRESS_MODE_ENV,
     EGRESS_RULES_ENV,
+    OPENSANDBOX_EGRESS_MITMPROXY_TRANSPARENT,
     OPENSANDBOX_EGRESS_TOKEN,
+    OPENSANDBOX_RUNTIME_MOUNT_PATH,
     SANDBOX_EGRESS_AUTH_TOKEN_METADATA_KEY,
     SANDBOX_EMBEDDING_PROXY_PORT_LABEL,
     SANDBOX_HTTP_PORT_LABEL,
@@ -48,7 +53,7 @@ from opensandbox_server.services.endpoint_auth import (
     build_egress_auth_headers,
     merge_endpoint_headers,
 )
-from opensandbox_server.services.validators import ensure_egress_configured
+from opensandbox_server.services.validators import ensure_egress_configured, ensure_egress_runtime_compatible
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +139,7 @@ class DockerNetworkingMixin:
 
         # Common validation: egress.image must be configured
         ensure_egress_configured(request.network_policy, self.app_config.egress)
+        ensure_egress_runtime_compatible(request.network_policy, self.app_config.secure_runtime)
 
     def _ensure_secure_access_support(self, request) -> None:
         """Validate that secure access can be honored under the current Docker runtime."""
@@ -203,6 +209,7 @@ class DockerNetworkingMixin:
                     self._resolve_proxy_host(),
                     labels,
                     port,
+                    include_egress_auth_headers=False,
                 )
             return self._resolve_internal_endpoint(container, port)
 
@@ -212,7 +219,7 @@ class DockerNetworkingMixin:
             endpoint = Endpoint(endpoint=f"{public_host}:{port}")
             container = self._get_container_by_sandbox_id(sandbox_id)
             labels = container.attrs.get("Config", {}).get("Labels") or {}
-            self._attach_egress_auth_headers(endpoint, labels)
+            self._attach_egress_auth_headers(endpoint, labels, port)
             return endpoint
 
         # non-host mode (bridge / user-defined network)
@@ -225,6 +232,8 @@ class DockerNetworkingMixin:
         public_host: str,
         labels: dict[str, str],
         port: int,
+        *,
+        include_egress_auth_headers: bool = True,
     ) -> Endpoint:
         execd_host_port = self._parse_host_port_label(
             labels.get(SANDBOX_EMBEDDING_PROXY_PORT_LABEL),
@@ -245,7 +254,8 @@ class DockerNetworkingMixin:
                     },
                 )
             endpoint = Endpoint(endpoint=f"{public_host}:{http_host_port}")
-            self._attach_egress_auth_headers(endpoint, labels)
+            if include_egress_auth_headers:
+                self._attach_egress_auth_headers(endpoint, labels, port)
             return endpoint
 
         if execd_host_port is None:
@@ -258,14 +268,18 @@ class DockerNetworkingMixin:
             )
 
         endpoint = Endpoint(endpoint=f"{public_host}:{execd_host_port}/proxy/{port}")
-        self._attach_egress_auth_headers(endpoint, labels)
+        if include_egress_auth_headers:
+            self._attach_egress_auth_headers(endpoint, labels, port)
         return endpoint
 
     def _attach_egress_auth_headers(
         self,
         endpoint: Endpoint,
         labels: dict[str, str],
+        port: int,
     ) -> None:
+        if port != 18080:
+            return
         token = labels.get(SANDBOX_EGRESS_AUTH_TOKEN_METADATA_KEY)
         if not token:
             return
@@ -354,6 +368,10 @@ class DockerNetworkingMixin:
         host_execd_port: int,
         host_http_port: int,
         extra_port_bindings: Optional[dict[str, tuple[str, int]]] = None,
+        egress_api_host_port: Optional[int] = None,
+        runtime_volume_name: Optional[str] = None,
+        credential_proxy_enabled: bool = False,
+        extra_env: Optional[Dict[str, Optional[str]]] = None,
     ):
         sidecar_name = f"sandbox-egress-{sandbox_id}"
         sidecar_labels = {
@@ -374,6 +392,14 @@ class DockerNetworkingMixin:
             f"{EGRESS_MODE_ENV}={egress_mode}",
             f"{OPENSANDBOX_EGRESS_TOKEN}={egress_token}",
         ]
+        if credential_proxy_enabled:
+            sidecar_env.append(f"{OPENSANDBOX_EGRESS_MITMPROXY_TRANSPARENT}=true")
+
+        if extra_env:
+            skip_keys = {OPENSANDBOX_EGRESS_MITMPROXY_TRANSPARENT} if credential_proxy_enabled else set()
+            for key, value in extra_env.items():
+                if key not in skip_keys and value is not None:
+                    sidecar_env.append(f"{key}={value}")
 
         sidecar_port_bindings: dict[str, tuple[str, int]] = {
             "44772": ("0.0.0.0", host_execd_port),
@@ -387,6 +413,10 @@ class DockerNetworkingMixin:
             "cap_add": ["NET_ADMIN"],
             "port_bindings": normalize_port_bindings(sidecar_port_bindings),
         }
+        if runtime_volume_name:
+            sidecar_host_config_kwargs["binds"] = [
+                f"{runtime_volume_name}:{OPENSANDBOX_RUNTIME_MOUNT_PATH}:rw"
+            ]
         if self.app_config.egress.disable_ipv6:
             # Optional: disable IPv6 in the shared namespace when egress.disable_ipv6 is set.
             sidecar_host_config_kwargs["sysctls"] = {
@@ -424,6 +454,12 @@ class DockerNetworkingMixin:
             sidecar_container = self.docker_client.containers.get(sidecar_container_id)
             with self._docker_operation("start egress sidecar", sandbox_id):
                 sidecar_container.start()
+            if egress_api_host_port is not None:
+                self._wait_for_egress_sidecar_ready(
+                    sandbox_id,
+                    egress_api_host_port,
+                    egress_token,
+                )
             return sidecar_container
         except Exception as exc:
             if sidecar_container is not None:
@@ -455,6 +491,45 @@ class DockerNetworkingMixin:
                     "message": "Egress sidecar container failed to start.",
                 },
             ) from exc
+
+    def _wait_for_egress_sidecar_ready(
+        self,
+        sandbox_id: str,
+        host_port: int,
+        egress_token: str,
+        timeout_seconds: float = 30.0,
+    ) -> None:
+        deadline = time.monotonic() + timeout_seconds
+        url = f"http://{self._resolve_proxy_host()}:{host_port}/healthz"
+        last_error: Exception | None = None
+        while time.monotonic() < deadline:
+            request = urllib.request.Request(
+                url,
+                headers=build_egress_auth_headers(egress_token),
+                method="GET",
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=1.0) as response:  # nosec B310 - local Docker endpoint
+                    if 200 <= response.status < 300:
+                        return
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                if exc.code >= 500:
+                    time.sleep(0.2)
+                    continue
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+            time.sleep(0.2)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": SandboxErrorCodes.CONTAINER_START_FAILED,
+                "message": (
+                    f"Egress sidecar did not become ready within {timeout_seconds:.0f}s "
+                    f"for sandbox {sandbox_id}: {last_error}"
+                ),
+            },
+        )
 
     @staticmethod
     def _parse_host_port_label(value: Optional[str], label_name: str) -> Optional[int]:

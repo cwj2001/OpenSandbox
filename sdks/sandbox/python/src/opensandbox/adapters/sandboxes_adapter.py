@@ -40,6 +40,7 @@ from opensandbox.api.lifecycle.types import UNSET
 from opensandbox.config import ConnectionConfig
 from opensandbox.models.sandboxes import (
     CreateSnapshotRequest,
+    CredentialProxyConfig,
     NetworkPolicy,
     PagedSandboxInfos,
     PagedSnapshotInfos,
@@ -127,6 +128,8 @@ class SandboxesAdapter(Sandboxes):
         platform: PlatformSpec | None = None,
         secure_access: bool = False,
         snapshot_id: str | None = None,
+        credential_proxy: CredentialProxyConfig | None = None,
+        resource_requests: dict[str, str] | None = None,
     ) -> SandboxCreateResponse:
         """Create a new sandbox instance with the specified configuration."""
         logger.info(
@@ -146,10 +149,12 @@ class SandboxesAdapter(Sandboxes):
                 resource=resource,
                 platform=platform,
                 network_policy=network_policy,
+                credential_proxy=credential_proxy,
                 extensions=extensions,
                 volumes=volumes,
                 secure_access=secure_access,
                 snapshot_id=snapshot_id,
+                resource_requests=resource_requests,
             )
 
             client = await self._get_client()

@@ -25,6 +25,7 @@ from opensandbox_cli import __version__
 from opensandbox_cli.client import ClientContext
 from opensandbox_cli.commands.command import command_group
 from opensandbox_cli.commands.config_cmd import config_group
+from opensandbox_cli.commands.credential_vault import credential_vault_group
 from opensandbox_cli.commands.devops import devops_group
 from opensandbox_cli.commands.diagnostics import diagnostics_group
 from opensandbox_cli.commands.egress import egress_group
@@ -134,6 +135,7 @@ cli.add_command(sandbox_group)
 cli.add_command(command_group)
 cli.add_command(file_group)
 cli.add_command(egress_group)
+cli.add_command(credential_vault_group)
 cli.add_command(config_group)
 cli.add_command(diagnostics_group)
 cli.add_command(devops_group)

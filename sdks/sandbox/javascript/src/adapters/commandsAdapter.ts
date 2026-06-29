@@ -38,8 +38,6 @@ type ApiRunCommandRequest =
   ExecdPaths["/command"]["post"]["requestBody"]["content"]["application/json"];
 type ApiCommandStatusOk =
   ExecdPaths["/command/status/{id}"]["get"]["responses"][200]["content"]["application/json"];
-type ApiCommandLogsOk =
-  ExecdPaths["/command/{id}/logs"]["get"]["responses"][200]["content"]["text/plain"];
 type ApiCreateSessionRequest =
   NonNullable<ExecdPaths["/session"]["post"]["requestBody"]>["content"]["application/json"];
 type ApiCreateSessionOk =
@@ -249,14 +247,20 @@ export class CommandsAdapter implements ExecdCommands {
       parseAs: "text",
     });
     throwOnOpenApiFetchError({ error, response }, "Get command logs failed");
-    const ok = data as ApiCommandLogsOk | undefined;
-    if (typeof ok !== "string") {
+
+    let content: string;
+    if (typeof data === "string") {
+      content = data;
+    } else if (data == null && response.ok) {
+      content = "";
+    } else {
       throw new Error("Get command logs failed: unexpected response shape");
     }
+
     const cursorHeader = response.headers.get("EXECD-COMMANDS-TAIL-CURSOR");
-    const parsedCursor = (cursorHeader != null && cursorHeader !== "") ? Number(cursorHeader) : undefined;
+    const parsedCursor = cursorHeader != null && cursorHeader !== "" ? Number(cursorHeader) : undefined;
     return {
-      content: ok,
+      content,
       cursor: Number.isFinite(parsedCursor ?? NaN) ? parsedCursor : undefined,
     };
   }

@@ -1210,10 +1210,20 @@ components:
         resourceLimits:
           $ref: '#/components/schemas/ResourceLimits'
           description: |
-            Runtime resource constraints for the sandbox instance.
+            Runtime resource constraints (hard caps) for the sandbox instance.
             Required when `extensions.poolRef` is not set.
             Optional when using pool mode (resource limits are defined by the Pool CRD template).
             SDK clients should provide sensible defaults (e.g., cpu: "500m", memory: "512Mi").
+
+        resourceRequests:
+          $ref: '#/components/schemas/ResourceLimits'
+          description: |
+            Resource reservations (guaranteed minimums) for the sandbox instance.
+            When provided, these values are used as Kubernetes resource `requests`,
+            enabling Burstable QoS class (where `requests < limits`).
+            When omitted, `resourceLimits` values are used for both limits and requests,
+            resulting in Guaranteed QoS class.
+            Only meaningful for Kubernetes-based runtimes; ignored by Docker runtime.
 
         env:
           type: object
@@ -1271,6 +1281,14 @@ components:
             Optional outbound network policy for the sandbox.
             Shape matches the sidecar `/policy` endpoint. If omitted or empty,
             the sidecar starts in allow-all mode until updated.
+
+        credentialProxy:
+          $ref: '#/components/schemas/CredentialProxyConfig'
+          description: |
+            Optional Credential Vault proxy startup settings. Set `enabled: true`
+            to enable transparent MITM support for credential injection. Plain
+            `networkPolicy` does not enable transparent MITM unless this option
+            is set.
 
         secureAccess:
           type: boolean
@@ -1406,6 +1424,22 @@ components:
             $ref: '#/components/schemas/NetworkRule'
       additionalProperties: false
 
+    CredentialProxyConfig:
+      type: object
+      description: |
+        Credential Vault proxy startup settings. This is an explicit opt-in for
+        transparent MITM support used by credential injection; plain egress
+        network policy remains DNS/FQDN policy enforcement only.
+      properties:
+        enabled:
+          type: boolean
+          default: false
+          description: |
+            When true, the server starts the egress sidecar with transparent
+            MITM enabled and installs the runtime-managed MITM CA bundle into
+            the sandbox container. Requires `networkPolicy`.
+      additionalProperties: false
+
     NetworkRule:
       type: object
       properties:
@@ -1514,9 +1548,9 @@ components:
           description: |
             When true, the volume is automatically removed when the sandbox
             is deleted. Only applies to volumes that were auto-created by the
-            server (Docker only). Pre-existing volumes are never removed.
-            Has no effect on Kubernetes PVCs, whose lifecycle is managed by
-            the StorageClass reclaim policy.
+            server on this request; pre-existing volumes are never removed.
+            For Kubernetes, the resulting PVC delete triggers the bound PV's
+            StorageClass reclaim policy (`Retain`/`Delete`).
         storageClass:
           type: string
           nullable: true

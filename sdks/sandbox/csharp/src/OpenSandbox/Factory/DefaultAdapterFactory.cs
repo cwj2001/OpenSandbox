@@ -71,12 +71,20 @@ public sealed class DefaultAdapterFactory : IAdapterFactory
             headers,
             options.LoggerFactory.CreateLogger("OpenSandbox.CommandsAdapter"));
 
+        var isolated = new IsolatedSessionsAdapter(
+            options.HttpClientProvider.HttpClient,
+            options.HttpClientProvider.SseHttpClient,
+            options.ExecdBaseUrl,
+            headers,
+            options.LoggerFactory.CreateLogger("OpenSandbox.IsolatedSessionsAdapter"));
+
         return new ExecdStack
         {
             Commands = commands,
             Files = files,
             Health = health,
-            Metrics = metrics
+            Metrics = metrics,
+            Isolation = isolated
         };
     }
 
@@ -91,9 +99,11 @@ public sealed class DefaultAdapterFactory : IAdapterFactory
             headers,
             options.LoggerFactory.CreateLogger("OpenSandbox.HttpClientWrapper"));
 
+        var egress = new EgressAdapter(clientWrapper);
         return new EgressStack
         {
-            Egress = new EgressAdapter(clientWrapper)
+            Egress = egress,
+            CredentialVault = egress
         };
     }
 }

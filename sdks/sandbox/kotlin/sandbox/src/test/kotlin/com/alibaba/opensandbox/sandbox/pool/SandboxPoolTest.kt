@@ -22,6 +22,7 @@ import com.alibaba.opensandbox.sandbox.config.ConnectionConfig
 import com.alibaba.opensandbox.sandbox.domain.exceptions.PoolAcquireFailedException
 import com.alibaba.opensandbox.sandbox.domain.exceptions.PoolEmptyException
 import com.alibaba.opensandbox.sandbox.domain.exceptions.PoolNotRunningException
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.CredentialProxyConfig
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.Host
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.NetworkPolicy
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.NetworkRule
@@ -33,6 +34,7 @@ import com.alibaba.opensandbox.sandbox.domain.pool.PoolCreationSpec
 import com.alibaba.opensandbox.sandbox.domain.pool.PoolLifecycleState
 import com.alibaba.opensandbox.sandbox.domain.pool.PoolState
 import com.alibaba.opensandbox.sandbox.domain.pool.PoolStateStore
+import com.alibaba.opensandbox.sandbox.domain.pool.PooledSandboxCreator
 import com.alibaba.opensandbox.sandbox.domain.pool.SandboxPreparer
 import com.alibaba.opensandbox.sandbox.domain.pool.StoreCounters
 import com.alibaba.opensandbox.sandbox.infrastructure.pool.InMemoryPoolStateStore
@@ -406,6 +408,22 @@ class SandboxPoolTest {
     }
 
     @Test
+    fun `applyToBuilder propagates pool creation spec credential proxy to sandbox builder`() {
+        val credentialProxy = CredentialProxyConfig.enabled()
+        val spec =
+            PoolCreationSpec.builder()
+                .image("ubuntu:22.04")
+                .credentialProxy(credentialProxy)
+                .build()
+
+        val builder = spec.applyToBuilder(Sandbox.builder())
+
+        val credentialProxyField = builder.javaClass.getDeclaredField("credentialProxy")
+        credentialProxyField.isAccessible = true
+        assertSame(credentialProxy, credentialProxyField.get(builder))
+    }
+
+    @Test
     fun `pool creation spec builder convenience methods align with sandbox builder semantics`() {
         val volume =
             Volume.builder()
@@ -486,6 +504,7 @@ class SandboxPoolTest {
     @Test
     fun `sandbox pool builder forwards acquire readiness settings into config`() {
         val healthCheck: (Sandbox) -> Boolean = { true }
+        val sandboxCreator = PooledSandboxCreator { mockk<Sandbox>() }
         val pool =
             SandboxPool.builder()
                 .poolName("test-pool")
@@ -499,6 +518,7 @@ class SandboxPoolTest {
                 .acquireHealthCheck(healthCheck)
                 .acquireSkipHealthCheck()
                 .acquireMinRemainingTtl(Duration.ofSeconds(90))
+                .sandboxCreator(sandboxCreator)
                 .idleTimeout(Duration.ofMinutes(15))
                 .build()
 
@@ -511,6 +531,7 @@ class SandboxPoolTest {
         assertSame(healthCheck, config.acquireHealthCheck)
         assertEquals(true, config.acquireSkipHealthCheck)
         assertEquals(Duration.ofSeconds(90), config.acquireMinRemainingTtl)
+        assertSame(sandboxCreator, config.sandboxCreator)
         assertEquals(Duration.ofMinutes(15), config.idleTimeout)
     }
 
@@ -550,6 +571,39 @@ class SandboxPoolTest {
             assertEquals(3, store.maxIdleByPool["test-pool"])
             assertEquals(listOf("test-pool" to 3), store.setMaxIdleCalls)
             assertEquals(3, pool.snapshot().maxIdle)
+        } finally {
+            pool.shutdown(graceful = false)
+        }
+    }
+
+    @Test
+    fun `custom direct create kills and closes when renew fails`() {
+        val sandbox = mockk<Sandbox>()
+        every { sandbox.renew(Duration.ofMinutes(5)) } throws RuntimeException("renew failed")
+        every { sandbox.kill() } just runs
+        every { sandbox.close() } just runs
+
+        val pool =
+            SandboxPool.builder()
+                .poolName("test-pool")
+                .ownerId("test-owner")
+                .maxIdle(0)
+                .stateStore(InMemoryPoolStateStore())
+                .connectionConfig(ConnectionConfig.builder().build())
+                .creationSpec(PoolCreationSpec.builder().image("ubuntu:22.04").build())
+                .sandboxCreator(PooledSandboxCreator { sandbox })
+                .drainTimeout(Duration.ofMillis(50))
+                .reconcileInterval(Duration.ofSeconds(30))
+                .build()
+        pool.start()
+
+        try {
+            assertThrows(RuntimeException::class.java) {
+                pool.acquire(Duration.ofMinutes(5))
+            }
+
+            verify(exactly = 1) { sandbox.kill() }
+            verify(exactly = 1) { sandbox.close() }
         } finally {
             pool.shutdown(graceful = false)
         }

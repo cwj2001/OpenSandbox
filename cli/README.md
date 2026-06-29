@@ -6,6 +6,7 @@
 - run commands inside a sandbox
 - read and modify sandbox files
 - inspect runtime egress policy
+- manage sandbox-local Credential Vault state
 - collect low-level diagnostics
 - install OpenSandbox-specific skills for coding agents
 
@@ -148,6 +149,12 @@ osb sandbox create \
   --volumes-file volumes.json
 ```
 
+Create with Credential Vault proxy enabled:
+
+```bash
+osb sandbox create --image python:3.12 --network-policy-file network-policy.json --credential-proxy -o json
+```
+
 ### List and inspect sandboxes
 
 ```bash
@@ -221,6 +228,24 @@ If you are debugging connectivity, verify behavior with an actual command:
 ```bash
 osb command run <sandbox-id> -o raw -- curl -I https://pypi.org
 ```
+
+### Manage Credential Vault
+
+Credential Vault operations call the sandbox egress sidecar through the Python SDK.
+Create the sandbox with `--credential-proxy` and an explicit network policy before
+writing vault state.
+
+```bash
+osb credential-vault create <sandbox-id> --file vault.yaml -o json
+osb credential-vault get <sandbox-id> -o json
+osb credential-vault patch <sandbox-id> --file mutation.yaml -o json
+osb credential-vault credential list <sandbox-id> -o json
+osb credential-vault binding list <sandbox-id> -o json
+osb credential-vault delete <sandbox-id> -o json
+```
+
+Use `--file -` to read a JSON/YAML payload from stdin. Do not pass plaintext
+credential values as command-line flags; keep them in the payload stream or file.
 
 ### Collect diagnostics
 

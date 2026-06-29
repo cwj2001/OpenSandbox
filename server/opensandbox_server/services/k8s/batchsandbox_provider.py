@@ -28,6 +28,8 @@ from opensandbox_server.config import (
     EGRESS_MODE_DNS,
     INGRESS_MODE_GATEWAY,
 )
+from opensandbox_server.extensions.keys import BOOTSTRAP_EXECD_ISOLATION_KEY
+from opensandbox_server.services.constants import OPENSANDBOX_EGRESS_MITMPROXY_TRANSPARENT
 from opensandbox_server.services.helpers import format_ingress_endpoint
 from opensandbox_server.api.schema import Endpoint, ImageSpec, NetworkPolicy, PlatformSpec, Volume
 from opensandbox_server.services.k8s.image_pull_secret_helper import (
@@ -36,9 +38,8 @@ from opensandbox_server.services.k8s.image_pull_secret_helper import (
 )
 from opensandbox_server.services.k8s.batchsandbox_template import BatchSandboxTemplateManager
 from opensandbox_server.services.k8s.client import K8sClient
-from opensandbox_server.services.k8s.egress_helper import (
-    apply_egress_to_spec,
-)
+from opensandbox_server.services.k8s.egress_helper import apply_egress_to_spec
+from opensandbox_server.services.validators import ensure_egress_runtime_compatible
 from opensandbox_server.services.k8s.provider_common import (
     DEFAULT_ENTRYPOINT,
     _build_execd_init_container,
@@ -118,6 +119,9 @@ class BatchSandboxProvider(WorkloadProvider):
         annotations: Optional[Dict[str, str]] = None,
         egress_auth_token: Optional[str] = None,
         egress_mode: str = EGRESS_MODE_DNS,
+        credential_proxy_enabled: bool = False,
+        resource_requests: Optional[Dict[str, str]] = None,
+        egress_env: Optional[Dict[str, Optional[str]]] = None,
     ) -> Dict[str, Any]:
         """Create a BatchSandbox in template mode or pool mode."""
         extensions = extensions or {}
@@ -164,25 +168,37 @@ class BatchSandboxProvider(WorkloadProvider):
             disable_ipv6_for_egress=disable_ipv6_for_egress,
         )
         
+        main_env = dict(env)
+        if credential_proxy_enabled:
+            main_env[OPENSANDBOX_EGRESS_MITMPROXY_TRANSPARENT] = "true"
+
         main_container = _build_main_container(
             image_spec=image_spec,
             entrypoint=entrypoint,
-            env=env,
+            env=main_env,
             resource_limits=resource_limits,
             has_network_policy=network_policy is not None,
+            isolation_enabled=(extensions or {}).get(BOOTSTRAP_EXECD_ISOLATION_KEY) == "enable",
             image_pull_policy=self.image_pull_policy,
+            resource_requests=resource_requests or None,
         )
         
         containers = [_container_to_dict(main_container)]
+        pod_volumes = [
+            {
+                "name": "opensandbox-bin",
+                "emptyDir": {}
+            }
+        ]
+        if (extensions or {}).get(BOOTSTRAP_EXECD_ISOLATION_KEY) == "enable":
+            pod_volumes.append({
+                "name": "isolation-upper",
+                "emptyDir": {}
+            })
         pod_spec = {
             "initContainers": [_container_to_dict(init_container)],
             "containers": containers,
-            "volumes": [
-                {
-                    "name": "opensandbox-bin",
-                    "emptyDir": {}
-                }
-            ],
+            "volumes": pod_volumes,
         }
         if windows_profile:
             apply_windows_profile_overrides(
@@ -191,6 +207,7 @@ class BatchSandboxProvider(WorkloadProvider):
                 env=env,
                 resource_limits=resource_limits,
                 disable_ipv6_for_egress=disable_ipv6_for_egress,
+                resource_requests=resource_requests or None,
             )
             template = self.template_manager.get_base_template()
             template_spec = (
@@ -220,6 +237,8 @@ class BatchSandboxProvider(WorkloadProvider):
             egress_image=egress_image,
             egress_auth_token=egress_auth_token,
             egress_mode=egress_mode,
+            credential_proxy_enabled=credential_proxy_enabled,
+            extra_env=egress_env,
         )
 
         if volumes:
@@ -255,8 +274,12 @@ class BatchSandboxProvider(WorkloadProvider):
         else:
             batchsandbox["spec"]["expireTime"] = expires_at.isoformat()
         self._merge_pod_spec_extras(batchsandbox, extra_volumes, extra_mounts)
+        merged_pod_spec = batchsandbox.get("spec", {}).get("template", {}).get("spec", {})
+        ensure_egress_runtime_compatible(
+            network_policy,
+            effective_runtime_class=merged_pod_spec.get("runtimeClassName"),
+        )
         if platform is not None and not windows_profile:
-            merged_pod_spec = batchsandbox.get("spec", {}).get("template", {}).get("spec", {})
             WorkloadProvider.ensure_platform_compatible_with_affinity(merged_pod_spec, platform)
 
         created = self.k8s_client.create_custom_object(
@@ -297,6 +320,8 @@ class BatchSandboxProvider(WorkloadProvider):
         return {
             "name": created["metadata"]["name"],
             "uid": created["metadata"]["uid"],
+            "apiVersion": f"{self.group}/{self.version}",
+            "kind": "BatchSandbox",
         }
 
     def _apply_platform_node_selector(
@@ -331,6 +356,7 @@ class BatchSandboxProvider(WorkloadProvider):
         annotations: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """Create a BatchSandbox by referencing an existing pool."""
+        entrypoint = entrypoint or DEFAULT_ENTRYPOINT
         spec: Dict[str, Any] = {
             "replicas": 1,
             "poolRef": pool_ref,
@@ -364,6 +390,8 @@ class BatchSandboxProvider(WorkloadProvider):
         return {
             "name": created["metadata"]["name"],
             "uid": created["metadata"]["uid"],
+            "apiVersion": f"{self.group}/{self.version}",
+            "kind": "BatchSandbox",
         }
 
     def _extract_template_pod_extras(self) -> tuple[list[Dict[str, Any]], list[Dict[str, Any]]]:
@@ -440,7 +468,7 @@ class BatchSandboxProvider(WorkloadProvider):
     ) -> Dict[str, Any]:
         """Build pool taskTemplate with shell-escaped bootstrap command."""
         escaped_entrypoint = ' '.join(shlex.quote(arg) for arg in entrypoint)
-        user_process_cmd = f"/opt/opensandbox/bin/bootstrap.sh {escaped_entrypoint} &"
+        user_process_cmd = f"/opt/opensandbox/bootstrap.sh {escaped_entrypoint} &"
         
         wrapped_command = ["/bin/sh", "-c", user_process_cmd]
 
