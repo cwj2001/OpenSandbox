@@ -1,0 +1,29 @@
+docs/sdks/csharp.md
+  s_23571ca888d389::t_827bbca4d796e8 73-76
+docs/sdks/go.md
+  s_23571ca888d389::t_827bbca4d796e8 101-105
+docs/sdks/kotlin.md
+  s_23571ca888d389::t_827bbca4d796e8 87-90
+specs/execd-api.yaml
+  s_23571ca888d389::t_827bbca4d796e8 405-406,434
+docs/sdks/python.md
+  s_23571ca888d389::t_827bbca4d796e8 262-265
+docs/sdks/javascript.md
+  s_23571ca888d389::t_827bbca4d796e8 79-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "80a4f2644c9dd7b53571c42f30a302645847ef41",
+  "prompts": {},
+  "sessions": {
+    "s_23571ca888d389": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05684f4c6ffeqzxEC6ra05D12i",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
