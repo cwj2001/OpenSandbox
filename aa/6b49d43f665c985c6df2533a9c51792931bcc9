@@ -1,0 +1,19 @@
+docs/components/execd.md
+  s_3dea16c67a3e86::t_de8db017e1ea6c 92-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "aa6b49d43f665c985c6df2533a9c51792931bcc9",
+  "prompts": {},
+  "sessions": {
+    "s_3dea16c67a3e86": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0bb38afb8ffe1jX2OY4PsHhA4e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
