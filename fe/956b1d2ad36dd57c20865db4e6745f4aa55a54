@@ -7,6 +7,7 @@ components/execd/tests/test_smoke_api_inventory.py
   s_eded7d31f9080c::t_5ce5ffd5a7fea7 208-215
 sdks/sandbox/javascript/tests/types/execd-command-inventory.typecheck.ts
   s_2b2310473b07ca::t_fc9226ff2488da 1-16,22-33
+  s_3dea16c67a3e86::t_71750cc0691c9a 17-21,34-44
 sdks/sandbox/python/tests/test_generate_api.py
   s_52679175678012::t_d4584623831675 21,132,136-140,150-152,154,157,160-164,173-190
   s_52679175678012::t_d70385c46c922c 36-43,48,50-57,59-60,62-63,70-71,81,83,86-87,90-91,93,96-100,104,111,113-114,117-119,121,123-128,131,133-135,141-146,158-159,165-169
@@ -83,6 +84,7 @@ sdks/sandbox/python/tests/test_command_inventory_capability.py
   s_b473a40c774947::t_fbf94cc16eed8c 18
   s_b473a40c774947::t_af666580f56a47 34,89-90,92-95,100-101,103-106,118-119,121-124,129-130,132-135
   s_b473a40c774947::t_8d081d0ed2ec3b 20-27,30-31,37-39,41-88,91,96-99,102,107-117,120,125-128,131,136-144
+  s_3dea16c67a3e86::t_71750cc0691c9a 1-17,19,28-29,32-33,35-36,40
 sdks/sandbox/python/src/opensandbox/sandbox.py
   s_b473a40c774947::t_845108a8e30bf0 53,174-177
   s_b473a40c774947::t_7dd7b28c8476e0 25,178-180
@@ -104,6 +106,7 @@ sdks/sandbox/go/command_inventory_test.go
 .github/workflows/execd-test.yml
   s_c7832e666de498::t_da18032156e0e6 117-118,120-122
   s_eded7d31f9080c::t_7350fd83aff98c 115,119,123
+  s_3dea16c67a3e86::t_71750cc0691c9a 116
 sdks/sandbox/python/src/opensandbox/api/execd/models/command_pagination.py
   s_2f1745f4bbde6a::t_8679ee4bcc80a9 35
 sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/service/CommandsAdapter.kt
@@ -234,6 +237,14 @@ components/execd/pkg/runtime/command_inventory_test.go
         "tool": "opencode",
         "id": "ses_0606121f4ffeLenXfDDj5xHEQ3",
         "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_3dea16c67a3e86": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0bb38afb8ffe1jX2OY4PsHhA4e",
+        "model": "gpt-5.5"
       },
       "human_author": "weijia2.chen <weijia2.chen@ly.com>"
     },
