@@ -1,0 +1,274 @@
+specs/execd-api.yaml
+  s_830b9f617d5e26::t_77227e52471813 398-459,1915-1998
+  s_830b9f617d5e26::t_f58d01fed371fd 1999
+components/execd/pkg/runtime/command.go
+  s_9415b3e0b70cf8::t_bb60c46163f54d 277-278,282,284,379-380,383-384
+  s_c918f94692c511::t_b318de71d39df6 205,365
+components/execd/pkg/web/model/command.go
+  s_c1a2cfeaf2e46e::t_a71dc61184728b 29-31,33-59
+  s_c1a2cfeaf2e46e::t_a0cb00dbe99595 32
+components/execd/pkg/runtime/command_inventory_fuzz_test.go
+  s_03e03d056c8cec::t_5666c23b21def1 43
+  s_4d221a4399c535::t_c3e0a1d0234c29 20-24,26-35,44-45
+  s_03e03d056c8cec::t_fd178f139de447 1-19,25,36-42,46-48
+components/execd/pkg/runtime/command_inventory_test.go
+  s_c918f94692c511::t_9c8fcb288dc061 1037-1041
+  s_b5c00490621001::t_1d4b33cd7b3767 21,71,73,79-81,87-92,96-99,360,404-423,449,466,474,488,499-608
+  s_c918f94692c511::t_ebaa0b9295fa9a 24-25,971-972,1029-1036,1042-1062
+  s_03e03d056c8cec::t_d0168fc6616032 28-31,40-42,102,134,331,357
+  s_72091cb2dc5597::t_0bd1011841d79a 765,772
+  s_bf7e86648d4614::t_8c79c9f3822472 361-363,424-448,450-465,467-473,475-487,492-498
+  s_03e03d056c8cec::t_37c49d3b5a93e1 304
+  s_03e03d056c8cec::t_fd178f139de447 18-20,27,43-46,48-70,72,74-78,82-86,93-95,100-101,103-106,108-133,135,137-154,189-190,332-344,348-356,367-388,615-623
+  s_03e03d056c8cec::t_b48d20750a1829 47,107,136
+  s_ccd39396a429bf::t_a1341fa1b47583 644-645,647-707,709-759,761-764,766,768,773,775,777-839,842-843,845-865,867-886,891-892,895-902,911-943,947-953,957-969
+  s_ccd39396a429bf::t_152e05633f12ec 840-841,844
+  s_03e03d056c8cec::t_0312cd4ba7d836 273,276,279
+  s_464edb7e30f0e9::t_83527dc1ff9f3c 1-17,22-23,26,624-643,646,708,760,771,774,776,866,887-890,893-894,903-910,970,1063
+  s_03e03d056c8cec::t_407a40be466934 316,319-328
+  s_03e03d056c8cec::t_91b8e9bde95ea1 34-39,191-272,274-275,277-278,280-288,301-303,305-315,317-318,329-330,345-346,358-359,364-366,389-403,609-614
+  s_5b28ce0a861ec8::t_5390d43408f851 767,769-770
+  s_ccd39396a429bf::t_95327d093e5676 944-946,954-956
+  s_bf7e86648d4614::t_fabdc97851216c 489-491
+  s_03e03d056c8cec::t_cf6b33c6c8b5b1 32-33,155-188
+  s_644b3387898f55::t_c24d5861509f30 979-982,990-993,1001-1004
+  s_03e03d056c8cec::t_9e64edbb82ffde 289-300
+  s_03e03d056c8cec::t_7b7b61f4e73ccc 347
+  s_644b3387898f55::t_aaacda10ccc5b0 973-978,983-989,994-1000,1005-1028
+components/execd/pkg/runtime/command_status.go
+  s_c918f94692c511::t_7950ec66df0f77 115-117,126-127,138-147
+components/execd/go.mod
+  s_ccd39396a429bf::t_b924b805438f12 18
+components/execd/pkg/runtime/command_inventory_windows_test.go
+  s_c918f94692c511::t_3bf0b020728cdb 52,183,187-193,210,216,296-297
+  s_9415b3e0b70cf8::t_4480517b3e0e8e 48,75
+  s_f29e7fb9eb0470::t_664904049c5d7d 21,31-32,34-47,49-50,53-60,62-67,72-74,76,79-86,88-96,99-102,116-117,159,185-186,195,197-198,200,215,220,226,228,231,298-301,303
+  s_f29e7fb9eb0470::t_8b980c187d1c82 87,103-115,121,131-132,134-143,145-156,167,169-170,173-177,179-181,211-213,232-255,286-294
+  s_f29e7fb9eb0470::t_ffe6c654ecf2a7 120,122-130,133,144,157-158,160-166,178,182,256-285,295
+  s_9415b3e0b70cf8::t_9ae4bdbf5065cb 51,61,77-78,217-219,221-225,227,229-230
+  s_f29e7fb9eb0470::t_8fa864b876a656 68-71
+  s_9415b3e0b70cf8::t_b8d3f5b90b2120 97-98,118-119
+  s_f29e7fb9eb0470::t_6858868ee3cf6f 168,171-172
+  s_4f422f1247dd1d::t_2d4247e9bf36ed 214
+  s_c918f94692c511::t_ad546a08e8d9b1 1-20,22-30,33,184,194,196,199,201-209,302,304
+components/execd/pkg/web/controller/command_inventory_test.go
+  s_c1a2cfeaf2e46e::t_90d05766936c48 1-72,93,96,100-124,129-132,158,161-166,168-208
+  s_c1a2cfeaf2e46e::t_eb0d3b34987b76 154,157
+  s_c1a2cfeaf2e46e::t_3711a65b4ea562 73-92,94-95,97-99,125-128
+  s_c1a2cfeaf2e46e::t_bfad4f73d41243 133-153,155-156,159-160,167
+components/execd/pkg/flag/flags.go
+  s_c918f94692c511::t_7950ec66df0f77 45-50
+components/execd/pkg/web/controller/codeinterpreting_test.go
+  s_c1a2cfeaf2e46e::t_90d05766936c48 37,59-65,108-117,153,159,168
+  s_c1a2cfeaf2e46e::t_eb0d3b34987b76 163-164
+  s_c1a2cfeaf2e46e::t_3711a65b4ea562 118-121,124,129-133,160-161,166-167
+  s_c1a2cfeaf2e46e::t_bfad4f73d41243 122-123,125-128,134-152,154-158,162,165
+  s_c1a2cfeaf2e46e::t_e0dcd1f21f6fe5 169
+components/execd/pkg/runtime/command_inventory.go
+  s_03e03d056c8cec::t_d0168fc6616032 485,514-517,528,630,635
+  s_bf7e86648d4614::t_e784dd9c954f36 359-362,366
+  s_03e03d056c8cec::t_10188014fef867 462,466,574
+  s_ccd39396a429bf::t_c1461aa1dbc03d 313-319
+  s_83ed9d475e5043::t_0f002d2347ecd0 256-260,262
+  s_4d221a4399c535::t_522e177d2edfe7 91
+  s_03e03d056c8cec::t_5f71967dd27ef0 102-103,149,226-227,670-672
+  s_03e03d056c8cec::t_bfb1f30acac5aa 527,536,544
+  s_4d221a4399c535::t_19f49373d5cddd 599
+  s_03e03d056c8cec::t_6fd2d29d6ed3f1 365,367-369,371,391-395,415,419-423,455,470-473,475,499,520,551-571,582,584-587,594,601-603,605,609,614,616-620,622,692-699,701-702,715-716,718-722
+  s_ccd39396a429bf::t_b924b805438f12 1-17,22,24-26,29-30,92-101,104-105,117,120-124,127,129-135,138-143,150,152-153,158-161,196,199-209,214-218,222-224,231,233-234,237,251,253-255,275-284,291-295,299-304,306-311,324-339,731
+  s_03e03d056c8cec::t_9f100d4b11e0ad 505
+  s_c918f94692c511::t_7950ec66df0f77 106-116
+  s_03e03d056c8cec::t_c8a8cdf4516c00 439-442,457
+  s_b5c00490621001::t_1e43cbc308b315 136-137,197-198,363-364
+  s_c918f94692c511::t_3054f958e0b4cc 162-167,169,174
+  s_ccd39396a429bf::t_a6dfbbfb28d776 118-119,125-126,128,151,154-157,210-213,219-221,225,228-230,232,235-236,238-250,252,285-290,296-298,305,312,320-323
+  s_03e03d056c8cec::t_55e8cea13723f6 543,575,631-632
+  s_03e03d056c8cec::t_85fd02468e1ccf 18-21,23,31-90,261,263-274,340-358,370,372-390,396-414,416-418,424-438,443-454,456,458-461,463-465,467-469,474,476,481-484,486-498,500-504,506-513,518-519,521-526,529-535,537-542,545-550,572-573,576-581,583,588-593,595-598,604,606-608,610-613,615,621,623-629,633-634,636-669,673-691,700,703-714,717,723-730
+  s_4d221a4399c535::t_565994dab3c69f 477-480,600
+  s_9415b3e0b70cf8::t_bb60c46163f54d 177-195
+  s_c918f94692c511::t_a5c85e1e62933b 27-28
+  s_c918f94692c511::t_63896e1e26bb40 168,170-173,175-176
+  s_03e03d056c8cec::t_329933c9feceef 144-148
+components/execd/pkg/web/model/error.go
+  s_c1a2cfeaf2e46e::t_a71dc61184728b 21
+components/execd/pkg/web/controller/command.go
+  s_c1a2cfeaf2e46e::t_eb0d3b34987b76 110-113,121-124,131
+  s_c1a2cfeaf2e46e::t_1baf30a6785b7e 137
+  s_c1a2cfeaf2e46e::t_08a75747e1505a 24,40,42-44,100-102,105-109,114-120,125-130,132,138-140,144-146,148,150-151,155,157-162
+  s_c1a2cfeaf2e46e::t_ef4d36bfda11eb 41
+  s_c1a2cfeaf2e46e::t_a71dc61184728b 19,22,35-39,45-99,103-104,133-136,141-143,147,149,152-154,156,163-174
+  s_c1a2cfeaf2e46e::t_650e5d7112d7c5 175
+components/execd/pkg/runtime/command_windows.go
+  s_9415b3e0b70cf8::t_bb60c46163f54d 83-86,91,119-120,123,125,201-202,205-206
+  s_9415b3e0b70cf8::t_9449161198de90 98,103
+  s_c918f94692c511::t_b318de71d39df6 179
+components/execd/pkg/web/router.go
+  s_c1a2cfeaf2e46e::t_a71dc61184728b 77
+components/execd/pkg/web/router_test.go
+  s_c1a2cfeaf2e46e::t_90d05766936c48 1-38,65-87
+  s_c1a2cfeaf2e46e::t_bfad4f73d41243 39-46,51-52,61-64
+  s_c1a2cfeaf2e46e::t_950f3ac04f3336 47-50,53-60
+components/execd/pkg/flag/parser_test.go
+  s_c918f94692c511::t_9c8fcb288dc061 88-97
+  s_c918f94692c511::t_2f27133a71309c 106-117,141-142,144-145
+  s_c918f94692c511::t_ebaa0b9295fa9a 74-87,98-105,118-140,143,146-186
+components/execd/pkg/flag/parser.go
+  s_c918f94692c511::t_4c0bc8fa6cfcaa 22,36-40,52-53,98-100,103-106,116-121,131-213
+  s_c918f94692c511::t_52f0f802d20e47 19
+components/execd/pkg/web/controller/codeinterpreting.go
+  s_c1a2cfeaf2e46e::t_a71dc61184728b 38-45,60
+components/execd/pkg/runtime/ctrl.go
+  s_03e03d056c8cec::t_6fd2d29d6ed3f1 117
+  s_b5c00490621001::t_d85fa4e2e20433 78-86
+  s_ccd39396a429bf::t_72dcce59942529 51,112-116,118-119
+  s_ccd39396a429bf::t_a6dfbbfb28d776 40
+  s_ccd39396a429bf::t_b924b805438f12 20,26-27,41-50,52-63,77,110-111,120-122,124
+  s_bf7e86648d4614::t_e784dd9c954f36 23
+components/execd/pkg/runtime/command_inventory_lifecycle_test.go
+  s_9415b3e0b70cf8::t_1420b83ed1f102 63,93
+  s_c918f94692c511::t_dcb384505d4c5c 35,56,59,66,86,89,428,430-432,440,445,464,466-470
+  s_c918f94692c511::t_ad546a08e8d9b1 15-16,24,36-55,60-62,64-65,67-85,90-92,94,120,415,417-422,424-425,433-439,441-443,448-451,453-463,465
+  s_9415b3e0b70cf8::t_cbe6d08e0bb524 370-371,373,382-412
+  s_9415b3e0b70cf8::t_396fa41619bc22 23,123-151,153-156,158-185,187-194,196-199,246,269-271,309,336-359,361-363,376-377,379-381
+  s_c918f94692c511::t_6f0e1e15f17738 1-14,17-20,26-34,95-106,108-119,121,452,471
+  s_c918f94692c511::t_b318de71d39df6 21-22,25,107,122,413-414,416,423,426-427,429,444,446-447
+  s_9415b3e0b70cf8::t_9449161198de90 200-231,235-245,247-268
+  s_9415b3e0b70cf8::t_c8d9d6870275f4 152,157,186,195,232-234,272-308,310-335,360,364-369,372,374-375,378
+  s_c918f94692c511::t_25e7bb5089fc35 57-58,87-88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "fad4c7f79c99d45fe3d43573bea00599a70d1c31",
+  "prompts": {},
+  "sessions": {
+    "s_03e03d056c8cec": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0784aa9a8ffePBlI8LPL98CY97",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_464edb7e30f0e9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07bbf34a6ffeaftZz7QXlxYrE4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_4d221a4399c535": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0781b6d85ffeaEgNnsLfnkXJD1",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_4f422f1247dd1d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_076e5ba80ffeS0lNk4gcIYYokE",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_5b28ce0a861ec8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07a99f836ffe0AR9ExGJNuKpKv",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_644b3387898f55": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07771c7b2ffeWSKG3VlgCkI7co",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_72091cb2dc5597": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07a7ecff6ffeLcWqQPxmO1UPiG",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_830b9f617d5e26": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07794dde0ffeGeiXCM9Uj5fe5r",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_83ed9d475e5043": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0768c04c4ffeh1Xe2WefaNRNv1",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_9415b3e0b70cf8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0786beb1bffefPOBUWsX0eoBKF",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_b5c00490621001": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06de43334ffekA0WJAeblLwshR",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_bf7e86648d4614": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_077c07d85ffemOoO2j762UOz4m",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c1a2cfeaf2e46e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_077b20f24ffeV9xUqjSbNbZwpX",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c918f94692c511": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07a54941fffe6V7Fl7sbEMfT6G",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_ccd39396a429bf": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07a7158abffeOSN2q6A1TQQRZn",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_f29e7fb9eb0470": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07771c884ffefPTzTMC9Hhx9a2",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

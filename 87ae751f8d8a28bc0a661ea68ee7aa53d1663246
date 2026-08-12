@@ -1,0 +1,24 @@
+components/execd/pkg/runtime/command_status.go
+  s_67d0ff802450e5::t_38500f9df0d6e4 88-92,107
+components/execd/pkg/runtime/ctrl.go
+  s_67d0ff802450e5::t_5eec0377246aa5 38-48
+  s_67d0ff802450e5::t_38500f9df0d6e4 49
+components/execd/pkg/runtime/command_status_test.go
+  s_67d0ff802450e5::t_9afaebafec103d 160-220
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.13",
+  "base_commit_sha": "87ae751f8d8a28bc0a661ea68ee7aa53d1663246",
+  "prompts": {},
+  "sessions": {
+    "s_67d0ff802450e5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_096207d03ffeJsbnr4LxBxt04m",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

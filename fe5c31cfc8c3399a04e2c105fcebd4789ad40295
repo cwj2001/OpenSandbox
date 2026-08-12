@@ -1,0 +1,361 @@
+sdks/sandbox/python/tests/test_command_inventory_validation.py
+  s_28fbd3f9169c7d::t_1e120441cba63b 165-184
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 242
+  s_2f1745f4bbde6a::t_42ada1043f950f 243-244
+components/execd/tests/test_smoke_api_inventory.py
+  s_eded7d31f9080c::t_744c67ded45881 1-207,216-226
+  s_eded7d31f9080c::t_5ce5ffd5a7fea7 208-215
+sdks/sandbox/javascript/tests/types/execd-command-inventory.typecheck.ts
+  s_2b2310473b07ca::t_fc9226ff2488da 1-16,22-33
+sdks/sandbox/python/tests/test_generate_api.py
+  s_52679175678012::t_d4584623831675 21,132,136-140,150-152,154,157,160-164,173-190
+  s_52679175678012::t_d70385c46c922c 36-43,48,50-57,59-60,62-63,70-71,81,83,86-87,90-91,93,96-100,104,111,113-114,117-119,121,123-128,131,133-135,141-146,158-159,165-169
+  s_52679175678012::t_b2571ae28c5305 153
+sdks/sandbox/python/src/opensandbox/services/__init__.py
+  s_b473a40c774947::t_845108a8e30bf0 22,33
+components/execd/tests/jupyter.sh
+  s_5b4c4c6dab1a8b::t_06bb0df34c22d3 20
+  s_5b4c4c6dab1a8b::t_bf81b5edb5ac18 21-23,26,28-29
+sdks/sandbox/python/src/opensandbox/sync/adapters/command_adapter.py
+  s_5b4c4c6dab1a8b::t_c47dc0f4d1156e 340
+  s_d5b5d3b316a8aa::t_48f2af4b4611ff 38-42,338-339,341-348
+  s_d5b5d3b316a8aa::t_019f0e4633fae4 349-350
+  s_2f1745f4bbde6a::t_9160904ba5d874 334
+components/execd/pkg/runtime/command_inventory.go
+  s_2bebcf64e2f3c4::t_c642969cfcf511 523
+sdks/sandbox/kotlin/sandbox/src/test/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/service/CommandsAdapterTest.kt
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 502-503,510-537,557-559,751
+  s_e643fe2cfa22f5::t_4196219281637f 25-27,31,34,36,117,122,561-563,607-636,638,640-642,647,660,662,682,708,710,723,735-750,753-768,770
+  s_2f1745f4bbde6a::t_42ada1043f950f 556,560
+  s_20cb5ecf289429::t_04940f4b21627f 639
+  s_20cb5ecf289429::t_f2dc8d389849df 654-657
+  s_e643fe2cfa22f5::t_0fd1096fc5c89a 564-568,584-589,594,646,769
+  s_e643fe2cfa22f5::t_4e4de3ae38213e 595-606
+  s_20cb5ecf289429::t_92d47aa56ee1d2 569,583
+  s_02b8144a13db93::t_77971144f72d83 94,477-498,658,661,684,689-696,700-705,709,716-722,724-730,732-734
+  s_20cb5ecf289429::t_78ac93ccb231a1 573-582
+  s_e643fe2cfa22f5::t_0e2b4d037f0c8d 637,668-680,752
+  s_02b8144a13db93::t_18e46bd335ed01 731
+  s_02b8144a13db93::t_da9a48e72c4bb1 95-116,118-121,123,643-645,659,681,683,706-707,771-773
+sdks/sandbox/python/src/opensandbox/sync/services/command.py
+  s_b473a40c774947::t_845108a8e30bf0 149-160
+  s_b473a40c774947::t_d7b9fcdd56a1c8 161
+sdks/sandbox/javascript/package.json
+  s_5b4c4c6dab1a8b::t_65cc1c99e606c6 46
+components/execd/tests/smoke_api.py
+  s_c7832e666de498::t_8fbd5b914a946d 256-259,272-276,278-280,290,300
+  s_eded7d31f9080c::t_5ce5ffd5a7fea7 262-264,371-372
+  s_478c5e036ea730::t_78306d0de55360 129-156,214-216,222-223
+  s_d8150064339d7e::t_00a82515347646 52-87,97-99,110,115-117,182,199
+  s_c7832e666de498::t_da18032156e0e6 203-213,217-221,225-226,230-235,255,260-261,266,277,283-286
+  s_c7832e666de498::t_dc00403d9e7d0b 236-249,252-254
+sdks/sandbox/python/src/opensandbox/sync/services/__init__.py
+  s_b473a40c774947::t_845108a8e30bf0 20,34
+sdks/sandbox/python/tests/test_sync_command_service_adapter_streaming.py
+  s_b473a40c774947::t_7dd7b28c8476e0 35,37
+  s_d5b5d3b316a8aa::t_48f2af4b4611ff 26-29,44-50,288-296,305-306,308-312,320,329,332,372,381,384,405,414,417,456,465,468
+  s_2f1745f4bbde6a::t_42ada1043f950f 252,261,264,266-268,270,273-287,313-319,321-327,330
+  s_28fbd3f9169c7d::t_1e120441cba63b 387-404,406-413,415-416,418
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 240,251,257
+  s_57b11ffc802a80::t_83e88211892454 51-52,328,331,385-386,469
+sdks/sandbox/csharp/tests/OpenSandbox.Tests/CommandInventoryCapabilityTests.cs
+  s_9445ee527963bb::t_0a34322fc6ce77 142-156,239,259,269,304-305,307-308,310-312,314,316,321
+  s_9445ee527963bb::t_b536583b86c818 306,309,313
+  s_9445ee527963bb::t_9cd34f2084a74d 315
+  s_9445ee527963bb::t_a7880eeb39443f 317-320
+  s_9445ee527963bb::t_fc3d6c48d57ba0 322
+sdks/sandbox/python/src/opensandbox/adapters/command_adapter.py
+  s_2f1745f4bbde6a::t_9160904ba5d874 374
+  s_d5b5d3b316a8aa::t_48f2af4b4611ff 46-50,379-380,382-389
+  s_5b4c4c6dab1a8b::t_c47dc0f4d1156e 381
+  s_d5b5d3b316a8aa::t_019f0e4633fae4 390-391
+components/execd/tests/smoke.sh
+  s_5b4c4c6dab1a8b::t_06bb0df34c22d3 115
+  s_5b4c4c6dab1a8b::t_bf81b5edb5ac18 116
+specs/execd-api.yaml
+  s_a7d46d02df94f2::t_f11076a7a28296 436,1987
+  s_5b4c4c6dab1a8b::t_ac2166b89af81a 1964
+  s_9445ee527963bb::t_0a34322fc6ce77 432,435,1986,1988
+sdks/sandbox/python/src/opensandbox/models/execd.py
+  s_28fbd3f9169c7d::t_28713f2eb1d2db 431-434,506-507
+  s_2f1745f4bbde6a::t_42ada1043f950f 388-394
+sdks/sandbox/python/tests/test_command_inventory_capability.py
+  s_b473a40c774947::t_fbf94cc16eed8c 18
+  s_b473a40c774947::t_af666580f56a47 34,89-90,92-95,100-101,103-106,118-119,121-124,129-130,132-135
+  s_b473a40c774947::t_8d081d0ed2ec3b 20-27,30-31,37-39,41-88,91,96-99,102,107-117,120,125-128,131,136-144
+sdks/sandbox/python/src/opensandbox/sandbox.py
+  s_b473a40c774947::t_845108a8e30bf0 53,174-177
+  s_b473a40c774947::t_7dd7b28c8476e0 25,178-180
+  s_b473a40c774947::t_9c7d7b40ac3f4e 181
+components/execd/pkg/runtime/command_inventory_lifecycle_test.go
+  s_fa59c02338fb4d::t_b0ea27fef2190c 232-233
+sdks/sandbox/python/tests/test_command_service_adapter_streaming.py
+  s_b473a40c774947::t_7dd7b28c8476e0 36,38
+  s_d5b5d3b316a8aa::t_48f2af4b4611ff 27-31,45-51,346,351-352,361-362,364-366,377,386,389,431,440,443-445,465,474,476-477,517,526,529
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 294,305,311
+  s_28fbd3f9169c7d::t_1e120441cba63b 447-464,466-473,475,478
+  s_2f1745f4bbde6a::t_42ada1043f950f 306,315-342,367-376,378-384,387,446
+  s_57b11ffc802a80::t_417bc8911fd469 52-53,385,388,530
+sdks/sandbox/javascript/src/api/execd.ts
+  s_2f1745f4bbde6a::t_8679ee4bcc80a9 1078,1781
+sdks/sandbox/go/command_inventory_test.go
+  s_fa59c02338fb4d::t_fb81db962751bd 138-140
+  s_9445ee527963bb::t_0a34322fc6ce77 44-45,136-137
+.github/workflows/execd-test.yml
+  s_c7832e666de498::t_da18032156e0e6 117-118,120-122
+  s_eded7d31f9080c::t_7350fd83aff98c 115,119,123
+sdks/sandbox/python/src/opensandbox/api/execd/models/command_pagination.py
+  s_2f1745f4bbde6a::t_8679ee4bcc80a9 35
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/service/CommandsAdapter.kt
+  s_e643fe2cfa22f5::t_246cf35c3709f5 191
+  s_2f1745f4bbde6a::t_42ada1043f950f 192-193
+  s_e643fe2cfa22f5::t_4c2e0ef799857a 45,183-190,194-212
+  s_02b8144a13db93::t_13d8369d9da3fa 36
+sdks/sandbox/javascript/src/services/execdCommands.ts
+  s_6fd3eac354d12f::t_f0cf478b69c776 55
+sdks/sandbox/csharp/src/OpenSandbox/Models/CommandInventory.cs
+  s_9445ee527963bb::t_0a34322fc6ce77 195-198
+sdks/sandbox/python/src/opensandbox/services/command.py
+  s_b473a40c774947::t_845108a8e30bf0 171-182
+  s_b473a40c774947::t_005e921e58547e 183
+sdks/sandbox/javascript/tests/commands.list.test.mjs
+  s_6fd3eac354d12f::t_fc029cc38be1cd 191-207,209-212,214-218,231-232,253
+  s_6fd3eac354d12f::t_0668898071c03d 6-38,156-190,233-239,241-252
+  s_2f1745f4bbde6a::t_42ada1043f950f 39,86,102,106-107,109-115,121-131
+  s_6fd3eac354d12f::t_8f35390a7a881c 208,213,219-230
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 71-78,87,93,100,103,240
+sdks/sandbox/javascript/src/adapters/commandsAdapter.ts
+  s_6fd3eac354d12f::t_230ecae3801e8e 127-134,184-191,240
+  s_6fd3eac354d12f::t_f0cf478b69c776 115-125,135-158,173-176,192-209,211-212,214-221,229,244-250,252-253,256-258,260-265,270,272-276,279-280,285,287-290,298-309,312-313,317-320,322
+  s_6fd3eac354d12f::t_a551892e9c748e 172,266-269,284,291-297
+  s_6fd3eac354d12f::t_b401fe81662d05 230-239
+  s_6fd3eac354d12f::t_d135ab0cb47ee1 277-278,286,310-311,321,480
+  s_2f1745f4bbde6a::t_42ada1043f950f 314-316,473-475
+  s_6fd3eac354d12f::t_ec1f024e8a465f 126,177-183,210,213,222-228
+sdks/sandbox/go/types.go
+  s_9445ee527963bb::t_0a34322fc6ce77 23,719-721
+  s_fa59c02338fb4d::t_b0ea27fef2190c 717-718,722
+sdks/sandbox/python/src/opensandbox/sync/sandbox.py
+  s_b473a40c774947::t_845108a8e30bf0 52,180-183
+  s_b473a40c774947::t_7dd7b28c8476e0 24,184-186
+  s_b473a40c774947::t_455db3822468b1 187
+sdks/sandbox/go/execd.go
+  s_9445ee527963bb::t_0a34322fc6ce77 28,148
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/domain/services/Commands.kt
+  s_e643fe2cfa22f5::t_379fd4c5c2428c 93
+  s_02b8144a13db93::t_26ac49202e797f 22
+sdks/sandbox/javascript/tsconfig.typecheck.json
+  s_5b4c4c6dab1a8b::t_65cc1c99e606c6 1-11
+docs/components/execd.md
+  s_c7832e666de498::t_da18032156e0e6 38
+  s_5b4c4c6dab1a8b::t_185f4357c92c1e 21,30
+  s_61803828919f65::t_5b28c65d75a3ab 36,41,44,47,53,68,70,72-74,76,78,80,82-85,147-148,160-161,169
+  s_5b4c4c6dab1a8b::t_65cc1c99e606c6 51,55
+sdks/sandbox/python/scripts/generate_api.py
+  s_52679175678012::t_d0fa3318313ec7 57-59,61-64,95,100,106,108-114,117-119,121-124,126-129,131-132,134-135,149,151-168,172-173,175-186,188-190,203,205,207,209-223,226-227,229-237,239-240,243-245,259,261-264,266-272,274-280
+  s_5b4c4c6dab1a8b::t_cee240a988db0e 133,187
+  s_52679175678012::t_d70385c46c922c 29,65-69,72-73,76-77,92,94,96,101-105,116,125,130,136,169-171,208,224-225,281-283,285-289,291-292,296-299,301-302,309-310,319,323,327,333-343,345,353,357,360,362,364,366,369,371,374-377,381,384-387,392,399,413-423,426-429,431,434-437,440-447
+  s_5b4c4c6dab1a8b::t_1311e21e2f28f6 300
+  s_5b4c4c6dab1a8b::t_a17c0e8ebc91d7 303,307-308
+  s_5b4c4c6dab1a8b::t_80b6e560de5c20 60
+  s_52679175678012::t_94ccee8ab9e981 71,74-75,79,98-99,107,238,241-242,246,265,273,284,290,293-295,304-306,370,373,378-380,383,405,412,430,432-433,438-439
+  s_52679175678012::t_b2571ae28c5305 80-91,93,137-148,150,191-202,204,206,247-258,260,388
+  s_5b4c4c6dab1a8b::t_e961e39d9c30f8 120,174,228
+  s_5b4c4c6dab1a8b::t_28cce121325619 324-326
+  s_52679175678012::t_fb09920541f8aa 70
+  s_52679175678012::t_8cce82984e2e7d 78
+  s_52679175678012::t_25ac4191f0fe58 97
+  s_52679175678012::t_dfff69384b2ba5 115
+sdks/sandbox/csharp/src/OpenSandbox/Adapters/CommandsAdapter.cs
+  s_9445ee527963bb::t_b536583b86c818 198-199,209
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/converter/ExecutionConverter.kt
+  s_2f1745f4bbde6a::t_42ada1043f950f 171-173
+  s_e643fe2cfa22f5::t_68f6b9a388db23 66-68,72-74
+  s_e643fe2cfa22f5::t_0e2b4d037f0c8d 110,159,195,199-205
+  s_e643fe2cfa22f5::t_6554214ee4719b 175
+  s_e643fe2cfa22f5::t_0fd1096fc5c89a 71,83,101-105,134-139,151-153
+  s_e643fe2cfa22f5::t_ecaded374a8a76 22,24,26-30,61,65,75-76,88-91,94-100,106-109,111-133,140-150,154-155,158,160-170,174,176-194,196-198
+  s_02b8144a13db93::t_36f958d92c7f36 19,206-210
+components/execd/pkg/runtime/command_inventory_fuzz_test.go
+  s_fa59c02338fb4d::t_b0ea27fef2190c 5-13
+components/execd/pkg/runtime/command_inventory_test.go
+  s_2bebcf64e2f3c4::t_7990b0091ff200 382
+  s_2bebcf64e2f3c4::t_46aaff4efd1838 31,131-189,195,238,246
+  s_2bebcf64e2f3c4::t_565dd3501f04cd 381
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "fe5c31cfc8c3399a04e2c105fcebd4789ad40295",
+  "prompts": {},
+  "sessions": {
+    "s_02b8144a13db93": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d76d627ffeviI9B4zzwxJlKF",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_20cb5ecf289429": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d7fb5fbffe4vw692uxiriFA2",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_28fbd3f9169c7d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_062a024feffeHb1Mq5V2M4p5jJ",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_2b2310473b07ca": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_062dc7db2ffeSIf8WORaXDGQ2b",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_2bebcf64e2f3c4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065658cfbffeo6JDj5HwkfM7cz",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_2f1745f4bbde6a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0606121f4ffeLenXfDDj5xHEQ3",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_478c5e036ea730": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06539b8a0ffe7lT0F5ebzdL9SS",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_52679175678012": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05ddedf8affebMXq3F7Mp2E0Cj",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_57b11ffc802a80": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05dcf9825ffe2oFS1lwEGCmCP0",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_5b4c4c6dab1a8b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05dc4a50cffeKUPzUoNg4woC80",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_61803828919f65": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_062dc7251ffeWILyP7OuPcdHSy",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6fd3eac354d12f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065c40e1effe3oSrrXEziQMCoE",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_9445ee527963bb": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_060b68d49ffe2ALxU2H4LZrCIG",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_a7d46d02df94f2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05ea99320ffem2jgk5nXm8Atq0",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_b473a40c774947": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065af9f06ffe65Ckkiv9GqdHN5",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c7832e666de498": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_060b741a9ffeh2d61pArCsuE4P",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_d5b5d3b316a8aa": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05dcf7621ffePZlI3GiyNr2E0B",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_d8150064339d7e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0658b28d6ffeJkCf1ixffXWt5M",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_e643fe2cfa22f5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065a11c4dffeCtY2KkiSTm9z9f",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_eded7d31f9080c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05df53a11ffesAHUU6rAOHo7hL",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_fa59c02338fb4d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_062a024b8ffeNW0t4fJZfaTNi7",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
