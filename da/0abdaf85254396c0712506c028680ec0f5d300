@@ -1,0 +1,60 @@
+kubernetes/internal/controller/pool_controller.go
+  s_06e1e3bd437165::t_c547111d62cb80 219,221-223,267,274-275,301-303,326-342,346-354
+  s_06e1e3bd437165::t_578de5c17628f8 343-345
+  s_06e1e3bd437165::t_0726ee664a10c7 355-356
+docs/api/index.md
+  s_9d7319284e6622::t_3f1ce29c6c9f74 43-47
+kubernetes/internal/controller/pool_allocation_backfill_test.go
+  s_06e1e3bd437165::t_578de5c17628f8 178-184
+  s_6e7d323870200c::t_8a71c18119b60c 20,29-30,34,220-272,295-299,319-349,352-367
+  s_6e7d323870200c::t_1159762cc80439 350-351
+  s_06e1e3bd437165::t_e2bd42c5655bff 50,62,75-78,163-177,185-194,205-209
+kubernetes/AGENTS.md
+  s_9d7319284e6622::t_3f1ce29c6c9f74 49
+sdks/sandbox/kotlin/sandbox/src/test/kotlin/com/alibaba/opensandbox/sandbox/domain/models/SandboxInfoCompatibilityTest.kt
+  s_bdec3d15a00f6b::t_56ebb43ee28b9f 1-66
+kubernetes/DEVELOPMENT.md
+  s_9d7319284e6622::t_3f1ce29c6c9f74 146,411,414
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/domain/models/sandboxes/SandboxModels.kt
+  s_bdec3d15a00f6b::t_56ebb43ee28b9f 732-757
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "da0abdaf85254396c0712506c028680ec0f5d300",
+  "prompts": {},
+  "sessions": {
+    "s_06e1e3bd437165": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0f24f8491ffehsnJdiZZdIgIQD",
+        "model": "gpt-5.5"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6e7d323870200c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_006f5cf7cffeQiOmvceSGBeFNl",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_9d7319284e6622": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_006fe1518ffeOL0Qzbd6faF4jC",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_bdec3d15a00f6b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_006fe1598ffeqQ7HxcQsUfm4Aa",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
