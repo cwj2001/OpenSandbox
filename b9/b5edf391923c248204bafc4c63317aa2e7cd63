@@ -1,0 +1,211 @@
+tests/python/tests/test_sandbox_e2e_sync.py
+  s_1b8d968b4a6da2::t_62e08f6173bcc9 784-795,797-816,818-846
+  s_1b8d968b4a6da2::t_5112e889097a3e 24,796,817
+  s_1b8d968b4a6da2::t_0e4ed3127fca62 783
+specs/sandbox-lifecycle.yml
+  s_1b8d968b4a6da2::t_c5bd127219ec74 1554,1587-1590
+  s_1b8d968b4a6da2::t_9fd2871223006b 1591-1596
+server/tests/test_schema.py
+  s_1b8d968b4a6da2::t_edc5b28cb76823 298,318
+  s_1b8d968b4a6da2::t_b7e165e13b2127 184-189,211,214,230
+  s_1b8d968b4a6da2::t_c5bd127219ec74 16,174-183,190-210,215,217-229,231-233
+  s_1b8d968b4a6da2::t_d9a210b6ded735 216
+  s_1b8d968b4a6da2::t_2a5c4c5e2b62d2 212-213
+  s_1b8d968b4a6da2::t_a11eb3a85fced0 234
+sdks/sandbox/python/src/opensandbox/models/sandboxes.py
+  s_1b8d968b4a6da2::t_62e08f6173bcc9 483,531-537
+  s_1b8d968b4a6da2::t_ce14f0cc9c2cdd 538
+server/opensandbox_server/api/schema.py
+  s_1b8d968b4a6da2::t_c5bd127219ec74 341-345,347-348,362-364,366,370-373,375-379
+  s_1b8d968b4a6da2::t_9dce904bf4252e 368
+  s_1b8d968b4a6da2::t_9fd2871223006b 346
+  s_1b8d968b4a6da2::t_b7e165e13b2127 365,367,369,374
+components/execd/cmd/subpath-initializer/main.go
+  s_1b8d968b4a6da2::t_2bc46f285c2e76 1-40
+components/execd/pkg/subpathinitializer/securetree_unsupported.go
+  s_1b8d968b4a6da2::t_8accc8272d855b 1-36
+server/tests/k8s/test_kubernetes_service.py
+  s_1b8d968b4a6da2::t_d863a34affa60c 38-39,95-128
+  s_1b8d968b4a6da2::t_a7bec86a46a24b 129
+server/tests/test_docker_service.py
+  s_1b8d968b4a6da2::t_d863a34affa60c 3448-3473
+  s_1b8d968b4a6da2::t_820e752ea38ab4 3447
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/volume.py
+  s_1b8d968b4a6da2::t_283245b061688f 40,70-76,86,109-110,129-130,170-171,180
+server/tests/k8s/test_batchsandbox_provider.py
+  s_1b8d968b4a6da2::t_b7e165e13b2127 143,145,883,1338,1370,1438,1440,2842-2844,2864-2866
+  s_1b8d968b4a6da2::t_cca5b11eeb1ad3 2799-2801
+  s_1b8d968b4a6da2::t_c5bd127219ec74 2802-2807,2809-2841,2845-2849,2851-2863,2867-2899
+  s_1b8d968b4a6da2::t_d863a34affa60c 2850
+  s_1b8d968b4a6da2::t_d6d48abaad2764 2808
+components/execd/Dockerfile
+  s_1b8d968b4a6da2::t_2bc46f285c2e76 69-72,106
+sdks/sandbox/python/tests/test_converters_and_error_handling.py
+  s_1b8d968b4a6da2::t_62e08f6173bcc9 57,519-531
+  s_1b8d968b4a6da2::t_2b9141a4d0f0c3 51
+  s_1b8d968b4a6da2::t_9f2a4b28150645 532-533
+scripts/remote-k8s-subpath-poc.sh
+  s_77c3f3ccd3d5e2::t_d924a92022d8b9 257-259
+  s_579eae3e9f9a2b::t_a4806fb5cf6e6c 84-87,263,269-278
+  s_579eae3e9f9a2b::t_4276fef5b1d932 5-7,45-46,79-83,88-124,148-149,176-183,197-198,244-245,264-268,279-287,289-297
+  s_579eae3e9f9a2b::t_08135852d2f296 1-4,8-44,47-55,125-131,134-147,150-175,187,190-194,199-200,203-204,206,208-220,222-224,226-236,239-240,242-243,247-253,255-256,260-262,288,298-310,313-317,320,322-324,326-335,337-343,345-372,374
+  s_77c3f3ccd3d5e2::t_2be93ee15dc3af 56-71,184,195,201-202,221,237,246
+  s_579eae3e9f9a2b::t_5cef9a8eef2522 188-189,312,318-319,321,325
+  s_579eae3e9f9a2b::t_592d1dde61d68f 205,207,225
+  s_77c3f3ccd3d5e2::t_4bac16ae4dfdd2 72-74,76-78,185-186,196,238,311
+  s_183e637d7940a7::t_a9e59d3e020c8a 241,254
+  s_579eae3e9f9a2b::t_6dd9dd9cfd7325 373
+  s_77c3f3ccd3d5e2::t_26e77dad6e634f 75
+  s_579eae3e9f9a2b::t_6cacf29a3d4edf 132-133
+  s_77c3f3ccd3d5e2::t_350c0bcb290915 336,344
+scripts/poc-local-kind-subpath-initializer.sh
+  s_b7d43e8df158fc::t_c113723681d392 68-111,113-155
+  s_b7d43e8df158fc::t_2af8451f251186 112,529
+  s_b7d43e8df158fc::t_4c5d3a524ac4d2 381,387-388,390,393,397,399,402,406,409,414,418
+  s_b7d43e8df158fc::t_74730abef112d6 13,59-67,395-396,398,400-401,407,416
+  s_b7d43e8df158fc::t_93a5cd858a527a 382-386,389,408,410-413,415,417
+  s_b7d43e8df158fc::t_9d607711d1f21b 481-500,527,623
+  s_b7d43e8df158fc::t_1a359ba0303f88 631
+  s_b7d43e8df158fc::t_97cd021c86b910 285-287,289,296,300,302,322,341-342,355,367,379-380
+  s_1061813f5def63::t_aac9f35c06c290 655-656
+  s_b7d43e8df158fc::t_02bd7d6387772a 635-637
+  s_b7d43e8df158fc::t_06b94001d8bb58 451-476,479-480,622
+  s_fa71f024dcde28::t_19437b6ccab78f 261
+  s_b7d43e8df158fc::t_05334c1c0c2658 362-364,368,373-376
+  s_1061813f5def63::t_26eaf57730719b 1-7,9,11-12,14-37,501-525,533-534,536-539,541-567,569,572,583-592,594-616,627-628,634,638-654,657-669
+  s_b7d43e8df158fc::t_17f58847fc3c70 391-392,394,403-405
+  s_b7d43e8df158fc::t_2c237affdbd524 449-450,617
+  s_b7d43e8df158fc::t_8d6ac831995e09 532,535,624-626,630
+  s_b7d43e8df158fc::t_82adbfbde08727 568,570-571,573-582,618,629
+  s_b7d43e8df158fc::t_68397f4fee7b39 8,156-158,161-163,165-181,196-198,200-201,203-205,632
+  s_b7d43e8df158fc::t_8871f3181d5d68 38-48,593
+  s_b7d43e8df158fc::t_497bcc1362e7cf 284,288,290-295,297-299,301,303-321,323-340,343-354,356-361,365-366,369-372,377-378,447-448,477-478,526
+  s_b7d43e8df158fc::t_48f2e93ff2d17f 10,49-58,419-446,528,540,619-621
+  s_b7d43e8df158fc::t_9e004ff9b26446 159-160,182-195,199,202
+  s_b7d43e8df158fc::t_c382fde71d9ef2 164,206-260,262-283,530-531,633
+components/execd/pkg/subpathinitializer/securetree_linux_test.go
+  s_1b8d968b4a6da2::t_d863a34affa60c 1-57
+components/execd/pkg/subpathinitializer/securetree_linux.go
+  s_1b8d968b4a6da2::t_f650cfe0243d51 79-81,83-88,94-97
+  s_1b8d968b4a6da2::t_2bc46f285c2e76 1-78,82,89-93,98-151
+server/opensandbox_server/services/k8s/batchsandbox_provider.py
+  s_1b8d968b4a6da2::t_c5bd127219ec74 57-61,297-301,303,448-457,459-461,463
+  s_1b8d968b4a6da2::t_b7e165e13b2127 70,202,415,458,462,550,750,753,869
+  s_1b8d968b4a6da2::t_9fd2871223006b 107-108,302
+  s_1b8d968b4a6da2::t_de2be9b845de40 188
+  s_523e655d4d80e1::t_456d369d2afaaf 109-110,464
+server/opensandbox_server/services/k8s/workload_provider.py
+  s_1b8d968b4a6da2::t_9fd2871223006b 246-249
+server/opensandbox_server/services/k8s/volume_helper.py
+  s_1b8d968b4a6da2::t_c5bd127219ec74 19,27-29,132-136,138-139,141-145,147-152,154-156,158-174,176-183,185-201
+  s_1b8d968b4a6da2::t_b7e165e13b2127 140,153,157,175
+  s_1b8d968b4a6da2::t_1d464af7567b1a 184
+  s_1b8d968b4a6da2::t_9fd2871223006b 137,146
+sdks/sandbox/python/tests/test_models_stability.py
+  s_1b8d968b4a6da2::t_62e08f6173bcc9 304-318
+server/opensandbox_server/services/k8s/agent_sandbox_provider.py
+  s_1b8d968b4a6da2::t_2bc46f285c2e76 147-151
+scripts/remote-k8s-subpath-poc-provision.sh
+  s_579eae3e9f9a2b::t_f48cce22208e13 130-132,134-136
+  s_fa71f024dcde28::t_2090283d570524 111
+  s_579eae3e9f9a2b::t_99b6a01e3f4d4a 100,103-104,117
+  s_579eae3e9f9a2b::t_63b9ae2aab9008 133
+  s_579eae3e9f9a2b::t_c47508a2e1d92c 1-53,55-56,59-63,65-70,74,76-87,90-99,101-102,105-110,114-116,118-123,127-129,137-168,170-175,177-178,181-185,187-201,204-205,207-208,211-221
+  s_183e637d7940a7::t_a9e59d3e020c8a 54,57-58,64,71-73,75,169,176,179-180,186
+  s_579eae3e9f9a2b::t_01ba16f872d90f 88-89
+  s_183e637d7940a7::t_310745f099646b 112-113,202-203
+  s_77c3f3ccd3d5e2::t_52a30c0efe2371 124-126
+  s_183e637d7940a7::t_6c9737ca2ae9b5 206,209-210
+sdks/sandbox/python/src/opensandbox/adapters/converter/sandbox_model_converter.py
+  s_1b8d968b4a6da2::t_62e08f6173bcc9 167
+server/opensandbox_server/services/docker/docker_service.py
+  s_1b8d968b4a6da2::t_2bc46f285c2e76 647-657
+server/opensandbox_server/services/k8s/kubernetes_service.py
+  s_1b8d968b4a6da2::t_353151884f4dab 392-408
+  s_1b8d968b4a6da2::t_2bc46f285c2e76 853-854
+docs/guides/remote-kubernetes-subpath-poc.zh.md
+  s_579eae3e9f9a2b::t_7f20958bcac722 20-22,27,33,35,37,41,44-45,51,55,62,64-69,71,114,116-119,132,146-151,165-166
+  s_77c3f3ccd3d5e2::t_2be93ee15dc3af 46
+  s_579eae3e9f9a2b::t_08135852d2f296 1-19,24-26,28-32,34,36,38-40,50,52-54,56-61,63,108-113,115,122-131,133-139,141-145,153-164,167-169,171-172
+  s_579eae3e9f9a2b::t_3611b7fe24e713 23
+  s_77c3f3ccd3d5e2::t_523605cbfa2a2e 120
+  s_77c3f3ccd3d5e2::t_4bac16ae4dfdd2 121
+  s_183e637d7940a7::t_6c9737ca2ae9b5 101,103
+  s_579eae3e9f9a2b::t_c47508a2e1d92c 42,72-80,82-100,102,104-105,107,170
+  s_77c3f3ccd3d5e2::t_d924a92022d8b9 47,140
+  s_183e637d7940a7::t_a9e59d3e020c8a 43,48-49,70,81,106,152
+tests/python/uv.lock
+  s_1b8d968b4a6da2::t_765332ee2f0627 125-133,167,176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "b9b5edf391923c248204bafc4c63317aa2e7cd63",
+  "prompts": {},
+  "sessions": {
+    "s_1061813f5def63": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00b5f4755ffeEusACCAgg3bYzO",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_183e637d7940a7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a275c28ffe8lInQF2ZgleC2I",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_1b8d968b4a6da2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00bd27b09ffebYrqzTEZzDj8FQ",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_523e655d4d80e1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_006dfdf08ffe4EZnZMPdzFUdmi",
+        "model": "gpt-5.5"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_579eae3e9f9a2b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00b7a5780ffegcV1qjL45B54ov",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_77c3f3ccd3d5e2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a67dbc5ffebAiGBJK1XfLxU6",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_b7d43e8df158fc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00b4d682cffeCejj4nodwF6fDP",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_fa71f024dcde28": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0249c73f7ffeI6AN49ms4dfV2m",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
