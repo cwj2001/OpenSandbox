@@ -1,0 +1,51 @@
+server/opensandbox_server/services/k8s/workload_mapper.py
+  s_7dc62019f303f8::t_7bbc888b59dc28 101-104,154-155,160-194
+  s_7dc62019f303f8::t_c4ee5680cc3b6b 195-196
+kubernetes/internal/controller/pool_controller.go
+  s_57eace9808e7ff::t_67d5fa0a70038e 39,215-218,220-221
+  s_e90c8bf0b2df2a::t_cc06932a374f09 335
+  s_e90c8bf0b2df2a::t_5bbebd61f20b3d 219,276-277,280-282,284,323-334,336-337,339-350,353
+  s_57eace9808e7ff::t_b8d48128d15f53 48
+  s_e90c8bf0b2df2a::t_52f9b439ebe9ca 21
+  s_57eace9808e7ff::t_053f494fa8fb22 222,261-275,278-279,283,285-322,338,351-352,354-376
+  s_e90c8bf0b2df2a::t_1dcc048b77d2b5 223
+kubernetes/internal/controller/pool_allocation_backfill_test.go
+  s_57eace9808e7ff::t_b702c9861effb4 1-70,74-93,136-220
+  s_57eace9808e7ff::t_149d24bc5fee5e 115-117,132-135
+  s_e90c8bf0b2df2a::t_5bbebd61f20b3d 94-114,118-131
+  s_57eace9808e7ff::t_b8d48128d15f53 71-73
+server/tests/k8s/test_workload_mapper.py
+  s_7dc62019f303f8::t_7bbc888b59dc28 131-182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d8b75c84e143666d9c4f32e4b361d8512805dc64",
+  "prompts": {},
+  "sessions": {
+    "s_57eace9808e7ff": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a653a2fffe74pbhqKy2N5cEy",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_7dc62019f303f8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a6831a6ffexHmiVpItvgfsi3",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_e90c8bf0b2df2a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00a5f9276ffefwWJy5ooV8yUW5",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
