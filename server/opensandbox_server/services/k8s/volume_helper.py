@@ -16,15 +16,13 @@
 Volume helper utilities for Kubernetes pod specs.
 """
 
-import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from opensandbox_server.api.schema import Volume
 
 logger = logging.getLogger(__name__)
 
-SUBPATH_INITIALIZER_NAME = "volume-subpath-initializer"
 _SUBPATH_INITIALIZER_ROOT = "/opensandbox-subpath-pvcs"
 _MAX_FS_GROUP = 2_147_483_647
 
@@ -132,32 +130,15 @@ def apply_volumes_to_pod_spec(
     main_container["volumeMounts"] = mounts
 
 
-def add_subpath_initializer_to_pod_spec(
+def build_subpath_initializer_plan(
     pod_spec: Dict[str, Any],
     volumes: List[Volume],
-    initializer_image: str,
     fs_group: int,
-) -> None:
-    """Append the fixed PVC subPath initializer when a request requires it."""
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, str]]]:
+    """Build the execd-installer arguments and PVC root mounts for subpaths."""
     requested_volumes = [volume for volume in volumes if volume.ensure_sub_path_directory]
     if not requested_volumes:
-        return
-
-    if not initializer_image or not initializer_image.strip():
-        raise ValueError(
-            "runtime.execd_image must be set when ensureSubPathDirectory=true."
-        )
-
-    init_containers = pod_spec.get("initContainers", [])
-    if not isinstance(init_containers, list):
-        raise ValueError("Pod spec initContainers must be a list.")
-    if any(
-        isinstance(container, dict) and container.get("name") == SUBPATH_INITIALIZER_NAME
-        for container in init_containers
-    ):
-        raise ValueError(
-            f"Pod template cannot define reserved init container '{SUBPATH_INITIALIZER_NAME}'."
-        )
+        return [], []
 
     pvc_volume_names: Dict[str, str] = {}
     for pod_volume in pod_spec.get("volumes", []):
@@ -191,31 +172,7 @@ def add_subpath_initializer_to_pod_spec(
             }
         )
 
-    init_containers.append(
-        {
-            "name": SUBPATH_INITIALIZER_NAME,
-            "image": initializer_image.strip(),
-            "command": ["/opensandbox-subpath-initializer"],
-            "args": [
-                "--plan-json",
-                json.dumps(plan_entries, separators=(",", ":")),
-                "--fs-group",
-                str(fs_group),
-            ],
-            "volumeMounts": root_mounts,
-            "securityContext": {
-                "runAsUser": 0,
-                "runAsGroup": 0,
-                "runAsNonRoot": False,
-                "allowPrivilegeEscalation": False,
-                "capabilities": {
-                    "drop": ["ALL"],
-                    "add": ["CHOWN", "DAC_OVERRIDE"],
-                },
-            },
-        }
-    )
-    pod_spec["initContainers"] = init_containers
+    return plan_entries, root_mounts
 
 
 def get_subpath_initializer_main_container_identity(

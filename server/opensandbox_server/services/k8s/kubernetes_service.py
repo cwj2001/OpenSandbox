@@ -390,18 +390,32 @@ class KubernetesSandboxService(K8sDiagnosticsMixin, SandboxService, ExtensionSer
         )
 
     def _ensure_sub_path_initializer_support(self, request: CreateSandboxRequest) -> None:
-        """Reject directory initialization unless the active provider implements it."""
+        """Reject directory initialization unless the provider and image support it."""
         if not any(volume.ensure_sub_path_directory for volume in request.volumes or []):
             return
-        if self.workload_provider.supports_ensure_sub_path_directory():
+        if not self.workload_provider.supports_ensure_sub_path_directory():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": SandboxErrorCodes.INVALID_PARAMETER,
+                    "message": (
+                        "ensureSubPathDirectory is supported only by the Kubernetes "
+                        "BatchSandbox provider in template mode."
+                    ),
+                },
+            )
+        if (
+            self.app_config.kubernetes is not None
+            and self.app_config.kubernetes.enable_sub_path_initializer
+        ):
             return
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": SandboxErrorCodes.INVALID_PARAMETER,
                 "message": (
-                    "ensureSubPathDirectory is supported only by the Kubernetes "
-                    "BatchSandbox provider in template mode."
+                    "ensureSubPathDirectory requires [kubernetes].enable_sub_path_initializer=true "
+                    "and a runtime.execd_image containing /opensandbox-subpath-initializer."
                 ),
             },
         )

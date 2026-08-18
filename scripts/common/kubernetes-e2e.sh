@@ -204,6 +204,7 @@ configToml: |
   [kubernetes]
   namespace = "${E2E_NAMESPACE}"
   workload_provider = "batchsandbox"
+  enable_sub_path_initializer = true
   sandbox_create_timeout_seconds = 180
   sandbox_create_poll_interval_seconds = 1.0
   batchsandbox_template_file = "${batchsandbox_template_file}"

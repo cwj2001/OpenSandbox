@@ -72,6 +72,15 @@ def serialize_security_context_to_dict(
     if security_context.privileged is not None:
         result["privileged"] = security_context.privileged
 
+    if security_context.run_as_user is not None:
+        result["runAsUser"] = security_context.run_as_user
+    if security_context.run_as_group is not None:
+        result["runAsGroup"] = security_context.run_as_group
+    if security_context.run_as_non_root is not None:
+        result["runAsNonRoot"] = security_context.run_as_non_root
+    if security_context.allow_privilege_escalation is not None:
+        result["allowPrivilegeEscalation"] = security_context.allow_privilege_escalation
+
     if getattr(security_context, "seccomp_profile", None) is not None:
         sp = security_context.seccomp_profile
         profile_dict: Dict[str, Any] = {"type": sp.type}

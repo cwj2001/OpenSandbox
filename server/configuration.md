@@ -141,6 +141,7 @@ If `runtime.type = "kubernetes"` and the `[kubernetes]` table is absent, the ser
 | `write_qps` | float | `0` | K8s API **write** rate limit (QPS). **0** = unlimited. |
 | `write_burst` | integer | `0` | Burst for write limiter. |
 | `execd_init_resources` | table \| omitted | `null` | Optional resource requests/limits for the **execd init** container. |
+| `enable_sub_path_initializer` | boolean | `false` | Enables `ensureSubPathDirectory` in BatchSandbox template mode. Set this only after `runtime.execd_image` is updated to an image containing `/opensandbox-subpath-initializer`. |
 
 ### BatchSandbox vs agent-sandbox
 
@@ -153,7 +154,7 @@ Kubernetes workloads are created by a **workload provider**. There is **no** `[b
 | Image pull policy | **`kubernetes.image_pull_policy`** — writes `imagePullPolicy` into the BatchSandbox pod template main container | Not currently used |
 | Extra TOML table | None | **`[agent_sandbox]`** is required (see below) |
 
-**BatchSandbox-only config keys in `config.py`:** `batchsandbox_template_file` and `image_pull_policy` on `KubernetesRuntimeConfig`. Everything else in the `[kubernetes]` table (namespace, kubeconfig, informer, API QPS, `sandbox_create_*`, `execd_init_resources`, …) applies to **whichever** provider you select.
+**BatchSandbox-only config keys in `config.py`:** `batchsandbox_template_file`, `image_pull_policy`, and `enable_sub_path_initializer` on `KubernetesRuntimeConfig`. Everything else in the `[kubernetes]` table (namespace, kubeconfig, informer, API QPS, `sandbox_create_*`, `execd_init_resources`, …) applies to **whichever** provider you select.
 
 ### `kubernetes.execd_init_resources`
 
@@ -161,6 +162,25 @@ Kubernetes workloads are created by a **workload provider**. There is **no** `[b
 |-----|------|-------------|
 | `limits` | map string → string | e.g. `{ cpu = "100m", memory = "128Mi" }` |
 | `requests` | map string → string | e.g. `{ cpu = "50m", memory = "64Mi" }` |
+
+### `kubernetes.enable_sub_path_initializer`
+
+This feature gate is disabled by default so existing deployments using an older
+`runtime.execd_image` cannot create a failing workload. After deploying an execd
+image that contains `/opensandbox-subpath-initializer`, set the gate explicitly:
+
+```toml
+[runtime]
+execd_image = "<published initializer-capable execd image>"
+
+[kubernetes]
+enable_sub_path_initializer = true
+```
+
+When enabled, the existing `execd-installer` init container creates requested
+PVC subpaths before the sandbox starts. No second image or init container is
+created. Requests that set `ensureSubPathDirectory=true` are rejected with HTTP
+400 until the administrator enables this gate.
 
 ---
 

@@ -659,6 +659,14 @@ class KubernetesRuntimeConfig(BaseModel):
             "If unset, no resource constraints are applied."
         ),
     )
+    enable_sub_path_initializer: bool = Field(
+        default=False,
+        description=(
+            "Allow ensureSubPathDirectory to run from the execd installer. "
+            "Enable this only when runtime.execd_image contains "
+            "/opensandbox-subpath-initializer."
+        ),
+    )
     image_pull_policy: Optional[str] = Field(
         default="IfNotPresent",
         description=(

@@ -14,7 +14,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional
+import shlex
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import HTTPException, status
 from kubernetes.client import (
@@ -118,6 +119,9 @@ def _build_execd_init_container(
     execd_init_resources: Any,
     *,
     disable_ipv6_for_egress: bool = False,
+    subpath_initializer_plan: Optional[str] = None,
+    subpath_initializer_fs_group: Optional[int] = None,
+    subpath_initializer_volume_mounts: Optional[List[Dict[str, str]]] = None,
 ) -> V1Container:
     script = (
         "cp ./execd /opt/opensandbox/execd && "
@@ -135,9 +139,35 @@ def _build_execd_init_container(
         "/opt/opensandbox/opensandbox-launcher && "
         "chmod 0555 /opt/opensandbox/opensandbox-launcher))"
     )
+    volume_mounts = [
+        V1VolumeMount(name="opensandbox-bin", mount_path="/opt/opensandbox")
+    ]
     security_context = None
+    if subpath_initializer_plan is not None:
+        if subpath_initializer_fs_group is None:
+            raise ValueError("subpath initializer requires a filesystem group.")
+        script += (
+            " && /opensandbox-subpath-initializer --plan-json "
+            f"{shlex.quote(subpath_initializer_plan)} --fs-group "
+            f"{shlex.quote(str(subpath_initializer_fs_group))}"
+        )
+        volume_mounts.extend(
+            V1VolumeMount(name=mount["name"], mount_path=mount["mountPath"])
+            for mount in subpath_initializer_volume_mounts or []
+        )
+        security_context = V1SecurityContext(
+            run_as_user=0,
+            run_as_group=0,
+            run_as_non_root=False,
+            allow_privilege_escalation=False,
+            capabilities=V1Capabilities(drop=["ALL"], add=["CHOWN", "DAC_OVERRIDE"]),
+        )
     if disable_ipv6_for_egress:
         script, sc_dict = prep_execd_init_for_egress(script)
+        # IPv6 disabling runs in the pod network namespace and the established
+        # egress contract requires a privileged installer. Do not combine that
+        # mode with the capability-only initializer context: privileged already
+        # supersedes those restrictions and must preserve the existing behavior.
         security_context = build_security_context_from_dict(sc_dict)
 
     resources = None
@@ -152,12 +182,7 @@ def _build_execd_init_container(
         image=execd_image,
         command=["/bin/sh", "-c"],
         args=[script],
-        volume_mounts=[
-            V1VolumeMount(
-                name="opensandbox-bin",
-                mount_path="/opt/opensandbox",
-            )
-        ],
+        volume_mounts=volume_mounts,
         resources=resources,
         security_context=security_context,
     )

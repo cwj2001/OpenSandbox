@@ -124,8 +124,33 @@ class TestKubernetesSandboxServiceCreate:
             )
         ]
         k8s_service.workload_provider.supports_ensure_sub_path_directory.return_value = True
+        k8s_service.app_config.kubernetes.enable_sub_path_initializer = True
 
         k8s_service._ensure_sub_path_initializer_support(create_sandbox_request)
+
+    @pytest.mark.asyncio
+    async def test_create_sandbox_rejects_unconfigured_subpath_initializer_before_pvc(
+        self, k8s_service, create_sandbox_request
+    ):
+        create_sandbox_request.volumes = [
+            Volume(
+                name="workspace",
+                pvc=PVC(claim_name="workspace-pvc"),
+                mount_path="/workspace",
+                sub_path="jobs/123",
+                ensure_sub_path_directory=True,
+            )
+        ]
+        k8s_service.workload_provider.supports_ensure_sub_path_directory.return_value = True
+
+        with pytest.raises(HTTPException, match="enable_sub_path_initializer") as exc_info:
+            await k8s_service.create_sandbox(create_sandbox_request)
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["code"] == SandboxErrorCodes.INVALID_PARAMETER
+        k8s_service.k8s_client.get_pvc.assert_not_called()
+        k8s_service.k8s_client.create_pvc.assert_not_called()
+        k8s_service.workload_provider.create_workload.assert_not_called()
 
     def test_credential_proxy_requires_dns_nft_mode(
         self, k8s_service, create_sandbox_request

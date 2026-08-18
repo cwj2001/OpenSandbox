@@ -55,6 +55,7 @@ def _app_config_with_template(template_file_path: str) -> AppConfig:
         kubernetes=KubernetesRuntimeConfig(
             namespace="test-ns",
             batchsandbox_template_file=template_file_path,
+            enable_sub_path_initializer=True,
         ),
     )
 
@@ -2923,14 +2924,13 @@ spec:
             "template"
         ]["spec"]
         assert [container["name"] for container in pod_spec["initContainers"]] == [
-            "execd-installer",
-            "volume-subpath-initializer",
+            "execd-installer"
         ]
-        initializer = pod_spec["initContainers"][1]
+        initializer = pod_spec["initContainers"][0]
         assert initializer["image"] == "execd:latest"
-        assert initializer["command"] == ["/opensandbox-subpath-initializer"]
-        assert initializer["args"][-2:] == ["--fs-group", "1234"]
-        # Root handles PVC ownership, but cannot escalate; only traversal and chown caps remain.
+        assert initializer["command"] == ["/bin/sh", "-c"]
+        assert "/opensandbox-subpath-initializer --plan-json" in initializer["args"][0]
+        assert "--fs-group 1234" in initializer["args"][0]
         assert initializer["securityContext"] == {
             "runAsUser": 0,
             "runAsGroup": 0,
@@ -2941,35 +2941,35 @@ spec:
                 "add": ["CHOWN", "DAC_OVERRIDE"],
             },
         }
-        assert initializer["volumeMounts"] == [
-            {"name": "workspace-a", "mountPath": "/opensandbox-subpath-pvcs/0"}
-        ]
-        assert json.loads(initializer["args"][1]) == [
-            {"mountPath": "/opensandbox-subpath-pvcs/0", "subPaths": ["jobs/a", "jobs/b"]}
-        ]
+        assert {mount["mountPath"] for mount in initializer["volumeMounts"]} == {
+            "/opt/opensandbox",
+            "/opensandbox-subpath-pvcs/0",
+        }
+        assert json.dumps(
+            [{"mountPath": "/opensandbox-subpath-pvcs/0", "subPaths": ["jobs/a", "jobs/b"]}],
+            separators=(",", ":"),
+        ) in initializer["args"][0]
         main_mounts = pod_spec["containers"][0]["volumeMounts"]
         assert {mount["subPath"] for mount in main_mounts if mount["name"] == "workspace-a"} == {
             "jobs/a",
             "jobs/b",
         }
 
-    def test_create_workload_rejects_template_initializer_name_collision(
+    def test_create_workload_rejects_subpath_initializer_when_gate_disabled(
         self, mock_k8s_client, tmp_path
     ):
         from opensandbox_server.api.schema import PVC, Volume
 
         template_file = tmp_path / "template.yaml"
         template_file.write_text(
-            "spec:\n  template:\n    spec:\n      initContainers:\n"
-            "        - name: volume-subpath-initializer\n"
-            "      containers:\n        - name: sandbox\n"
-            "          securityContext:\n            runAsGroup: 1000\n"
+            "spec:\n  template:\n    spec:\n      containers:\n        - name: sandbox\n"
+            "          securityContext:\n            runAsGroup: 1234\n"
         )
-        provider = BatchSandboxProvider(
-            mock_k8s_client, _app_config_with_template(str(template_file))
-        )
+        app_config = _app_config_with_template(str(template_file))
+        app_config.kubernetes.enable_sub_path_initializer = False
+        provider = BatchSandboxProvider(mock_k8s_client, app_config)
 
-        with pytest.raises(ValueError, match="reserved init container"):
+        with pytest.raises(ValueError, match="enable_sub_path_initializer"):
             provider.create_workload(
                 sandbox_id="test-id",
                 namespace="test-ns",
@@ -3121,8 +3121,8 @@ spec:
             "runAsGroup": 1000,
             "runAsNonRoot": True,
         }
-        initializer = pod_spec["initContainers"][-1]
-        assert initializer["args"][-2:] == ["--fs-group", "1000"]
+        initializer = pod_spec["initContainers"][0]
+        assert "--fs-group 1000" in initializer["args"][0]
 
     def test_create_workload_preserves_generated_network_and_isolation_security_context(
         self, mock_k8s_client, tmp_path
@@ -3184,7 +3184,9 @@ spec:
             "runAsGroup": 1000,
             "runAsNonRoot": True,
         }
-        assert pod_spec["initContainers"][-1]["args"][-2:] == ["--fs-group", "1000"]
+        execd_installer = pod_spec["initContainers"][0]
+        assert "--fs-group 1000" in execd_installer["args"][0]
+        assert execd_installer["securityContext"] == {"privileged": True}
 
     def test_create_workload_with_host_volume(self, mock_k8s_client):
         """

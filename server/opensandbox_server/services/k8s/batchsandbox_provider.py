@@ -55,9 +55,8 @@ from opensandbox_server.services.k8s.windows_profile import (
     validate_windows_profile_resource_limits,
 )
 from opensandbox_server.services.k8s.volume_helper import (
-    SUBPATH_INITIALIZER_NAME,
-    add_subpath_initializer_to_pod_spec,
     apply_volumes_to_pod_spec,
+    build_subpath_initializer_plan,
     get_subpath_initializer_main_container_identity,
     merge_subpath_initializer_main_container_identity,
 )
@@ -83,6 +82,9 @@ class BatchSandboxProvider(WorkloadProvider):
         if template_file_path:
             logger.info(f"Using BatchSandbox template file: {template_file_path}")
         self.execd_init_resources = k8s_config.execd_init_resources if k8s_config else None
+        self.enable_sub_path_initializer = bool(
+            k8s_config and k8s_config.enable_sub_path_initializer
+        )
         self.image_pull_policy = k8s_config.image_pull_policy if k8s_config else "IfNotPresent"
         self.execd_run_as_init = bool(app_config and app_config.runtime.execd_run_as_init)
 
@@ -183,6 +185,14 @@ class BatchSandboxProvider(WorkloadProvider):
             and egress_image is not None
             and self.egress_disable_ipv6
         )
+        requires_subpath_initializer = bool(
+            volumes and any(volume.ensure_sub_path_directory for volume in volumes)
+        )
+        if requires_subpath_initializer and not self.enable_sub_path_initializer:
+            raise ValueError(
+                "ensureSubPathDirectory requires [kubernetes].enable_sub_path_initializer=true "
+                "and a runtime.execd_image containing /opensandbox-subpath-initializer."
+            )
         init_container = _build_execd_init_container(
             execd_image,
             self.execd_init_resources,
@@ -300,8 +310,7 @@ class BatchSandboxProvider(WorkloadProvider):
             batchsandbox["spec"]["expireTime"] = expires_at.isoformat()
         self._merge_pod_spec_extras(batchsandbox, extra_volumes, extra_mounts)
         merged_pod_spec = batchsandbox.get("spec", {}).get("template", {}).get("spec", {})
-        if volumes and any(volume.ensure_sub_path_directory for volume in volumes):
-            self._reject_template_subpath_initializer_collision()
+        if requires_subpath_initializer:
             template = self.template_manager.get_base_template()
             template_pod_spec = (
                 template.get("spec", {}).get("template", {}).get("spec", {})
@@ -315,12 +324,26 @@ class BatchSandboxProvider(WorkloadProvider):
                 merged_pod_spec,
                 identity,
             )
-            add_subpath_initializer_to_pod_spec(
+            plan_entries, root_mounts = build_subpath_initializer_plan(
                 merged_pod_spec,
-                volumes,
-                execd_image,
+                volumes or [],
                 identity["runAsGroup"],
             )
+            execd_installer = next(
+                container
+                for container in merged_pod_spec["initContainers"]
+                if container.get("name") == "execd-installer"
+            )
+            init_container = _build_execd_init_container(
+                execd_image,
+                self.execd_init_resources,
+                disable_ipv6_for_egress=disable_ipv6_for_egress,
+                subpath_initializer_plan=json.dumps(plan_entries, separators=(",", ":")),
+                subpath_initializer_fs_group=identity["runAsGroup"],
+                subpath_initializer_volume_mounts=root_mounts,
+            )
+            execd_installer.clear()
+            execd_installer.update(_container_to_dict(init_container))
         ensure_egress_runtime_compatible(
             network_policy,
             effective_runtime_class=merged_pod_spec.get("runtimeClassName"),
@@ -478,23 +501,6 @@ class BatchSandboxProvider(WorkloadProvider):
         if not isinstance(extra_mounts, list):
             extra_mounts = []
         return extra_volumes, extra_mounts
-
-    def _reject_template_subpath_initializer_collision(self) -> None:
-        """Reject templates that try to define the server-reserved initializer."""
-        template = self.template_manager.get_base_template()
-        template_spec = (
-            template.get("spec", {}).get("template", {}).get("spec", {})
-            if isinstance(template, dict)
-            else {}
-        )
-        init_containers = template_spec.get("initContainers", [])
-        if isinstance(init_containers, list) and any(
-            isinstance(container, dict) and container.get("name") == SUBPATH_INITIALIZER_NAME
-            for container in init_containers
-        ):
-            raise ValueError(
-                f"Pod template cannot define reserved init container '{SUBPATH_INITIALIZER_NAME}'."
-            )
 
     def _merge_pod_spec_extras(
         self,

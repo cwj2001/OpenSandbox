@@ -33,6 +33,22 @@ Kubernetes PVCs need a [Container Storage Interface (CSI)](https://kubernetes-cs
 
 The server must run on the Kubernetes runtime with the BatchSandbox workload provider. The stock Helm chart grants the RBAC needed by both BYO mounts and server-managed provisioning (`get`/`create`/`list`/`delete`/`patch` on `persistentvolumeclaims`).
 
+For `ensureSubPathDirectory`, deploy an execd image containing
+`/opensandbox-subpath-initializer` and explicitly enable the Kubernetes feature
+gate. The stock chart leaves the gate disabled until an initializer-capable execd
+release is configured:
+
+```toml
+[runtime]
+execd_image = "<published initializer-capable execd image>"
+
+[kubernetes]
+enable_sub_path_initializer = true
+```
+
+The existing `execd-installer` init container performs the initialization; this
+does not add a second init container or image pull.
+
 ### Python SDK
 
 ```shell

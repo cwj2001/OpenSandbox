@@ -152,8 +152,10 @@ directory. It preserves runtime-required capabilities, seccomp, and AppArmor
 settings and does not otherwise replace the security context. Storage and mount
 behavior remains Kubernetes/CSI dependent; the initializer does not recursively
 alter existing paths. The JSON wire field is
-`ensureSubPathDirectory`. Use a compatible published execd image that contains
-`/opensandbox-subpath-initializer`.
+`ensureSubPathDirectory`. An administrator must use a compatible published execd
+image that contains `/opensandbox-subpath-initializer` and set
+`[kubernetes].enable_sub_path_initializer = true`; otherwise the request is
+rejected before any PVC or workload is created.
 
 ### 2. Custom Health Check
 

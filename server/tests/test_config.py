@@ -179,6 +179,26 @@ def test_runtime_execd_run_as_init_defaults_false(tmp_path):
     assert loaded.runtime.execd_run_as_init is False
 
 
+def test_kubernetes_subpath_initializer_gate_defaults_false_and_parses(tmp_path):
+    toml = """
+        [runtime]
+        type = "kubernetes"
+        execd_image = "opensandbox/execd:test"
+
+        [kubernetes]
+        namespace = "sandbox"
+        enable_sub_path_initializer = true
+        """
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(toml)
+
+    loaded = config_module.load_config(config_path)
+
+    assert loaded.kubernetes is not None
+    assert loaded.kubernetes.enable_sub_path_initializer is True
+    assert config_module.KubernetesRuntimeConfig().enable_sub_path_initializer is False
+
+
 def test_docker_runtime_disallows_kubernetes_block():
     server_cfg = ServerConfig()
     runtime_cfg = RuntimeConfig(type="docker", execd_image="busybox:latest")
