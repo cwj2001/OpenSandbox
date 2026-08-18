@@ -27,6 +27,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var (
+	fchown = unix.Fchown
+	fchmod = unix.Fchmod
+)
+
 // PlanEntry names one trusted PVC root mount and the relative paths to create beneath it.
 type PlanEntry struct {
 	MountPath string   `json:"mountPath"`
@@ -123,21 +128,24 @@ func mkdirAt(rootFD int, subPath string, fsGroup *int) error {
 			return err
 		}
 		nextFD, err := unix.Openat(currentFD, segment, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
-		if currentFD != rootFD {
-			unix.Close(currentFD)
-		}
 		if err != nil {
+			if currentFD != rootFD {
+				unix.Close(currentFD)
+			}
 			return err
 		}
 		if created && fsGroup != nil {
-			if err := unix.Fchown(nextFD, -1, *fsGroup); err != nil {
+			if err := fchown(nextFD, -1, *fsGroup); err != nil {
 				unix.Close(nextFD)
-				return err
+				return removeUninitializedDirectory(currentFD, segment, err)
 			}
-			if err := unix.Fchmod(nextFD, 02770); err != nil {
+			if err := fchmod(nextFD, 02770); err != nil {
 				unix.Close(nextFD)
-				return err
+				return removeUninitializedDirectory(currentFD, segment, err)
 			}
+		}
+		if currentFD != rootFD {
+			unix.Close(currentFD)
 		}
 		currentFD = nextFD
 	}
@@ -145,6 +153,13 @@ func mkdirAt(rootFD int, subPath string, fsGroup *int) error {
 		return unix.Close(currentFD)
 	}
 	return nil
+}
+
+func removeUninitializedDirectory(parentFD int, segment string, operationErr error) error {
+	if err := unix.Unlinkat(parentFD, segment, unix.AT_REMOVEDIR); err != nil {
+		return fmt.Errorf("%w (remove uninitialized directory: %v)", operationErr, err)
+	}
+	return operationErr
 }
 
 func validateFSGroup(fsGroup *int) error {

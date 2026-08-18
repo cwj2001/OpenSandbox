@@ -17,12 +17,53 @@
 package subpathinitializer
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"syscall"
 	"testing"
 )
+
+func TestApplyRemovesNewDirectoryWhenOwnershipInitializationFails(t *testing.T) {
+	root := t.TempDir()
+	fsGroup := 1234
+	originalFchown := fchown
+	fchown = func(int, int, int) error {
+		return errors.New("root-squashed")
+	}
+	t.Cleanup(func() {
+		fchown = originalFchown
+	})
+
+	err := Apply([]PlanEntry{{MountPath: root, SubPaths: []string{"jobs"}}}, &fsGroup)
+	if err == nil {
+		t.Fatal("Apply() succeeded")
+	}
+	if _, err := os.Stat(filepath.Join(root, "jobs")); !os.IsNotExist(err) {
+		t.Fatalf("uninitialized directory remains: %v", err)
+	}
+}
+
+func TestApplyRemovesNewDirectoryWhenModeInitializationFails(t *testing.T) {
+	root := t.TempDir()
+	fsGroup := 1234
+	originalFchmod := fchmod
+	fchmod = func(int, uint32) error {
+		return errors.New("chmod denied")
+	}
+	t.Cleanup(func() {
+		fchmod = originalFchmod
+	})
+
+	err := Apply([]PlanEntry{{MountPath: root, SubPaths: []string{"jobs"}}}, &fsGroup)
+	if err == nil {
+		t.Fatal("Apply() succeeded")
+	}
+	if _, err := os.Stat(filepath.Join(root, "jobs")); !os.IsNotExist(err) {
+		t.Fatalf("uninitialized directory remains: %v", err)
+	}
+}
 
 func TestParsePlanRejectsUnsafeAndMalformedInput(t *testing.T) {
 	tests := []string{
