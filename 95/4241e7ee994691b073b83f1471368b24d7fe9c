@@ -1,0 +1,14 @@
+oseps/0023-ha-server-managed-snapshots.md
+  h_ccf8ab871ccace 12-31,33,35-38,40-43,47-101,105-242,246,248-250,252,254-255,257,259-260,262,264-267,269,271-274,276,278,280-281,283-289,291-294
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "954241e7ee994691b073b83f1471368b24d7fe9c",
+  "prompts": {},
+  "humans": {
+    "h_ccf8ab871ccace": {
+      "author": "cwj2001 <74065082+cwj2001@users.noreply.github.com>"
+    }
+  }
+}
