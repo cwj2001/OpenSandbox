@@ -32,6 +32,7 @@ from opensandbox_server.api.schema import (
     UpdatePoolRequest,
 )
 from opensandbox_server.services.constants import SandboxErrorCodes
+from opensandbox_server.services.k8s.pool_service import PoolService
 
 
 _POOL_SERVICE_PATCH = "opensandbox_server.api.pool._get_pool_service"
@@ -53,6 +54,10 @@ def _pool_response(
     total: int = 2,
     allocated: int = 1,
     available: int = 1,
+    terminating: int = 0,
+    oldest_terminating_age_seconds: int = 0,
+    degraded: bool = False,
+    degraded_reason: str = "",
 ) -> PoolResponse:
     return PoolResponse(
         name=name,
@@ -62,6 +67,10 @@ def _pool_response(
             allocated=allocated,
             available=available,
             revision="rev-1",
+            terminating=terminating,
+            oldestTerminatingAgeSeconds=oldest_terminating_age_seconds,
+            degraded=degraded,
+            degradedReason=degraded_reason,
         ),
     )
 
@@ -232,6 +241,50 @@ class TestListPoolsRoute:
         assert pool["status"]["total"] == 5
         assert pool["status"]["allocated"] == 3
         assert pool["status"]["available"] == 2
+
+    def test_list_pools_response_exposes_sanitized_termination_debt(self, client: TestClient, auth_headers: dict):
+        mock_svc = MagicMock()
+        mock_svc.list_pools.return_value = ListPoolsResponse(
+            items=[_pool_response(
+                "p",
+                terminating=2,
+                oldest_terminating_age_seconds=123,
+                degraded=True,
+                degraded_reason="TerminationDebt",
+            )]
+        )
+        with patch(_POOL_SERVICE_PATCH, return_value=mock_svc):
+            response = client.get("/pools", headers=auth_headers)
+
+        status = response.json()["items"][0]["status"]
+        assert status["terminating"] == 2
+        assert status["oldestTerminatingAgeSeconds"] == 123
+        assert status["degraded"] is True
+        assert status["degradedReason"] == "TerminationDebt"
+
+
+    def test_pool_service_decodes_termination_debt_from_crd_status(self):
+        service = PoolService(MagicMock(), "default")
+        pool = service._pool_from_raw({
+            "metadata": {"name": "p"},
+            "spec": {"capacitySpec": {"bufferMax": 1, "bufferMin": 0, "poolMax": 2, "poolMin": 0}},
+            "status": {
+                "total": 2,
+                "allocated": 1,
+                "available": 0,
+                "revision": "rev",
+                "terminating": 1,
+                "oldestTerminatingAgeSeconds": 456,
+                "degraded": True,
+                "degradedReason": "TerminationDebt",
+            },
+        })
+
+        assert pool.status is not None
+        assert pool.status.terminating == 1
+        assert pool.status.oldest_terminating_age_seconds == 456
+        assert pool.status.degraded is True
+        assert pool.status.degraded_reason == "TerminationDebt"
 
 
 class TestGetPoolRoute:

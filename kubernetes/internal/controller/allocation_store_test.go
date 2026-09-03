@@ -21,12 +21,27 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	sandboxv1alpha1 "github.com/alibaba/OpenSandbox/sandbox-k8s/apis/sandbox/v1alpha1"
 )
+
+func recoveryPool(name string) *sandboxv1alpha1.Pool {
+	return &sandboxv1alpha1.Pool{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", UID: types.UID(name + "-uid")}}
+}
+
+func recoveryPod(name string, pool *sandboxv1alpha1.Pool) *corev1.Pod {
+	controller := true
+	return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Name:            name,
+		Namespace:       pool.Namespace,
+		OwnerReferences: []metav1.OwnerReference{{UID: pool.UID, Controller: &controller}},
+	}}
+}
 
 func TestInMemoryAllocationStore_GetAllocation_Empty(t *testing.T) {
 	store := NewInMemoryAllocationStore()
@@ -145,6 +160,7 @@ func TestInMemoryAllocationStore_GetAllocation_IsolatedByPool(t *testing.T) {
 func TestInMemoryAllocationStore_Recover(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = sandboxv1alpha1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	allocation1 := &SandboxAllocation{Pods: []string{"pod1", "pod2"}}
 	allocation2 := &SandboxAllocation{Pods: []string{"pod3", "pod4"}}
@@ -191,10 +207,13 @@ func TestInMemoryAllocationStore_Recover(t *testing.T) {
 			PoolRef: "pool2",
 		},
 	}
+	pool1 := recoveryPool("pool1")
+	pool2 := recoveryPool("pool2")
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithObjects(sandbox1, sandbox2, sandbox3).
+		WithObjects(sandbox1, sandbox2, sandbox3, pool1, pool2,
+			recoveryPod("pod1", pool1), recoveryPod("pod2", pool1), recoveryPod("pod3", pool1), recoveryPod("pod4", pool1)).
 		Build()
 
 	store := NewInMemoryAllocationStore().(*InMemoryAllocationStore)
@@ -203,18 +222,21 @@ func TestInMemoryAllocationStore_Recover(t *testing.T) {
 	err := store.Recover(ctx, client)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "sandbox1", store.pools["default/pool1"].data["pod1"])
-	assert.Equal(t, "sandbox1", store.pools["default/pool1"].data["pod2"])
-	assert.Equal(t, "sandbox2", store.pools["default/pool1"].data["pod3"])
+	pool1Key := store.poolKeyFor(pool1)
+	pool2Key := store.poolKeyFor(pool2)
+	assert.Equal(t, "sandbox1", store.pools[pool1Key].data["pod1"])
+	assert.Equal(t, "sandbox1", store.pools[pool1Key].data["pod2"])
+	assert.Equal(t, "sandbox2", store.pools[pool1Key].data["pod3"])
 	// pod4 is in alloc-released (completed recycle), so it should be excluded from the pool.
-	assert.Equal(t, "", store.pools["default/pool1"].data["pod4"])
+	assert.Equal(t, "", store.pools[pool1Key].data["pod4"])
 
-	assert.Equal(t, 0, len(store.pools["default/pool2"].data), "pool2 should have no allocations")
+	assert.Equal(t, 0, len(store.pools[pool2Key].data), "pool2 should have no allocations")
 }
 
 func TestInMemoryAllocationStore_Recover_ReleaseOnlyOwnPods(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = sandboxv1alpha1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	allocation1 := &SandboxAllocation{Pods: []string{"pod1"}}
 	// sandbox1 has completed recycling pod1 (alloc-released), so pod1 should be freed.
@@ -251,10 +273,11 @@ func TestInMemoryAllocationStore_Recover_ReleaseOnlyOwnPods(t *testing.T) {
 			PoolRef: "pool1",
 		},
 	}
+	pool1 := recoveryPool("pool1")
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithObjects(sandbox2, sandbox1).
+		WithObjects(sandbox2, sandbox1, pool1, recoveryPod("pod1", pool1)).
 		Build()
 
 	store := NewInMemoryAllocationStore().(*InMemoryAllocationStore)
@@ -263,12 +286,13 @@ func TestInMemoryAllocationStore_Recover_ReleaseOnlyOwnPods(t *testing.T) {
 	err := store.Recover(ctx, client)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "sandbox2", store.pools["default/pool1"].data["pod1"])
+	assert.Equal(t, "sandbox2", store.pools[store.poolKeyFor(pool1)].data["pod1"])
 }
 
 func TestInMemoryAllocationStore_Recover_ReleasePodReassignedMultipleTimes(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = sandboxv1alpha1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	allocation1 := &SandboxAllocation{Pods: []string{"pod1"}}
 	released1 := &AllocationReleased{Pods: []string{"pod1"}}
@@ -316,10 +340,11 @@ func TestInMemoryAllocationStore_Recover_ReleasePodReassignedMultipleTimes(t *te
 		},
 		Spec: sandboxv1alpha1.BatchSandboxSpec{PoolRef: "pool1"},
 	}
+	pool1 := recoveryPool("pool1")
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithObjects(sandbox3, sandbox2, sandbox1).
+		WithObjects(sandbox3, sandbox2, sandbox1, pool1, recoveryPod("pod1", pool1)).
 		Build()
 
 	store := NewInMemoryAllocationStore().(*InMemoryAllocationStore)
@@ -328,12 +353,13 @@ func TestInMemoryAllocationStore_Recover_ReleasePodReassignedMultipleTimes(t *te
 	err := store.Recover(ctx, client)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "sandbox3", store.pools["default/pool1"].data["pod1"])
+	assert.Equal(t, "sandbox3", store.pools[store.poolKeyFor(pool1)].data["pod1"])
 }
 
 func TestInMemoryAllocationStore_Recover_ClearsExisting(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = sandboxv1alpha1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	client := fake.NewClientBuilder().WithScheme(scheme).Build()
 	store := NewInMemoryAllocationStore().(*InMemoryAllocationStore)
@@ -356,18 +382,82 @@ func TestInMemoryAllocationStore_Recover_ClearsExisting(t *testing.T) {
 			PoolRef: "pool1",
 		},
 	}
+	pool1 := recoveryPool("pool1")
 
 	client = fake.NewClientBuilder().
 		WithScheme(scheme).
-		WithObjects(sandbox).
+		WithObjects(sandbox, pool1, recoveryPod("new-pod", pool1)).
 		Build()
 
 	err := store.Recover(ctx, client)
 	assert.NoError(t, err)
 
-	_, exists := store.pools["default/pool1"].data["old-pod"]
+	_, exists := store.pools[store.poolKeyFor(pool1)].data["old-pod"]
 	assert.False(t, exists, "old allocation should be cleared")
-	assert.Equal(t, "sandbox1", store.pools["default/pool1"].data["new-pod"])
+	assert.Equal(t, "sandbox1", store.pools[store.poolKeyFor(pool1)].data["new-pod"])
+}
+
+func TestInMemoryAllocationStore_RecoverDoesNotAdoptDeletedLegacyPoolAllocation(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = sandboxv1alpha1.AddToScheme(scheme)
+	pool := recoveryPool("pool")
+	legacy := &sandboxv1alpha1.BatchSandbox{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "sandbox",
+			Namespace:   "default",
+			Annotations: map[string]string{AnnoAllocStatusKey: `{"pods":["old-pod"]}`},
+		},
+		Spec: sandboxv1alpha1.BatchSandboxSpec{PoolRef: pool.Name},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pool, legacy).Build()
+	store := NewInMemoryAllocationStore()
+	if err := store.Recover(context.Background(), client); err != nil {
+		t.Fatal(err)
+	}
+	allocation, err := store.GetAllocation(context.Background(), pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(allocation.PodAllocation) != 0 {
+		t.Fatalf("replacement pool adopted deleted legacy allocation: %v", allocation.PodAllocation)
+	}
+	if legacy.Annotations[AnnoAllocStatusKey] == "" {
+		t.Fatal("restart recovery modified durable legacy allocation evidence")
+	}
+}
+
+func TestInMemoryAllocationStore_RecoverLegacyKeepsActivePodWhenReleasedPodIsAbsent(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = sandboxv1alpha1.AddToScheme(scheme)
+	pool := recoveryPool("pool")
+	sandbox := &sandboxv1alpha1.BatchSandbox{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sandbox",
+			Namespace: "default",
+			Annotations: map[string]string{
+				AnnoAllocStatusKey:   `{"pods":["active-pod","released-pod"]}`,
+				AnnoAllocReleasedKey: `{"pods":["released-pod"]}`,
+			},
+		},
+		Spec: sandboxv1alpha1.BatchSandboxSpec{PoolRef: pool.Name},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pool, sandbox, recoveryPod("active-pod", pool)).Build()
+	store := NewInMemoryAllocationStore()
+	if err := store.Recover(context.Background(), client); err != nil {
+		t.Fatal(err)
+	}
+	allocation, err := store.GetAllocation(context.Background(), pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allocation.PodAllocation["active-pod"] != sandbox.Name {
+		t.Fatalf("active owned pod was not recovered: %v", allocation.PodAllocation)
+	}
+	if _, exists := allocation.PodAllocation["released-pod"]; exists {
+		t.Fatalf("released absent pod was recovered: %v", allocation.PodAllocation)
+	}
 }
 
 func TestInMemoryAllocationStore_ThreadSafety(t *testing.T) {

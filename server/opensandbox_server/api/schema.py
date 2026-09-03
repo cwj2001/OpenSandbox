@@ -970,6 +970,21 @@ class PoolStatus(BaseModel):
     allocated: int = Field(..., description="Number of nodes currently allocated to sandboxes.")
     available: int = Field(..., description="Number of nodes currently available in the pool.")
     revision: str = Field(..., description="Latest revision identifier of the pool.")
+    terminating: int = Field(0, description="Number of physically present pods awaiting deletion.")
+    oldest_terminating_age_seconds: int = Field(
+        0,
+        alias="oldestTerminatingAgeSeconds",
+        description="Age in seconds of the oldest terminating pod, without pod identity.",
+    )
+    degraded: bool = Field(False, description="Whether termination debt is reducing schedulable capacity.")
+    degraded_reason: str = Field(
+        "",
+        alias="degradedReason",
+        description="Sanitized reason for the degraded state.",
+    )
+
+    class Config:
+        populate_by_name = True
 
 
 class PoolResponse(BaseModel):

@@ -120,6 +120,14 @@ type PoolStatus struct {
 	Available int32 `json:"available"`
 	// Updated is the number of nodes that have been updated to the latest revision.
 	Updated int32 `json:"updated,omitempty"`
+	// Terminating is the number of physically present pods that are awaiting deletion.
+	Terminating int32 `json:"terminating,omitempty"`
+	// OldestTerminatingAgeSeconds is the age of the oldest terminating pod, without pod identity.
+	OldestTerminatingAgeSeconds int64 `json:"oldestTerminatingAgeSeconds,omitempty"`
+	// Degraded reports that termination debt is reducing the pool's schedulable capacity.
+	Degraded bool `json:"degraded,omitempty"`
+	// DegradedReason is a sanitized reason for the degraded state.
+	DegradedReason string `json:"degradedReason,omitempty"`
 }
 
 // +genclient
@@ -130,6 +138,7 @@ type PoolStatus struct {
 // +kubebuilder:printcolumn:name="ALLOCATED",type="integer",JSONPath=".status.allocated",description="The number of allocated nodes in pool."
 // +kubebuilder:printcolumn:name="AVAILABLE",type="integer",JSONPath=".status.available",description="The number of available nodes in pool."
 // +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updated",description="The number of nodes updated to the latest revision."
+// +kubebuilder:printcolumn:name="TERMINATING",type="integer",JSONPath=".status.terminating",description="The number of pods awaiting physical deletion."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // Pool is the Schema for the pools API.
 type Pool struct {

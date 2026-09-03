@@ -33,6 +33,7 @@ const (
 
 	FinalizerTaskCleanup    = "batch-sandbox.sandbox.opensandbox.io/task-cleanup"
 	FinalizerPoolAllocation = "pool.sandbox.opensandbox.io/pool-allocation"
+	FinalizerPoolCleanup    = "pool.sandbox.opensandbox.io/allocation-cleanup"
 )
 
 // AnnotationSandboxEndpoints Use the exported constant from pkg/utils
@@ -41,6 +42,7 @@ var AnnotationSandboxEndpoints = pkgutils.AnnotationEndpoints
 type SandboxAllocation struct {
 	Pods       []string `json:"pods"`
 	PoolRef    string   `json:"poolRef"`
+	PoolUID    string   `json:"poolUID,omitempty"`
 	Generation int64    `json:"generation"`
 }
 

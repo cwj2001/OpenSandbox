@@ -31,6 +31,10 @@ spec:
       jsonPath: .status.updated
       name: UPDATED
       type: integer
+    - description: The number of pods awaiting physical deletion.
+      jsonPath: .status.terminating
+      name: TERMINATING
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -154,15 +158,29 @@ spec:
                   in the pool.
                 format: int32
                 type: integer
+              degraded:
+                description: Degraded reports that termination debt is reducing the pool's schedulable capacity.
+                type: boolean
+              degradedReason:
+                description: DegradedReason is a sanitized reason for the degraded state.
+                type: string
               observedGeneration:
                 description: |-
                   ObservedGeneration is the most recent generation observed for this BatchSandbox. It corresponds to the
                   BatchSandbox's generation, which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              oldestTerminatingAgeSeconds:
+                description: OldestTerminatingAgeSeconds is the age of the oldest terminating pod, without pod identity.
+                format: int64
+                type: integer
               revision:
                 description: Revision is the latest version of pool
                 type: string
+              terminating:
+                description: Terminating is the number of physically present pods that are awaiting deletion.
+                format: int32
+                type: integer
               total:
                 description: Total is the total number of nodes in the pool.
                 format: int32

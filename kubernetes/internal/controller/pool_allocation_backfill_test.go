@@ -36,7 +36,7 @@ import (
 
 func TestBackfillLegacyPoolAllocation(t *testing.T) {
 	ctx := context.Background()
-	pool := &sandboxv1alpha1.Pool{ObjectMeta: metav1.ObjectMeta{Name: "pool-a", Namespace: "default"}}
+	pool := &sandboxv1alpha1.Pool{ObjectMeta: metav1.ObjectMeta{Name: "pool-a", Namespace: "default", UID: "pool-uid"}}
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
 		Name:      "pool-pod",
 		Namespace: "default",
@@ -52,7 +52,7 @@ func TestBackfillLegacyPoolAllocation(t *testing.T) {
 		}
 		updated := getBackfillSandbox(t, ctx, r, sandbox)
 		allocation := parseBackfillAllocation(t, updated)
-		want := SandboxAllocation{Pods: []string{"pool-pod"}, PoolRef: pool.Name, Generation: sandbox.Generation}
+		want := SandboxAllocation{Pods: []string{"pool-pod"}, PoolRef: pool.Name, PoolUID: string(pool.UID), Generation: sandbox.Generation}
 		if !reflect.DeepEqual(allocation, want) {
 			t.Fatalf("allocation = %#v, want %#v", allocation, want)
 		}
@@ -247,7 +247,7 @@ func TestReconcilePoolRequeuesAfterBackfillPatchFailure(t *testing.T) {
 		latestAllocation: map[string]string{allocatedPod.Name: sandbox.Name},
 	}
 
-	result, err := r.reconcilePool(ctx, pool, []*sandboxv1alpha1.BatchSandbox{sandbox}, []*corev1.Pod{allocatedPod, idlePod})
+	result, err := r.reconcilePool(ctx, pool, []*sandboxv1alpha1.BatchSandbox{sandbox}, []*corev1.Pod{allocatedPod, idlePod}, []*corev1.Pod{allocatedPod, idlePod})
 	if err != nil {
 		t.Fatalf("reconcilePool() error = %v, want nil", err)
 	}

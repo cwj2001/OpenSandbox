@@ -56,7 +56,6 @@ import (
 	"github.com/alibaba/OpenSandbox/sandbox-k8s/internal/controller/eviction"
 	"github.com/alibaba/OpenSandbox/sandbox-k8s/internal/controller/recycle"
 	"github.com/alibaba/OpenSandbox/sandbox-k8s/internal/utils"
-	controllerutils "github.com/alibaba/OpenSandbox/sandbox-k8s/internal/utils/controller"
 	"github.com/alibaba/OpenSandbox/sandbox-k8s/internal/utils/expectations"
 	"github.com/alibaba/OpenSandbox/sandbox-k8s/internal/utils/fieldindex"
 )
@@ -127,11 +126,8 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	pool := &sandboxv1alpha1.Pool{}
 	if err := r.Get(ctx, req.NamespacedName, pool); err != nil {
 		if errors.IsNotFound(err) {
-			// Pool resource not found, could have been deleted
-			controllerKey := req.NamespacedName.String()
-			PoolScaleExpectations.DeleteExpectations(controllerKey)
-			r.Allocator.ClearPoolAllocation(ctx, req.Namespace, req.Name)
-			log.Info("Pool resource not found, cleaned up scale expectations", "pool", controllerKey)
+			// A recreated pool may have the same namespace/name. Never clear its
+			// name-keyed in-memory state from a stale delete reconcile.
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request
@@ -139,14 +135,21 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		return ctrl.Result{}, err
 	}
 	if !pool.DeletionTimestamp.IsZero() {
-		controllerKey := controllerutils.GetControllerKey(pool)
-		PoolScaleExpectations.DeleteExpectations(controllerKey)
-		r.Allocator.ClearPoolAllocation(ctx, req.Namespace, req.Name)
-		log.Info("Pool resource is being deleted, cleaned up scale expectations", "pool", controllerKey)
-		return ctrl.Result{}, nil
+		if !controllerutil.ContainsFinalizer(pool, FinalizerPoolCleanup) {
+			return ctrl.Result{}, fmt.Errorf("pool deletion cannot safely proceed without cleanup finalizer")
+		}
+		return r.reconcileDeletingPool(ctx, pool)
+	}
+	if !controllerutil.ContainsFinalizer(pool, FinalizerPoolCleanup) {
+		if err := utils.UpdateFinalizer(r.Client, pool, utils.AddFinalizerOpType, FinalizerPoolCleanup); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: time.Millisecond * 100}, nil
 	}
 
-	// List all pods of the pool
+	// List every physically present pod. Pods with a deletion timestamp remain
+	// owned resources until the API server removes them; they must consume
+	// capacity, but must never be scheduled.
 	podList := &corev1.PodList{}
 	if err := r.List(ctx, podList, &client.ListOptions{
 		Namespace:     pool.Namespace,
@@ -155,16 +158,9 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 		log.Error(err, "Failed to list pods")
 		return reconcile.Result{}, err
 	}
-	pods := make([]*corev1.Pod, 0, len(podList.Items))
-	for i := range podList.Items {
-		pod := podList.Items[i]
-		PoolScaleExpectations.ObserveScale(controllerutils.GetControllerKey(pool), expectations.Create, pod.Name)
-		if pod.DeletionTimestamp.IsZero() {
-			pods = append(pods, &pod)
-		}
-	}
+	physicalPods, schedulePods := partitionPoolPods(pool, podList.Items)
 
-	// List all batch sandboxes  ref to the pool
+	// List all batch sandboxes ref to the pool
 	batchSandboxList := &sandboxv1alpha1.BatchSandboxList{}
 	if err := r.List(ctx, batchSandboxList, &client.ListOptions{
 		Namespace:     pool.Namespace,
@@ -175,19 +171,202 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	}
 	batchSandboxes := make([]*sandboxv1alpha1.BatchSandbox, 0, len(batchSandboxList.Items))
 	for i := range batchSandboxList.Items {
-		batchSandbox := batchSandboxList.Items[i]
+		batchSandbox := &batchSandboxList.Items[i]
 		if batchSandbox.Spec.Template != nil {
 			continue
 		}
-		batchSandboxes = append(batchSandboxes, &batchSandbox)
+		batchSandboxes = append(batchSandboxes, batchSandbox)
 	}
-	log.Info("Pool reconcile", "pool", pool.Name, "pods", len(pods), "batchSandboxes", len(batchSandboxes))
-	return r.reconcilePool(ctx, pool, batchSandboxes, pods)
+	log.Info("Pool reconcile", "pool", pool.Name, "physicalPods", len(physicalPods), "schedulablePods", len(schedulePods), "batchSandboxes", len(batchSandboxes))
+	return r.reconcilePool(ctx, pool, batchSandboxes, physicalPods, schedulePods)
+}
+
+// reconcileDeletingPool blocks Pool deletion until every durable allocation for
+// this exact Pool UID is physically absent and has been removed from its
+// BatchSandbox. This prevents a same-name replacement pool from inheriting
+// stale allocations.
+func (r *PoolReconciler) reconcileDeletingPool(ctx context.Context, pool *sandboxv1alpha1.Pool) (ctrl.Result, error) {
+	PoolScaleExpectations.DeleteExpectations(poolExpectationKey(pool))
+
+	batchSandboxList := &sandboxv1alpha1.BatchSandboxList{}
+	if err := r.List(ctx, batchSandboxList, client.InNamespace(pool.Namespace)); err != nil {
+		return ctrl.Result{}, err
+	}
+	ownedPodsAbsent, err := r.ensurePoolOwnedPodsAbsent(ctx, pool)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !ownedPodsAbsent {
+		return ctrl.Result{RequeueAfter: defaultRetryTime}, nil
+	}
+	pending := false
+	for i := range batchSandboxList.Items {
+		sandbox := &batchSandboxList.Items[i]
+		candidate := sandbox.Spec.PoolRef == pool.Name
+		allocation, err := parseSandboxAllocation(sandbox)
+		if err != nil {
+			if candidate {
+				return ctrl.Result{}, err
+			}
+			continue
+		}
+		if !candidate && allocation.PoolUID != string(pool.UID) {
+			continue
+		}
+		if !allocationBelongsToPool(allocation, sandbox, pool) {
+			continue
+		}
+
+		absent, err := r.ensureAllocatedPodsAbsent(ctx, pool, allocation.Pods)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if !absent {
+			pending = true
+			continue
+		}
+		if err := r.clearSandboxPoolAllocation(ctx, sandbox, pool); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	if pending {
+		return ctrl.Result{RequeueAfter: defaultRetryTime}, nil
+	}
+
+	if err := r.Allocator.ClearPoolAllocation(ctx, pool.Namespace, pool.Name); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := utils.UpdateFinalizer(r.Client, pool, utils.RemoveFinalizerOpType, FinalizerPoolCleanup); err != nil && !errors.IsNotFound(err) {
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
+}
+
+// allocationBelongsToPool requires the durable UID when present. Legacy
+// pods-only evidence is retained for the matching PoolRef so it can be safely
+// backfilled or cleaned before a same-name replacement is admitted.
+func allocationBelongsToPool(allocation SandboxAllocation, sandbox *sandboxv1alpha1.BatchSandbox, pool *sandboxv1alpha1.Pool) bool {
+	if allocation.PoolUID != "" {
+		return allocation.PoolUID == string(pool.UID)
+	}
+	return sandbox.Spec.PoolRef == pool.Name && (allocation.PoolRef == "" || allocation.PoolRef == pool.Name)
+}
+
+// ensurePoolOwnedPodsAbsent lists every physical Pod controlled by the exact
+// Pool UID and drives each active one into deletion. Allocation coverage is
+// insufficient because idle Pods are also owned resources of the Pool.
+func (r *PoolReconciler) ensurePoolOwnedPodsAbsent(ctx context.Context, pool *sandboxv1alpha1.Pool) (bool, error) {
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList, client.InNamespace(pool.Namespace)); err != nil {
+		return false, err
+	}
+	absent := true
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if !podOwnedByPool(pod, pool.UID) {
+			continue
+		}
+		absent = false
+		if pod.DeletionTimestamp.IsZero() {
+			if err := r.Delete(ctx, pod); err != nil && !errors.IsNotFound(err) {
+				return false, err
+			}
+		}
+	}
+	return absent, nil
+}
+
+// ensureAllocatedPodsAbsent initiates deletion when needed and returns true
+// only once every allocated pod is NotFound. A pod with a deletion timestamp
+// is still physical and intentionally keeps cleanup pending.
+func (r *PoolReconciler) ensureAllocatedPodsAbsent(ctx context.Context, pool *sandboxv1alpha1.Pool, podNames []string) (bool, error) {
+	absent := true
+	for _, podName := range podNames {
+		pod := &corev1.Pod{}
+		err := r.Get(ctx, types.NamespacedName{Namespace: pool.Namespace, Name: podName}, pod)
+		if errors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		if !podOwnedByPool(pod, pool.UID) {
+			// A same-name Pod owned by another controller is not this Pool's
+			// physical resource. Treat the original allocation Pod as absent.
+			continue
+		}
+		absent = false
+		if pod.DeletionTimestamp.IsZero() {
+			if err := r.Delete(ctx, pod); err != nil && !errors.IsNotFound(err) {
+				return false, err
+			}
+		}
+	}
+	return absent, nil
+}
+
+func podOwnedByPool(pod *corev1.Pod, poolUID types.UID) bool {
+	for _, owner := range pod.OwnerReferences {
+		if owner.Controller != nil && *owner.Controller && owner.UID == poolUID {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *PoolReconciler) clearSandboxPoolAllocation(ctx context.Context, sandbox *sandboxv1alpha1.BatchSandbox, pool *sandboxv1alpha1.Pool) error {
+	latest := &sandboxv1alpha1.BatchSandbox{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(sandbox), latest); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	allocation, err := parseSandboxAllocation(latest)
+	if err != nil {
+		return err
+	}
+	if !allocationBelongsToPool(allocation, latest, pool) {
+		return nil
+	}
+	annotations := latest.GetAnnotations()
+	delete(annotations, AnnoAllocStatusKey)
+	delete(annotations, AnnoAllocReleaseKey)
+	delete(annotations, AnnoAllocReleasedKey)
+	latest.SetAnnotations(annotations)
+	controllerutil.RemoveFinalizer(latest, FinalizerPoolAllocation)
+	return r.Update(ctx, latest)
+}
+
+func poolExpectationKey(pool *sandboxv1alpha1.Pool) string {
+	return string(pool.UID)
+}
+
+// partitionPoolPods splits physically present owned pods from pods that may be
+// scheduled. A terminating pod belongs only to the physical set until its
+// delete event removes it from the API server.
+func partitionPoolPods(pool *sandboxv1alpha1.Pool, podItems []corev1.Pod) ([]*corev1.Pod, []*corev1.Pod) {
+	physicalPods := make([]*corev1.Pod, 0, len(podItems))
+	schedulePods := make([]*corev1.Pod, 0, len(podItems))
+	for i := range podItems {
+		pod := &podItems[i]
+		PoolScaleExpectations.ObserveScale(poolExpectationKey(pool), expectations.Create, pod.Name)
+		physicalPods = append(physicalPods, pod)
+		if pod.DeletionTimestamp.IsZero() {
+			schedulePods = append(schedulePods, pod)
+		}
+	}
+	return physicalPods, schedulePods
 }
 
 // reconcilePool contains the main reconciliation logic
-func (r *PoolReconciler) reconcilePool(ctx context.Context, pool *sandboxv1alpha1.Pool, batchSandboxes []*sandboxv1alpha1.BatchSandbox, pods []*corev1.Pod) (ctrl.Result, error) {
+func (r *PoolReconciler) reconcilePool(ctx context.Context, pool *sandboxv1alpha1.Pool, batchSandboxes []*sandboxv1alpha1.BatchSandbox, physicalPods, schedulablePods []*corev1.Pod) (ctrl.Result, error) {
 	var result ctrl.Result
+	if len(physicalPods) != len(schedulablePods) {
+		// A terminating pod has no guaranteed follow-up event while its finalizers
+		// are stuck. Poll as a fallback; pod delete events still wake us promptly.
+		result.RequeueAfter = defaultRetryTime
+	}
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// 1. Get latest Pool CR
@@ -197,27 +376,35 @@ func (r *PoolReconciler) reconcilePool(ctx context.Context, pool *sandboxv1alpha
 		}
 
 		// 2. Handle pod eviction
-		schedulePods, evictionErr := r.handleEviction(ctx, latestPool, pods)
+		schedulePods, evictionErr := r.handleEviction(ctx, latestPool, schedulablePods)
 		if schedulePods == nil {
 			return evictionErr
 		}
 
 		// 3. Schedule sandbox (compute + persist + sync)
-		schedResult, err := r.scheduleSandbox(ctx, latestPool, batchSandboxes, schedulePods)
+		schedResult, err := r.scheduleSandbox(ctx, latestPool, batchSandboxes, schedulePods, physicalPods)
 		if err != nil {
 			return err
 		}
 		// Requeue if there are pending sandboxes waiting for scheduling
-		if schedResult.SupplyCnt > 0 {
-			result = ctrl.Result{RequeueAfter: defaultRetryTime}
+		if schedResult.SupplyCnt > 0 && result.RequeueAfter == 0 {
+			result.RequeueAfter = defaultRetryTime
 		}
 
 		// Best-effort compatibility migration for allocations written before PoolRef
 		// was included in the alloc-status annotation. Do not let a patch failure
 		// interrupt scheduling, releasing, or scaling.
 		for _, sandbox := range batchSandboxes {
-			if err := r.backfillLegacyPoolAllocation(ctx, latestPool, sandbox, schedulePods, schedResult.LatestAllocation); err != nil {
+			if err := r.backfillLegacyPoolAllocation(ctx, latestPool, sandbox, physicalPods, schedResult.LatestAllocation); err != nil {
 				logf.FromContext(ctx).Error(err, "Failed to backfill legacy pool allocation", "pool", latestPool.Name, "sandbox", sandbox.Name)
+				if result.RequeueAfter == 0 || result.RequeueAfter > defaultRetryTime {
+					result.RequeueAfter = defaultRetryTime
+				}
+			}
+		}
+		for _, sandbox := range batchSandboxes {
+			if err := r.backfillPoolAllocationUID(ctx, latestPool, sandbox, physicalPods, schedResult.LatestAllocation); err != nil {
+				logf.FromContext(ctx).Error(err, "Failed to backfill pool allocation identity", "pool", latestPool.Name, "sandbox", sandbox.Name)
 				if result.RequeueAfter == 0 || result.RequeueAfter > defaultRetryTime {
 					result.RequeueAfter = defaultRetryTime
 				}
@@ -225,7 +412,7 @@ func (r *PoolReconciler) reconcilePool(ctx context.Context, pool *sandboxv1alpha
 		}
 
 		// 4. Handle pool upgrade
-		updateResult, err := r.updatePool(ctx, latestPool, schedulePods, schedResult.IdlePods)
+		updateResult, err := r.updatePool(ctx, latestPool, schedulePods, schedResult.IdlePods, int32(len(physicalPods)-len(schedulablePods)))
 		if err != nil {
 			return err
 		}
@@ -235,7 +422,8 @@ func (r *PoolReconciler) reconcilePool(ctx context.Context, pool *sandboxv1alpha
 		args := &scaleArgs{
 			updateRevision: updateResult.UpdateRevision,
 			pods:           schedulePods,
-			totalPodCnt:    int32(len(pods)),
+			totalPodCnt:    int32(len(physicalPods)),
+			terminatingCnt: int32(len(physicalPods) - len(schedulablePods)),
 			allocatedCnt:   int32(len(schedResult.LatestAllocation)),
 			idlePods:       updateResult.IdlePods,
 			toDeletePods:   toDeletePods,
@@ -247,7 +435,7 @@ func (r *PoolReconciler) reconcilePool(ctx context.Context, pool *sandboxv1alpha
 		}
 
 		// 6. Update pool status
-		if err := r.updatePoolStatus(ctx, updateResult.UpdateRevision, latestPool, pods, schedulePods, schedResult.LatestAllocation); err != nil {
+		if err := r.updatePoolStatus(ctx, updateResult.UpdateRevision, latestPool, physicalPods, schedulePods, schedResult.LatestAllocation); err != nil {
 			return err
 		}
 
@@ -305,6 +493,7 @@ func (r *PoolReconciler) backfillLegacyPoolAllocation(ctx context.Context, pool 
 
 	allocation.PoolRef = pool.Name
 	allocation.Generation = sandbox.Generation
+	allocation.PoolUID = string(pool.UID)
 	rawAllocation, err := json.Marshal(allocation)
 	if err != nil {
 		return err
@@ -321,6 +510,37 @@ func (r *PoolReconciler) backfillLegacyPoolAllocation(ctx context.Context, pool 
 	obj.Name = sandbox.Name
 	obj.Namespace = sandbox.Namespace
 	return r.Patch(ctx, obj, client.RawPatch(types.MergePatchType, patchData))
+}
+
+// backfillPoolAllocationUID adds immutable Pool UID evidence to allocations
+// written before PoolUID was introduced. Physical ownership and current
+// in-memory allocation must both agree before it changes durable state.
+func (r *PoolReconciler) backfillPoolAllocationUID(ctx context.Context, pool *sandboxv1alpha1.Pool, sandbox *sandboxv1alpha1.BatchSandbox, pods []*corev1.Pod, latestAllocation map[string]string) error {
+	if sandbox.Spec.PoolRef != pool.Name || !controllerutil.ContainsFinalizer(sandbox, FinalizerPoolAllocation) {
+		return nil
+	}
+	allocation, err := parseSandboxAllocation(sandbox)
+	if err != nil || allocation.PoolUID != "" || allocation.PoolRef != pool.Name {
+		return err
+	}
+	poolPods := make(map[string]struct{}, len(pods))
+	for _, pod := range pods {
+		if pod != nil {
+			poolPods[pod.Name] = struct{}{}
+		}
+	}
+	for _, podName := range allocation.Pods {
+		if _, ok := poolPods[podName]; !ok || latestAllocation[podName] != sandbox.Name {
+			return nil
+		}
+	}
+	allocation.PoolUID = string(pool.UID)
+	rawAllocation, err := json.Marshal(allocation)
+	if err != nil {
+		return err
+	}
+	obj := &sandboxv1alpha1.BatchSandbox{ObjectMeta: metav1.ObjectMeta{Name: sandbox.Name, Namespace: sandbox.Namespace}}
+	return r.Patch(ctx, obj, client.RawPatch(types.MergePatchType, []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":%q}}}`, AnnoAllocStatusKey, string(rawAllocation)))))
 }
 
 // parseLegacySandboxAllocation accepts only the historical pods-only JSON
@@ -422,51 +642,43 @@ func (r *PoolReconciler) calculateRevision(pool *sandboxv1alpha1.Pool) (string, 
 
 // SetupWithManager sets up the controller with the Manager.
 // Todo pod deletion expectations
+
 func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
+	poolPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldPool, okOld := e.ObjectOld.(*sandboxv1alpha1.Pool)
+			newPool, okNew := e.ObjectNew.(*sandboxv1alpha1.Pool)
+			if !okOld || !okNew {
+				return false
+			}
+			return oldPool.Generation != newPool.Generation ||
+				(oldPool.DeletionTimestamp.IsZero() && !newPool.DeletionTimestamp.IsZero())
+		},
+	}
+
 	filterBatchSandbox := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			bsb, ok := e.Object.(*sandboxv1alpha1.BatchSandbox)
-			if !ok {
-				return false
-			}
-			return bsb.Spec.PoolRef != ""
+			return ok && bsb.Spec.PoolRef != ""
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldObj, okOld := e.ObjectOld.(*sandboxv1alpha1.BatchSandbox)
 			newObj, okNew := e.ObjectNew.(*sandboxv1alpha1.BatchSandbox)
-			if !okOld || !okNew {
+			if !okOld || !okNew || newObj.Spec.PoolRef == "" {
 				return false
 			}
-			if newObj.Spec.PoolRef == "" {
-				return false
-			}
-			oldVal := oldObj.Annotations[AnnoAllocReleaseKey]
-			newVal := newObj.Annotations[AnnoAllocReleaseKey]
-			if oldVal != newVal {
+			if oldObj.Annotations[AnnoAllocReleaseKey] != newObj.Annotations[AnnoAllocReleaseKey] || oldObj.Spec.Replicas != newObj.Spec.Replicas {
 				return true
 			}
-			if oldObj.Spec.Replicas != newObj.Spec.Replicas {
-				return true
-			}
-			// Trigger reconcile when sandbox enters terminating state (DeletionTimestamp is set).
-			if oldObj.DeletionTimestamp.IsZero() && !newObj.DeletionTimestamp.IsZero() {
-				return true
-			}
-			return false
+			return oldObj.DeletionTimestamp.IsZero() && !newObj.DeletionTimestamp.IsZero()
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
 			bsb, ok := e.Object.(*sandboxv1alpha1.BatchSandbox)
-			if !ok {
-				return false
-			}
-			return bsb.Spec.PoolRef != ""
+			return ok && bsb.Spec.PoolRef != ""
 		},
 		GenericFunc: func(e event.GenericEvent) bool {
 			bsb, ok := e.Object.(*sandboxv1alpha1.BatchSandbox)
-			if !ok {
-				return false
-			}
-			return bsb.Spec.PoolRef != ""
+			return ok && bsb.Spec.PoolRef != ""
 		},
 	}
 
@@ -514,7 +726,7 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconci
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&sandboxv1alpha1.Pool{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		For(&sandboxv1alpha1.Pool{}, builder.WithPredicates(poolPredicate)).
 		Owns(&corev1.Pod{}).
 		Watches(
 			&sandboxv1alpha1.BatchSandbox{},
@@ -535,8 +747,44 @@ func (r *PoolReconciler) doAllocate(ctx context.Context, pool *sandboxv1alpha1.P
 	// 1. Compute latest allocated pods per sandbox (merge current + newly allocated).
 	toSyncMap := r.getLatestAllocated(ctx, pool, batchSandboxes, toAllocate)
 
-	// 2. Concurrently sync each sandbox's Allocated annotation (AddFinalizer is called inside SyncSandboxAllocation).
-	return r.syncSandboxConcurrently(ctx, batchSandboxes, toSyncMap, r.Allocator.SyncSandboxAllocation, "allocated")
+	// 2. Persist allocation and its immutable Pool UID evidence.
+	if err := r.syncSandboxConcurrently(ctx, batchSandboxes, toSyncMap, r.Allocator.SyncSandboxAllocation, "allocated"); err != nil {
+		return err
+	}
+	return r.persistPoolAllocationUIDs(ctx, pool, batchSandboxes, toSyncMap)
+}
+
+func (r *PoolReconciler) persistPoolAllocationUIDs(ctx context.Context, pool *sandboxv1alpha1.Pool, batchSandboxes []*sandboxv1alpha1.BatchSandbox, allocations map[string][]string) error {
+	byName := make(map[string]*sandboxv1alpha1.BatchSandbox, len(batchSandboxes))
+	for _, sandbox := range batchSandboxes {
+		byName[sandbox.Name] = sandbox
+	}
+	for sandboxName := range allocations {
+		sandbox := byName[sandboxName]
+		if sandbox == nil {
+			continue
+		}
+		allocation, err := parseSandboxAllocation(sandbox)
+		if err != nil || allocation.PoolRef != pool.Name || allocation.PoolUID == string(pool.UID) {
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		allocation.PoolUID = string(pool.UID)
+		rawAllocation, err := json.Marshal(allocation)
+		if err != nil {
+			return err
+		}
+		annotations := sandbox.GetAnnotations()
+		annotations[AnnoAllocStatusKey] = string(rawAllocation)
+		sandbox.SetAnnotations(annotations)
+		obj := &sandboxv1alpha1.BatchSandbox{ObjectMeta: metav1.ObjectMeta{Name: sandbox.Name, Namespace: sandbox.Namespace}}
+		if err := r.Patch(ctx, obj, client.RawPatch(types.MergePatchType, []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":%q}}}`, AnnoAllocStatusKey, string(rawAllocation))))); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // getLatestAllocated computes the latest allocated pods for each sandbox by merging current allocation with new pods to allocate.
@@ -760,7 +1008,7 @@ func (r *PoolReconciler) getLatestReleased(ctx context.Context, batchSandboxes [
 	return toSyncMap, orphanPods
 }
 
-func (r *PoolReconciler) scheduleSandbox(ctx context.Context, pool *sandboxv1alpha1.Pool, batchSandboxes []*sandboxv1alpha1.BatchSandbox, pods []*corev1.Pod) (*ScheduleResult, error) {
+func (r *PoolReconciler) scheduleSandbox(ctx context.Context, pool *sandboxv1alpha1.Pool, batchSandboxes []*sandboxv1alpha1.BatchSandbox, pods, physicalPods []*corev1.Pod) (*ScheduleResult, error) {
 	log := logf.FromContext(ctx)
 	// 1. Compute scheduling actions.
 	spec := &AllocSpec{
@@ -800,7 +1048,7 @@ func (r *PoolReconciler) scheduleSandbox(ctx context.Context, pool *sandboxv1alp
 	}
 
 	// 2.2 Execute ToRelease / release in-memory store.
-	toDeletePods, err := r.doRelease(ctx, pool, batchSandboxes, pods, allocAction.ToRelease)
+	toDeletePods, err := r.doRelease(ctx, pool, batchSandboxes, physicalPods, allocAction.ToRelease)
 	if err != nil {
 		return nil, err
 	}
@@ -827,7 +1075,7 @@ func (r *PoolReconciler) scheduleSandbox(ctx context.Context, pool *sandboxv1alp
 	return result, nil
 }
 
-func (r *PoolReconciler) updatePool(ctx context.Context, pool *sandboxv1alpha1.Pool, pods []*corev1.Pod, idlePods []string) (*UpdateResult, error) {
+func (r *PoolReconciler) updatePool(ctx context.Context, pool *sandboxv1alpha1.Pool, pods []*corev1.Pod, idlePods []string, terminatingCnt int32) (*UpdateResult, error) {
 	updateRevision, err := r.calculateRevision(pool)
 	if err != nil {
 		return nil, err
@@ -835,6 +1083,7 @@ func (r *PoolReconciler) updatePool(ctx context.Context, pool *sandboxv1alpha1.P
 	strategy := NewPoolUpdateStrategy(pool)
 	result := strategy.Compute(ctx, updateRevision, pods, idlePods)
 	result.UpdateRevision = updateRevision
+	limitUpdateForTerminationDebt(pool, result, int32(len(pods))+terminatingCnt, terminatingCnt)
 
 	if len(result.ToDeletePods) > 0 {
 		r.Recorder.Eventf(pool, corev1.EventTypeNormal, EventReasonPodUpdated,
@@ -844,10 +1093,28 @@ func (r *PoolReconciler) updatePool(ctx context.Context, pool *sandboxv1alpha1.P
 	return result, nil
 }
 
+// limitUpdateForTerminationDebt makes existing terminating pods consume the
+// rolling-update unavailable budget. Deferred pods remain idle for normal
+// scale accounting and are reconsidered after physical deletion completes.
+func limitUpdateForTerminationDebt(pool *sandboxv1alpha1.Pool, result *UpdateResult, desiredTotal, terminatingCnt int32) {
+	if terminatingCnt == 0 || len(result.ToDeletePods) == 0 {
+		return
+	}
+	budget := max(getUpdateMaxUnavailable(pool, desiredTotal)-terminatingCnt, 0)
+	if int32(len(result.ToDeletePods)) <= budget {
+		return
+	}
+	deferred := result.ToDeletePods[budget:]
+	result.IdlePods = append(result.IdlePods, deferred...)
+	result.ToDeletePods = result.ToDeletePods[:budget]
+	result.SupplyUpdateRevision = int32(len(result.ToDeletePods))
+}
+
 type scaleArgs struct {
 	updateRevision string
 	pods           []*corev1.Pod
-	totalPodCnt    int32 // all pods including evicting ones, for PoolMax enforcement
+	totalPodCnt    int32 // all physically present pods, including terminating ones
+	terminatingCnt int32
 	allocatedCnt   int32
 	supplyCnt      int32 // to create
 	idlePods       []string
@@ -878,11 +1145,11 @@ func (r *PoolReconciler) scalePool(ctx context.Context, pool *sandboxv1alpha1.Po
 	log := logf.FromContext(ctx)
 	errs := make([]error, 0)
 	pods := args.pods
-	if satisfied, unsatisfiedDuration, dirtyPods := PoolScaleExpectations.SatisfiedExpectations(controllerutils.GetControllerKey(pool)); !satisfied {
+	if satisfied, unsatisfiedDuration, dirtyPods := PoolScaleExpectations.SatisfiedExpectations(poolExpectationKey(pool)); !satisfied {
 		if unsatisfiedDuration >= expectations.ExpectationTimeout {
 			log.Info("Pool scale expectations timed out, clearing stale expectations",
 				"unsatisfiedDuration", unsatisfiedDuration, "dirtyPods", dirtyPods)
-			PoolScaleExpectations.DeleteExpectations(controllerutils.GetControllerKey(pool))
+			PoolScaleExpectations.DeleteExpectations(poolExpectationKey(pool))
 		} else {
 			log.Info("Pool scale is not ready, requeue", "unsatisfiedDuration", unsatisfiedDuration, "dirtyPods", dirtyPods)
 			return fmt.Errorf("pool scale is not ready, %v", pool.Name)
@@ -903,17 +1170,23 @@ func (r *PoolReconciler) scalePool(ctx context.Context, pool *sandboxv1alpha1.Po
 
 	// Calculate desired schedulable cnt.
 	desiredSchedulableCnt := max(allocatedCnt+supplyCnt+desiredBufferCnt, pool.Spec.CapacitySpec.PoolMin)
-	// Enforce PoolMax: limit new pods based on total running pods (including evicting).
-	maxNewPods := max(pool.Spec.CapacitySpec.PoolMax-totalPodCnt, 0)
+	desiredSchedulableCnt = min(desiredSchedulableCnt, pool.Spec.CapacitySpec.PoolMax)
+	// A terminating pod is physical capacity debt. It is unavailable for
+	// scheduling, but may borrow at most one existing maxUnavailable budget as
+	// surge capacity. This bounds replacement when deletion is stuck while
+	// retaining the established ScaleStrategy tuning convention.
+	maxPhysicalPodCnt := r.maxPhysicalPods(pool, args.terminatingCnt)
+	maxNewPods := max(maxPhysicalPodCnt-totalPodCnt, 0)
 
 	log.Info("Scale pool decision", "pool", pool.Name,
 		"totalPodCnt", totalPodCnt, "schedulableCnt", schedulableCnt,
+		"terminatingCnt", args.terminatingCnt, "maxPhysicalPodCnt", maxPhysicalPodCnt,
 		"allocatedCnt", allocatedCnt, "bufferCnt", bufferCnt,
 		"desiredBufferCnt", desiredBufferCnt, "supplyCnt", supplyCnt,
 		"desiredSchedulableCnt", desiredSchedulableCnt, "maxNewPods", maxNewPods,
 		"toDeletePods", len(toDeletePods), "idlePods", len(args.idlePods))
 
-	// Scale-up: create new pods if needed and allowed by PoolMax
+	// Scale-up: create new pods if needed and allowed by the physical capacity bound.
 	if desiredSchedulableCnt > schedulableCnt && maxNewPods > 0 {
 		createCnt := min(desiredSchedulableCnt-schedulableCnt, maxNewPods)
 		scaleMaxUnavailable := r.getScaleMaxUnavailable(pool, desiredSchedulableCnt)
@@ -955,7 +1228,7 @@ func (r *PoolReconciler) scalePool(ctx context.Context, pool *sandboxv1alpha1.Po
 	return gerrors.Join(errs...)
 }
 
-func (r *PoolReconciler) updatePoolStatus(ctx context.Context, updateRevision string, pool *sandboxv1alpha1.Pool, pods []*corev1.Pod, schedulePods []*corev1.Pod, podAllocation map[string]string) error {
+func (r *PoolReconciler) updatePoolStatus(ctx context.Context, updateRevision string, pool *sandboxv1alpha1.Pool, physicalPods, schedulePods []*corev1.Pod, podAllocation map[string]string) error {
 	oldStatus := pool.Status.DeepCopy()
 	availableCnt := int32(0)
 	for _, pod := range schedulePods {
@@ -968,51 +1241,86 @@ func (r *PoolReconciler) updatePoolStatus(ctx context.Context, updateRevision st
 		availableCnt++
 	}
 	updatedCnt := int32(0)
-	for _, pod := range pods {
+	for _, pod := range physicalPods {
 		if pod.Labels[LabelPoolRevision] == updateRevision {
 			updatedCnt++
 		}
 	}
+	terminatingCnt, oldestTerminatingAgeSeconds := terminatingPodStatus(physicalPods, time.Now())
 	pool.Status.ObservedGeneration = pool.Generation
-	pool.Status.Total = int32(len(pods))
+	pool.Status.Total = int32(len(physicalPods))
 	pool.Status.Allocated = int32(len(podAllocation))
 	pool.Status.Available = availableCnt
 	pool.Status.Revision = updateRevision
 	pool.Status.Updated = updatedCnt
+	pool.Status.Terminating = terminatingCnt
+	pool.Status.OldestTerminatingAgeSeconds = oldestTerminatingAgeSeconds
+	pool.Status.Degraded = terminatingCnt > 0
+	pool.Status.DegradedReason = ""
+	if pool.Status.Degraded {
+		pool.Status.DegradedReason = "TerminationDebt"
+	}
 	if equality.Semantic.DeepEqual(*oldStatus, pool.Status) {
 		return nil
 	}
 	log := logf.FromContext(ctx)
 	log.Info("Update pool status", "ObservedGeneration", pool.Status.ObservedGeneration, "Total", pool.Status.Total,
-		"Allocated", pool.Status.Allocated, "Available", pool.Status.Available, "Revision", pool.Status.Revision, "Updated", pool.Status.Updated)
+		"Allocated", pool.Status.Allocated, "Available", pool.Status.Available, "Revision", pool.Status.Revision,
+		"Updated", pool.Status.Updated, "Terminating", pool.Status.Terminating,
+		"OldestTerminatingAgeSeconds", pool.Status.OldestTerminatingAgeSeconds, "Degraded", pool.Status.Degraded)
 	if err := r.Status().Update(ctx, pool); err != nil {
 		return err
 	}
 	return nil
 }
 
+// terminatingPodStatus returns aggregate cleanup debt without exposing pod identity.
+func terminatingPodStatus(pods []*corev1.Pod, now time.Time) (int32, int64) {
+	var count int32
+	var oldest time.Time
+	for _, pod := range pods {
+		if pod.DeletionTimestamp.IsZero() {
+			continue
+		}
+		count++
+		if oldest.IsZero() || pod.DeletionTimestamp.Time.Before(oldest) {
+			oldest = pod.DeletionTimestamp.Time
+		}
+	}
+	if oldest.IsZero() || now.Before(oldest) {
+		return count, 0
+	}
+	return count, int64(now.Sub(oldest).Seconds())
+}
+
 func (r *PoolReconciler) pickPodsToDelete(pods []*corev1.Pod, idlePodNames []string, toDeletePodNames []string, scaleIn int32) []*corev1.Pod {
-	podMap := make(map[string]*corev1.Pod)
+	podMap := make(map[string]*corev1.Pod, len(pods))
 	for _, pod := range pods {
 		podMap[pod.Name] = pod
 	}
 
-	var podsToDelete []*corev1.Pod
-	for _, name := range toDeletePodNames {
-		pod, ok := podMap[name]
-		if !ok {
-			continue
+	podsToDelete := make([]*corev1.Pod, 0, len(toDeletePodNames)+int(scaleIn))
+	selected := make(map[string]struct{}, len(toDeletePodNames)+int(scaleIn))
+	appendIfActive := func(pod *corev1.Pod) bool {
+		if pod == nil || !pod.DeletionTimestamp.IsZero() {
+			return false
 		}
+		if _, exists := selected[pod.Name]; exists {
+			return false
+		}
+		selected[pod.Name] = struct{}{}
 		podsToDelete = append(podsToDelete, pod)
+		return true
+	}
+	for _, name := range toDeletePodNames {
+		appendIfActive(podMap[name])
 	}
 
-	var idlePods []*corev1.Pod
+	idlePods := make([]*corev1.Pod, 0, len(idlePodNames))
 	for _, name := range idlePodNames {
-		pod, ok := podMap[name]
-		if !ok {
-			continue
+		if pod, ok := podMap[name]; ok {
+			idlePods = append(idlePods, pod)
 		}
-		idlePods = append(idlePods, pod)
 	}
 	sort.Slice(idlePods, func(i, j int) bool {
 		return idlePods[i].CreationTimestamp.Before(&idlePods[j].CreationTimestamp)
@@ -1021,12 +1329,21 @@ func (r *PoolReconciler) pickPodsToDelete(pods []*corev1.Pod, idlePodNames []str
 		if scaleIn <= 0 {
 			break
 		}
-		if pod.DeletionTimestamp == nil {
-			podsToDelete = append(podsToDelete, pod)
+		if appendIfActive(pod) {
+			scaleIn--
 		}
-		scaleIn -= 1
 	}
 	return podsToDelete
+}
+
+// maxPhysicalPods allows a bounded replacement surge only while deletion debt
+// exists. The surge uses the pool's existing ScaleStrategy.MaxUnavailable
+// resolution, preserving one operational control for scale pacing and debt.
+func (r *PoolReconciler) maxPhysicalPods(pool *sandboxv1alpha1.Pool, terminatingCnt int32) int32 {
+	if terminatingCnt == 0 {
+		return pool.Spec.CapacitySpec.PoolMax
+	}
+	return pool.Spec.CapacitySpec.PoolMax + r.getScaleMaxUnavailable(pool, max(pool.Spec.CapacitySpec.PoolMax, 1))
 }
 
 // getScaleMaxUnavailable returns the resolved maxUnavailable value.
@@ -1078,7 +1395,7 @@ func (r *PoolReconciler) createPoolPod(ctx context.Context, pool *sandboxv1alpha
 		r.Recorder.Eventf(pool, corev1.EventTypeWarning, EventReasonFailedCreate, "Failed to create pool pod: %v", err)
 		return err
 	}
-	PoolScaleExpectations.ExpectScale(controllerutils.GetControllerKey(pool), expectations.Create, pod.Name)
+	PoolScaleExpectations.ExpectScale(poolExpectationKey(pool), expectations.Create, pod.Name)
 	log.Info("Created pool pod", "pool", pool.Name, "pod", pod.Name, "revision", updateRevision)
 	r.Recorder.Eventf(pool, corev1.EventTypeNormal, EventReasonSuccessfulCreate, "Created pool pod: %v", pod.Name)
 	return nil

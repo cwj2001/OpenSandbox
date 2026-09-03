@@ -19,9 +19,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -52,15 +54,17 @@ type poolEntry struct {
 
 // InMemoryAllocationStore depends on annoAllocationSyncer to get allocation info from BatchSandbox.
 type InMemoryAllocationStore struct {
-	poolsMu sync.RWMutex
-	pools   map[string]*poolEntry
-	syncer  *annoAllocationSyncer
+	poolsMu  sync.RWMutex
+	pools    map[string]*poolEntry
+	poolUIDs map[string]types.UID
+	syncer   *annoAllocationSyncer
 }
 
 func NewInMemoryAllocationStore() AllocationStore {
 	return &InMemoryAllocationStore{
-		pools:  make(map[string]*poolEntry),
-		syncer: &annoAllocationSyncer{},
+		pools:    make(map[string]*poolEntry),
+		poolUIDs: make(map[string]types.UID),
+		syncer:   &annoAllocationSyncer{},
 	}
 }
 
@@ -73,6 +77,20 @@ func (store *InMemoryAllocationStore) Recover(ctx context.Context, c client.Clie
 	batchSandboxList := &sandboxv1alpha1.BatchSandboxList{}
 	if err := c.List(ctx, batchSandboxList); err != nil {
 		return fmt.Errorf("failed to list batch sandboxes for recovery: %w", err)
+	}
+	poolList := &sandboxv1alpha1.PoolList{}
+	if err := c.List(ctx, poolList); err != nil {
+		return fmt.Errorf("failed to list pools for allocation recovery: %w", err)
+	}
+	livePools := make(map[string]*sandboxv1alpha1.Pool, len(poolList.Items))
+	for i := range poolList.Items {
+		pool := &poolList.Items[i]
+		livePools[store.poolKey(pool.Namespace, pool.Name)] = pool
+	}
+	livePoolUIDs := make(map[string]types.UID, len(poolList.Items))
+	for i := range poolList.Items {
+		pool := &poolList.Items[i]
+		livePoolUIDs[store.poolKey(pool.Namespace, pool.Name)] = pool.UID
 	}
 
 	// Build new pools map first without holding the lock
@@ -88,55 +106,111 @@ func (store *InMemoryAllocationStore) Recover(ctx context.Context, c client.Clie
 			log.Error(err, "Failed to unmarshal sandbox allocation during recovery", "sandbox", sbx.Name)
 			return err
 		}
-		key := store.poolKey(sbx.Namespace, poolRef)
-		entry, exists := newPools[key]
-		if !exists {
-			entry = &poolEntry{
-				data: make(map[string]string),
-			}
-			newPools[key] = entry
-		}
-
-		for _, podName := range allocation.Pods {
-			entry.data[podName] = sbx.Name
-		}
-		// Filter pods that have already been released (alloc-released records completed recycle).
-		// alloc-release (in-progress) pods must NOT be filtered: the recycle handler is still
-		// processing them and they are still "in use" from the pool's perspective.
 		allocReleased, err := store.syncer.GetReleased(ctx, &sbx)
 		if err != nil {
 			log.Error(err, "Failed to unmarshal sandbox released during recovery", "sandbox", sbx.Name)
 			return err
 		}
-		for _, podName := range allocReleased.Pods {
-			if entry.data[podName] == sbx.Name {
-				delete(entry.data, podName)
+		unreleasedPods := allocationPodsNotReleased(allocation.Pods, allocReleased.Pods)
+
+		pool, exists := livePools[store.poolKey(sbx.Namespace, poolRef)]
+		if allocation.PoolUID != "" {
+			if !exists || allocation.PoolRef != poolRef || allocation.PoolUID != string(pool.UID) {
+				continue
 			}
+		} else {
+			if !exists {
+				continue
+			}
+			owned, err := legacyAllocationPodsOwnedByPool(ctx, c, sbx.Namespace, unreleasedPods, pool.UID)
+			if err != nil {
+				return err
+			}
+			if !owned {
+				continue
+			}
+			allocation.PoolUID = string(pool.UID)
+		}
+		key := store.poolKeyWithUID(sbx.Namespace, poolRef, allocation.PoolUID)
+		entry, exists := newPools[key]
+		if !exists {
+			entry = &poolEntry{data: make(map[string]string)}
+			newPools[key] = entry
+		}
+		for _, podName := range unreleasedPods {
+			entry.data[podName] = sbx.Name
 		}
 
-		log.Info("Recovered sandbox allocation", "pool", poolRef, "sandbox", sbx.Name, "pods", len(allocation.Pods))
+		log.Info("Recovered sandbox allocation", "pool", poolRef, "sandbox", sbx.Name, "pods", len(unreleasedPods))
 	}
 
 	store.poolsMu.Lock()
 	store.pools = newPools
+	store.poolUIDs = livePoolUIDs
 	store.poolsMu.Unlock()
 
 	log.Info("Allocation recovery completed", "totalPools", len(store.pools))
 	return nil
 }
 
+func allocationPodsNotReleased(allocationPods, releasedPods []string) []string {
+	released := make(map[string]struct{}, len(releasedPods))
+	for _, podName := range releasedPods {
+		released[podName] = struct{}{}
+	}
+	unreleased := make([]string, 0, len(allocationPods))
+	for _, podName := range allocationPods {
+		if _, ok := released[podName]; !ok {
+			unreleased = append(unreleased, podName)
+		}
+	}
+	return unreleased
+}
+
+// legacyAllocationPodsOwnedByPool admits legacy name-only evidence only when
+// every recorded Pod still exists and is controlled by the current Pool UID.
+func legacyAllocationPodsOwnedByPool(ctx context.Context, c client.Client, namespace string, podNames []string, poolUID types.UID) (bool, error) {
+	for _, podName := range podNames {
+		pod := &corev1.Pod{}
+		if err := c.Get(ctx, types.NamespacedName{Namespace: namespace, Name: podName}, pod); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		owned := false
+		for _, owner := range pod.OwnerReferences {
+			if owner.Controller != nil && *owner.Controller && owner.UID == poolUID {
+				owned = true
+				break
+			}
+		}
+		if !owned {
+			return false, nil
+		}
+	}
+	return true, nil
+}
 func (store *InMemoryAllocationStore) ClearAllocation(ctx context.Context, ns string, poolName string) error {
 	log := logf.FromContext(ctx)
 	store.poolsMu.Lock()
 	log.Info("Clearing pool allocation", "namespace", ns, "pool", poolName)
+	prefix := store.poolKey(ns, poolName) + "/"
 	delete(store.pools, store.poolKey(ns, poolName))
+	for key := range store.pools {
+		if strings.HasPrefix(key, prefix) {
+			delete(store.pools, key)
+		}
+	}
+	delete(store.poolUIDs, store.poolKey(ns, poolName))
 	store.poolsMu.Unlock()
 	return nil
 }
 
 func (store *InMemoryAllocationStore) GetAllocation(ctx context.Context, pool *sandboxv1alpha1.Pool) (*PoolAllocation, error) {
+	store.activatePool(pool)
 	store.poolsMu.RLock()
-	entry, exists := store.pools[store.poolKey(pool.Namespace, pool.Name)]
+	entry, exists := store.pools[store.poolKeyFor(pool)]
 	store.poolsMu.RUnlock()
 
 	alloc := &PoolAllocation{
@@ -158,7 +232,8 @@ func (store *InMemoryAllocationStore) GetAllocation(ctx context.Context, pool *s
 }
 
 func (store *InMemoryAllocationStore) SetAllocation(ctx context.Context, pool *sandboxv1alpha1.Pool, alloc *PoolAllocation) error {
-	entry := store.getOrCreatePool(pool.Namespace, pool.Name)
+	store.activatePool(pool)
+	entry := store.getOrCreatePoolKey(store.poolKeyFor(pool))
 
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
@@ -172,8 +247,7 @@ func (store *InMemoryAllocationStore) SetAllocation(ctx context.Context, pool *s
 }
 
 func (store *InMemoryAllocationStore) ReleaseAllocation(ctx context.Context, ns string, poolName string, pods []string) {
-	entry := store.getOrCreatePool(ns, poolName)
-
+	entry := store.getOrCreatePoolKey(store.activePoolKey(ns, poolName))
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
 
@@ -183,7 +257,7 @@ func (store *InMemoryAllocationStore) ReleaseAllocation(ctx context.Context, ns 
 }
 
 func (store *InMemoryAllocationStore) UpdateAllocation(ctx context.Context, ns string, poolName string, sandboxName string, pods []string) {
-	entry := store.getOrCreatePool(ns, poolName)
+	entry := store.getOrCreatePoolKey(store.activePoolKey(ns, poolName))
 
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
@@ -203,7 +277,7 @@ func (store *InMemoryAllocationStore) UpdateAllocation(ctx context.Context, ns s
 // This should be called when a BatchSandbox is deleted to ensure the allocation state is cleaned up.
 func (store *InMemoryAllocationStore) ReleaseSandboxAllocation(ctx context.Context, ns string, poolName string, sandboxName string) {
 	store.poolsMu.RLock()
-	entry, exists := store.pools[store.poolKey(ns, poolName)]
+	entry, exists := store.pools[store.activePoolKey(ns, poolName)]
 	store.poolsMu.RUnlock()
 
 	if !exists {
@@ -220,30 +294,57 @@ func (store *InMemoryAllocationStore) ReleaseSandboxAllocation(ctx context.Conte
 	}
 }
 
-// getOrCreatePool returns the pool entry for the given pool name, creating it if necessary.
-// This method uses a double-checked locking pattern to ensure thread-safe creation.
-func (store *InMemoryAllocationStore) getOrCreatePool(ns string, poolName string) *poolEntry {
+// getOrCreatePoolKey returns the allocation entry for one exact Pool identity.
+func (store *InMemoryAllocationStore) getOrCreatePoolKey(key string) *poolEntry {
 	store.poolsMu.RLock()
-	entry, exists := store.pools[store.poolKey(ns, poolName)]
+	entry, exists := store.pools[key]
 	store.poolsMu.RUnlock()
-
 	if exists {
 		return entry
 	}
 
 	store.poolsMu.Lock()
 	defer store.poolsMu.Unlock()
-
-	// Double-check after acquiring write lock
-	if entry, exists := store.pools[store.poolKey(ns, poolName)]; exists {
+	if entry, exists = store.pools[key]; exists {
 		return entry
 	}
-
-	entry = &poolEntry{
-		data: make(map[string]string),
-	}
-	store.pools[store.poolKey(ns, poolName)] = entry
+	entry = &poolEntry{data: make(map[string]string)}
+	store.pools[key] = entry
 	return entry
+}
+
+func (store *InMemoryAllocationStore) activatePool(pool *sandboxv1alpha1.Pool) {
+	nameKey := store.poolKey(pool.Namespace, pool.Name)
+	store.poolsMu.Lock()
+	store.poolUIDs[nameKey] = pool.UID
+	if pool.UID != "" {
+		identityKey := store.poolKeyFor(pool)
+		if _, exists := store.pools[identityKey]; !exists {
+			if legacy, exists := store.pools[nameKey]; exists {
+				store.pools[identityKey] = legacy
+				delete(store.pools, nameKey)
+			}
+		}
+	}
+	store.poolsMu.Unlock()
+}
+
+func (store *InMemoryAllocationStore) activePoolKey(ns, poolName string) string {
+	store.poolsMu.RLock()
+	uid := store.poolUIDs[store.poolKey(ns, poolName)]
+	store.poolsMu.RUnlock()
+	return store.poolKeyWithUID(ns, poolName, string(uid))
+}
+
+func (store *InMemoryAllocationStore) poolKeyFor(pool *sandboxv1alpha1.Pool) string {
+	return store.poolKeyWithUID(pool.Namespace, pool.Name, string(pool.UID))
+}
+
+func (store *InMemoryAllocationStore) poolKeyWithUID(ns, name, uid string) string {
+	if uid == "" {
+		return store.poolKey(ns, name)
+	}
+	return store.poolKey(ns, name) + "/" + uid
 }
 
 func (store *InMemoryAllocationStore) poolKey(ns, name string) string {

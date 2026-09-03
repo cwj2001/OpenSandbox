@@ -95,6 +95,10 @@ class PoolService:
                 allocated=raw_status.get("allocated", 0),
                 available=raw_status.get("available", 0),
                 revision=raw_status.get("revision", ""),
+                terminating=raw_status.get("terminating", 0),
+                oldestTerminatingAgeSeconds=raw_status.get("oldestTerminatingAgeSeconds", 0),
+                degraded=raw_status.get("degraded", False),
+                degradedReason=raw_status.get("degradedReason", ""),
             )
 
         return PoolResponse(
