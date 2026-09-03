@@ -1,0 +1,82 @@
+kubernetes/internal/controller/apis.go
+  s_983eeb8bcffaeb::t_fc28f16074961c 42-44
+kubernetes/internal/controller/allocator.go
+  s_983eeb8bcffaeb::t_fc28f16074961c 654-658
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/__init__.py
+  s_0e4c5b302af450::t_97b8e2e93897ad 19-21,65-67
+kubernetes/internal/controller/allocator_test.go
+  s_983eeb8bcffaeb::t_ab3da24ebb87cc 353,358-362,365-371,458,470-471
+server/opensandbox_server/api/schema.py
+  s_8dcca83a463146::t_142bd776b5d95f 391-411,610-616,618
+  s_fa71f024dcde28::t_3e5227d6195710 617
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/sandbox.py
+  s_0e4c5b302af450::t_97b8e2e93897ad 30,71-75,89,114-117,146-147,159,191-197,227
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/allocation_summary_mode.py
+  s_0e4c5b302af450::t_97b8e2e93897ad 1-24
+server/tests/test_routes_get_sandbox.py
+  s_8dcca83a463146::t_142bd776b5d95f 21,83-113,142
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/allocation_summary.py
+  s_0e4c5b302af450::t_97b8e2e93897ad 1-82
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/allocation_summary_state.py
+  s_0e4c5b302af450::t_97b8e2e93897ad 1-24
+specs/sandbox-lifecycle.yml
+  s_8dcca83a463146::t_142bd776b5d95f 1038-1059,1088-1094
+  s_fa71f024dcde28::t_6b6e283fd5aa29 1095
+server/tests/k8s/test_workload_mapper.py
+  s_8dcca83a463146::t_142bd776b5d95f 40-45,49-60,78-114,116,124-138
+  s_983eeb8bcffaeb::t_8ecf5ace990704 46-48,118-120,122-123
+  s_c764ef936d5c49::t_5cbc0cb563d251 117,121
+  s_8dcca83a463146::t_dd8e30258ceaa6 15-18,115
+  s_8dcca83a463146::t_70077438d7c81e 139
+server/opensandbox_server/services/k8s/workload_mapper.py
+  s_983eeb8bcffaeb::t_8ecf5ace990704 52-56,75-91,94
+  s_8dcca83a463146::t_142bd776b5d95f 17,20-26,31-34,39-51,57-74,92-93,95-117,176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "1849da3982c05d0affe354b64b11294d253c827c",
+  "prompts": {},
+  "sessions": {
+    "s_0e4c5b302af450": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00b022b96ffesgpDuo2aP2ZPTy",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_8dcca83a463146": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00b06d19dffemX36P6fKb722Xb",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_983eeb8bcffaeb": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00ae5fc9cffejMi5CZPkmPGve1",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c764ef936d5c49": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_00ade5982ffettlFF50LNfZ9Hw",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_fa71f024dcde28": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0249c73f7ffeI6AN49ms4dfV2m",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

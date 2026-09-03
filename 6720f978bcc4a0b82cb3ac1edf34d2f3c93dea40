@@ -1,0 +1,21 @@
+sdks/sandbox/python/src/opensandbox/adapters/command_adapter.py
+  s_896d41c34009ce::t_69400c648306f7 43
+sdks/sandbox/python/src/opensandbox/sync/adapters/command_adapter.py
+  s_896d41c34009ce::t_69400c648306f7 35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "6720f978bcc4a0b82cb3ac1edf34d2f3c93dea40",
+  "prompts": {},
+  "sessions": {
+    "s_896d41c34009ce": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0582605ebffeSkTmTH9s8driaj",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

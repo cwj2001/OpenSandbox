@@ -1,0 +1,192 @@
+components/execd/tests/smoke.sh
+  s_5b4c4c6dab1a8b::t_bf81b5edb5ac18 116
+  s_3769a7c8bdd589::t_dda7ce9c879f25 127
+  s_f29e7fb9eb0470::t_6b3a3f29f86b7d 55,66-112,117-118,124-125
+  s_f29e7fb9eb0470::t_62d63568023faa 17-54,56-65,122-123,126,128
+components/execd/tests/smoke_api.py
+  s_c7832e666de498::t_8fbd5b914a946d 256-259,272-276,278-280,290,300
+  s_c7832e666de498::t_da18032156e0e6 203-213,217-221,225-226,230-234,255,260-261,266,277,283-286
+  s_f29e7fb9eb0470::t_62d63568023faa 102-107,111-114,118-119,122-128,157-162,164-168,171-181,183-186,188-189,191,193-197,200,228,250,265,267,281-282,287,535,540-545,568
+  s_f29e7fb9eb0470::t_c4cdf8f76035f5 120-121,268-271
+  s_478c5e036ea730::t_78306d0de55360 129-156,214-216,222-223
+  s_f29e7fb9eb0470::t_f4684201a99367 90-94
+  s_6a99a22fb48986::t_0b913abd94fbc9 288-289
+  s_f29e7fb9eb0470::t_6b3a3f29f86b7d 163,169-170,187,190,192,198,201-202,224,227,251,536-539,546
+  s_eded7d31f9080c::t_5ce5ffd5a7fea7 262-264
+  s_d8150064339d7e::t_00a82515347646 52-87,97-99,110,115-117,182,199
+  s_c7832e666de498::t_dc00403d9e7d0b 236-249,252-254
+  s_3dea16c67a3e86::t_8ed04d1f3bddec 100-101,229,235,547
+sdks/sandbox/javascript/tests/commands.list.test.mjs
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 85-92,101,107,114,117,254
+  s_3769a7c8bdd589::t_dda7ce9c879f25 1-14
+  s_6fd3eac354d12f::t_0668898071c03d 20-52,170-204,247-253,255-266
+  s_830b9f617d5e26::t_8f538c50ed217c 15-19,54-84,93-99,102-106,108-113,115,118
+  s_6fd3eac354d12f::t_fc029cc38be1cd 205-221,223-226,228-232,245-246,267
+  s_2f1745f4bbde6a::t_42ada1043f950f 53,100,116,120-121,123-129,135-145
+  s_0d64f5366879b5::t_186aae401f296f 119,122,130-134,146-169
+  s_6fd3eac354d12f::t_8f35390a7a881c 222,227,233-244
+.github/workflows/execd-test.yml
+  s_eded7d31f9080c::t_7350fd83aff98c 119,123
+  s_f29e7fb9eb0470::t_62d63568023faa 125-128,228-244,248,258,265,267
+  s_c7832e666de498::t_da18032156e0e6 117-118,120-122
+  s_3dea16c67a3e86::t_57b441b943a39d 124
+components/execd/tests/test_smoke_api_inventory.py
+  s_eded7d31f9080c::t_5ce5ffd5a7fea7 208-215
+  s_eded7d31f9080c::t_744c67ded45881 1-207,216-226
+docs/components/execd.md
+  s_bfaa3924ea3fc0::t_2cd0209c59be12 97,99,105,107,109
+  s_bfaa3924ea3fc0::t_470aab183697fd 112-129,133
+  s_bfaa3924ea3fc0::t_662f81deaff34e 134
+  s_61803828919f65::t_5b28c65d75a3ab 52,57,60,63,75,96,98,100-101,106,108,135,137-140,226-227,239-240,248
+  s_4f422f1247dd1d::t_2d4247e9bf36ed 53,55-56,58-59,61-62,64-66,74,78
+  s_5b4c4c6dab1a8b::t_65cc1c99e606c6 73,77
+  s_5b4c4c6dab1a8b::t_185f4357c92c1e 37,46
+  s_c7832e666de498::t_da18032156e0e6 54
+  s_f29e7fb9eb0470::t_0b84560c7decd3 136,141
+  s_bfaa3924ea3fc0::t_34f5c955b4f551 67-72,102-104,110,130-132
+  s_4975e8551b680e::t_00b53a41fb1a21 76,111,249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "508d65827b380155be9bfc9588c26eca44e24e30",
+  "prompts": {},
+  "sessions": {
+    "s_0d64f5366879b5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_076f48c4dffeSAzBfcjREPCxsw",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_2f1745f4bbde6a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0606121f4ffeLenXfDDj5xHEQ3",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_3769a7c8bdd589": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05c39743cffeR7wUdcBnBDD0bT",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_3dea16c67a3e86": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0bb38afb8ffe1jX2OY4PsHhA4e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_478c5e036ea730": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06539b8a0ffe7lT0F5ebzdL9SS",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_4975e8551b680e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d1abb74ffe6WVCwSvbMyGCWS",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_4f422f1247dd1d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_076e5ba80ffeS0lNk4gcIYYokE",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_5b4c4c6dab1a8b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05dc4a50cffeKUPzUoNg4woC80",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_61803828919f65": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_062dc7251ffeWILyP7OuPcdHSy",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6a99a22fb48986": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_077595186ffejn678wFWF3CJlW",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6fd3eac354d12f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065c40e1effe3oSrrXEziQMCoE",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_830b9f617d5e26": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07794dde0ffeGeiXCM9Uj5fe5r",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_bfaa3924ea3fc0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05c33b987ffeLFwPOGEeQcGPDj",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c7832e666de498": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_060b741a9ffeh2d61pArCsuE4P",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_d8150064339d7e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0658b28d6ffeJkCf1ixffXWt5M",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_eded7d31f9080c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05df53a11ffesAHUU6rAOHo7hL",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_f29e7fb9eb0470": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07771c884ffefPTzTMC9Hhx9a2",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
