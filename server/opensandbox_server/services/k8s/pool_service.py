@@ -24,6 +24,10 @@ from opensandbox_server.api.schema import (
     CreatePoolRequest,
     ListPoolsResponse,
     PoolCapacitySpec,
+    PoolMemberContainerStatus,
+    PoolMemberEvent,
+    PoolMemberResponse,
+    PoolMembersResponse,
     PoolResponse,
     PoolStatus,
     UpdatePoolRequest,
@@ -36,8 +40,11 @@ from opensandbox_server.services.k8s.client import (
     POOL_KIND,
     POOL_PLURAL,
 )
+from opensandbox_server.tenants.context import get_current_tenant
 
 logger = logging.getLogger(__name__)
+
+_POOL_NAME_LABEL = "sandbox.opensandbox.io/pool-name"
 
 
 class PoolService:
@@ -46,7 +53,12 @@ class PoolService:
     def __init__(self, k8s_client: K8sClient, namespace: str) -> None:
         """Initialize PoolService."""
         self._custom_api = k8s_client.get_custom_objects_api()
+        self._k8s_client = k8s_client
         self._namespace = namespace
+
+    def _resolve_namespace(self) -> str:
+        tenant = get_current_tenant()
+        return tenant.namespace if tenant else self._namespace
 
     def _build_pool_manifest(
         self,
@@ -151,18 +163,15 @@ class PoolService:
                 },
             ) from e
 
-    def get_pool(self, pool_name: str) -> PoolResponse:
-        """Retrieve a Pool by name."""
+    def _get_pool_raw(self, pool_name: str, namespace: Optional[str] = None) -> Dict[str, Any]:
         try:
-            raw = self._custom_api.get_namespaced_custom_object(
+            return self._custom_api.get_namespaced_custom_object(
                 group=OPENSANDBOX_API_GROUP,
                 version=OPENSANDBOX_API_VERSION,
-                namespace=self._namespace,
+                namespace=namespace or self._namespace,
                 plural=POOL_PLURAL,
                 name=pool_name,
             )
-            return self._pool_from_raw(raw)
-
         except ApiException as e:
             if e.status == 404:
                 raise HTTPException(
@@ -172,25 +181,185 @@ class PoolService:
                         "message": f"Pool '{pool_name}' not found.",
                     },
                 ) from e
-            logger.error(f"Kubernetes API error getting pool {pool_name}: {e}")
+            logger.error("Kubernetes API error getting Pool %s", pool_name)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail={
                     "code": SandboxErrorCodes.K8S_POOL_API_ERROR,
-                    "message": f"Failed to get pool: {e.reason}",
+                    "message": "Failed to get Pool.",
                 },
             ) from e
-        except HTTPException:
-            raise
         except Exception as e:
-            logger.error(f"Unexpected error getting pool {pool_name}: {e}")
+            logger.error("Unexpected error getting Pool %s", pool_name)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail={
                     "code": SandboxErrorCodes.K8S_POOL_API_ERROR,
-                    "message": f"Failed to get pool: {e}",
+                    "message": "Failed to get Pool.",
                 },
             ) from e
+
+    def get_pool(self, pool_name: str) -> PoolResponse:
+        """Retrieve a Pool by name."""
+        return self._pool_from_raw(self._get_pool_raw(pool_name))
+
+    def get_pool_members(self, pool_name: str, limit: int) -> PoolMembersResponse:
+        """Return bounded diagnostics for Pods controller-owned by a Pool."""
+        namespace = self._resolve_namespace()
+        pool = self._get_pool_raw(pool_name, namespace)
+        pool_uid = str((pool.get("metadata") or {}).get("uid") or "")
+        if not pool_uid:
+            logger.error("Pool %s is missing metadata.uid", pool_name)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "code": SandboxErrorCodes.K8S_POOL_API_ERROR,
+                    "message": "Pool identity is unavailable.",
+                },
+            )
+        try:
+            pods = self._k8s_client.list_pods(
+                namespace=namespace,
+                label_selector=f"{_POOL_NAME_LABEL}={pool_name}",
+                limit=limit + 1,
+            )
+        except Exception as e:
+            logger.error("Failed to list Pool member Pods for %s", pool_name)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "code": SandboxErrorCodes.K8S_POOL_API_ERROR,
+                    "message": "Failed to list Pool members.",
+                },
+            ) from e
+        members = [pod for pod in pods if self._is_owner_verified_member(pod, pool_name, pool_uid)]
+        members.sort(key=lambda pod: str(getattr(getattr(pod, "metadata", None), "name", "")))
+        reported_count = (pool.get("status") or {}).get("total")
+        member_count = (
+            max(len(members), reported_count) if isinstance(reported_count, int) else len(members)
+        )
+        return PoolMembersResponse(
+            poolName=pool_name,
+            memberCount=member_count,
+            truncated=len(pods) > limit or member_count > len(members),
+            members=[self._member_from_pod(pod, namespace) for pod in members[:limit]],
+        )
+
+    @staticmethod
+    def _is_owner_verified_member(pod: Any, pool_name: str, pool_uid: str) -> bool:
+        metadata = getattr(pod, "metadata", None)
+        labels = getattr(metadata, "labels", None) or {}
+        if labels.get(_POOL_NAME_LABEL) != pool_name:
+            return False
+        for owner in getattr(metadata, "owner_references", None) or []:
+            if (
+                getattr(owner, "kind", None) == "Pool"
+                and getattr(owner, "name", None) == pool_name
+                and str(getattr(owner, "uid", "")) == pool_uid
+                and getattr(owner, "controller", None) is True
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _pod_ready(pod: Any) -> bool:
+        pod_status = getattr(pod, "status", None)
+        for condition in getattr(pod_status, "conditions", None) or []:
+            if (
+                getattr(condition, "type", None) == "Ready"
+                and str(getattr(condition, "status", "")).lower() == "true"
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _container_status(status_entry: Any) -> PoolMemberContainerStatus:
+        container_state = getattr(status_entry, "state", None)
+        state, reason = "unknown", None
+        for name in ("waiting", "terminated", "running"):
+            detail = getattr(container_state, name, None)
+            if detail is not None:
+                state = name
+                candidate_reason = getattr(detail, "reason", None)
+                reason = (
+                    candidate_reason
+                    if isinstance(candidate_reason, str) and candidate_reason
+                    else None
+                )
+                break
+        restart_count = getattr(status_entry, "restart_count", 0)
+        return PoolMemberContainerStatus(
+            name=str(getattr(status_entry, "name", "")),
+            ready=getattr(status_entry, "ready", None) is True,
+            restartCount=restart_count if isinstance(restart_count, int) else 0,
+            state=state,
+            reason=reason,
+        )
+
+    def _latest_event(self, pod: Any, namespace: str) -> Optional[PoolMemberEvent]:
+        metadata = getattr(pod, "metadata", None)
+        pod_name = str(getattr(metadata, "name", ""))
+        if not pod_name:
+            return None
+        try:
+            response = self._k8s_client.get_core_v1_api().list_namespaced_event(
+                namespace=namespace,
+                field_selector=f"involvedObject.name={pod_name}",
+                limit=50,
+            )
+        except Exception:
+            logger.warning("Failed to read Pool member events for %s", pod_name)
+            return None
+        events = list(getattr(response, "items", None) or [])
+        if not events:
+            return None
+        event = max(events, key=self._event_sort_key)
+        event_metadata = getattr(event, "metadata", None)
+        observed_at = (
+            getattr(event, "event_time", None)
+            or getattr(event, "last_timestamp", None)
+            or getattr(event, "first_timestamp", None)
+            or getattr(event_metadata, "creation_timestamp", None)
+        )
+        return PoolMemberEvent(
+            type=self._optional_string(getattr(event, "type", None)),
+            reason=self._optional_string(getattr(event, "reason", None)),
+            observedAt=str(observed_at) if observed_at is not None else None,
+        )
+
+    @staticmethod
+    def _event_sort_key(event: Any) -> str:
+        metadata = getattr(event, "metadata", None)
+        observed_at = (
+            getattr(event, "event_time", None)
+            or getattr(event, "last_timestamp", None)
+            or getattr(event, "first_timestamp", None)
+            or getattr(metadata, "creation_timestamp", None)
+        )
+        return str(observed_at or "")
+
+    @staticmethod
+    def _optional_string(value: Any) -> Optional[str]:
+        return value if isinstance(value, str) and value else None
+
+    def _member_from_pod(self, pod: Any, namespace: str) -> PoolMemberResponse:
+        metadata = getattr(pod, "metadata", None)
+        pod_status = getattr(pod, "status", None)
+        ready = self._pod_ready(pod)
+        return PoolMemberResponse(
+            name=str(getattr(metadata, "name", "")),
+            phase=str(getattr(pod_status, "phase", None) or "Unknown"),
+            ready=ready,
+            containers=[
+                self._container_status(entry)
+                for entry in getattr(pod_status, "container_statuses", None) or []
+            ],
+            initContainers=[
+                self._container_status(entry)
+                for entry in getattr(pod_status, "init_container_statuses", None) or []
+            ],
+            latestEvent=None if ready else self._latest_event(pod, namespace),
+        )
 
     def list_pools(self) -> ListPoolsResponse:
         """List all Pools in the configured namespace."""

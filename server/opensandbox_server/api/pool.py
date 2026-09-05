@@ -21,7 +21,7 @@ These endpoints are only available when the runtime is configured as 'kubernetes
 
 from typing import Optional
 
-from fastapi import APIRouter, Header, status
+from fastapi import APIRouter, Header, Query, status
 from fastapi.exceptions import HTTPException
 from fastapi.responses import Response
 
@@ -29,6 +29,7 @@ from opensandbox_server.api.schema import (
     CreatePoolRequest,
     ErrorResponse,
     ListPoolsResponse,
+    PoolMembersResponse,
     PoolResponse,
     UpdatePoolRequest,
 )
@@ -74,6 +75,7 @@ def _get_pool_service():
 # Pool CRUD Endpoints
 # ============================================================================
 
+
 @router.post(
     "/pools",
     response_model=PoolResponse,
@@ -82,9 +84,15 @@ def _get_pool_service():
     responses={
         201: {"description": "Pool created successfully"},
         400: {"model": ErrorResponse, "description": "The request was invalid or malformed"},
-        401: {"model": ErrorResponse, "description": "Authentication credentials are missing or invalid"},
+        401: {
+            "model": ErrorResponse,
+            "description": "Authentication credentials are missing or invalid",
+        },
         409: {"model": ErrorResponse, "description": "A pool with the same name already exists"},
-        501: {"model": ErrorResponse, "description": "Pool management is not supported in this runtime"},
+        501: {
+            "model": ErrorResponse,
+            "description": "Pool management is not supported in this runtime",
+        },
         500: {"model": ErrorResponse, "description": "An unexpected server error occurred"},
     },
 )
@@ -116,8 +124,14 @@ def create_pool(
     response_model_exclude_none=True,
     responses={
         200: {"description": "List of pools"},
-        401: {"model": ErrorResponse, "description": "Authentication credentials are missing or invalid"},
-        501: {"model": ErrorResponse, "description": "Pool management is not supported in this runtime"},
+        401: {
+            "model": ErrorResponse,
+            "description": "Authentication credentials are missing or invalid",
+        },
+        501: {
+            "model": ErrorResponse,
+            "description": "Pool management is not supported in this runtime",
+        },
         500: {"model": ErrorResponse, "description": "An unexpected server error occurred"},
     },
 )
@@ -140,14 +154,48 @@ def list_pools(
 
 
 @router.get(
+    "/pools/{pool_name}/members",
+    response_model=PoolMembersResponse,
+    response_model_exclude_none=True,
+    responses={
+        200: {"description": "Bounded owner-verified Pool member diagnostics"},
+        401: {
+            "model": ErrorResponse,
+            "description": "Authentication credentials are missing or invalid",
+        },
+        404: {"model": ErrorResponse, "description": "The requested pool does not exist"},
+        501: {
+            "model": ErrorResponse,
+            "description": "Pool management is not supported in this runtime",
+        },
+        500: {"model": ErrorResponse, "description": "An unexpected server error occurred"},
+    },
+)
+def get_pool_members(
+    pool_name: str,
+    limit: int = Query(50, ge=1, le=100),
+    x_request_id: Optional[str] = Header(None, alias="X-Request-ID"),
+) -> PoolMembersResponse:
+    """Return bounded member diagnostics after validating Pool owner UIDs."""
+    pool_service = _get_pool_service()
+    return pool_service.get_pool_members(pool_name, limit)
+
+
+@router.get(
     "/pools/{pool_name}",
     response_model=PoolResponse,
     response_model_exclude_none=True,
     responses={
         200: {"description": "Pool retrieved successfully"},
-        401: {"model": ErrorResponse, "description": "Authentication credentials are missing or invalid"},
+        401: {
+            "model": ErrorResponse,
+            "description": "Authentication credentials are missing or invalid",
+        },
         404: {"model": ErrorResponse, "description": "The requested pool does not exist"},
-        501: {"model": ErrorResponse, "description": "Pool management is not supported in this runtime"},
+        501: {
+            "model": ErrorResponse,
+            "description": "Pool management is not supported in this runtime",
+        },
         500: {"model": ErrorResponse, "description": "An unexpected server error occurred"},
     },
 )
@@ -176,9 +224,15 @@ def get_pool(
     responses={
         200: {"description": "Pool capacity updated successfully"},
         400: {"model": ErrorResponse, "description": "The request was invalid or malformed"},
-        401: {"model": ErrorResponse, "description": "Authentication credentials are missing or invalid"},
+        401: {
+            "model": ErrorResponse,
+            "description": "Authentication credentials are missing or invalid",
+        },
         404: {"model": ErrorResponse, "description": "The requested pool does not exist"},
-        501: {"model": ErrorResponse, "description": "Pool management is not supported in this runtime"},
+        501: {
+            "model": ErrorResponse,
+            "description": "Pool management is not supported in this runtime",
+        },
         500: {"model": ErrorResponse, "description": "An unexpected server error occurred"},
     },
 )
@@ -211,9 +265,15 @@ def update_pool(
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
         204: {"description": "Pool deleted successfully"},
-        401: {"model": ErrorResponse, "description": "Authentication credentials are missing or invalid"},
+        401: {
+            "model": ErrorResponse,
+            "description": "Authentication credentials are missing or invalid",
+        },
         404: {"model": ErrorResponse, "description": "The requested pool does not exist"},
-        501: {"model": ErrorResponse, "description": "Pool management is not supported in this runtime"},
+        501: {
+            "model": ErrorResponse,
+            "description": "Pool management is not supported in this runtime",
+        },
         500: {"model": ErrorResponse, "description": "An unexpected server error occurred"},
     },
 )
