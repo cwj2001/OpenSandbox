@@ -1,0 +1,18 @@
+sdks/sandbox/javascript/src/api/execd.ts
+  h_016ba8798a68a0 273-274,301-302
+sdks/sandbox/python/src/opensandbox/api/execd/api/command/get_background_command_logs.py
+  h_016ba8798a68a0 101-102,143-144,180-181,220-221
+sdks/sandbox/python/src/opensandbox/api/execd/api/command/get_command_status.py
+  h_016ba8798a68a0 92-93,126-127,155-156,187-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "e2e417a6a71c882d58a558d604de49ca20a79ca9",
+  "prompts": {},
+  "humans": {
+    "h_016ba8798a68a0": {
+      "author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
