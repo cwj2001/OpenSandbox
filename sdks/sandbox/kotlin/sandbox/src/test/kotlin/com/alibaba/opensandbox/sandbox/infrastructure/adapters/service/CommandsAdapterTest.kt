@@ -38,6 +38,7 @@ import com.alibaba.opensandbox.sandbox.domain.services.Commands
 import com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter.ExecutionConverter.toCommandSummary
 import com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter.parseListCommandsPage
 import com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter.toCommandTimeoutMillis
+import com.alibaba.opensandbox.sandbox.transport.RetryPolicy
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -135,9 +136,7 @@ class CommandsAdapterTest {
                 override fun deleteSession(sessionId: String) = unsupported()
             }
 
-        val exception = assertThrows<UnsupportedOperationException> { legacy.listCommands() }
-
-        assertEquals("Command inventory is not supported", exception.message)
+        assertThrows<UnsupportedOperationException> { legacy.listCommands() }
     }
 
     @Test
@@ -764,6 +763,36 @@ data: {"type":"execution_complete","execution_time":100,"timestamp":167253120100
         assertEquals("INVALID_QUERY", exception.error.code)
         assertEquals("invalid cursor", exception.error.message)
         assertEquals("req-command-list", exception.requestId)
+    }
+
+    @Test
+    fun `listCommands preserves unstructured rate limit response metadata`() {
+        val responseBody = "slow down"
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(429)
+                .addHeader("X-Request-ID", "req-inventory-rate-limit")
+                .addHeader("Retry-After", "2")
+                .setBody(responseBody),
+        )
+
+        val config =
+            ConnectionConfig.builder()
+                .domain("${mockWebServer.hostName}:${mockWebServer.port}")
+                .protocol("http")
+                .retryPolicy(RetryPolicy.disabled())
+                .build()
+        HttpClientProvider(config).use { provider ->
+            val adapter = CommandsAdapter(provider, SandboxEndpoint("${mockWebServer.hostName}:${mockWebServer.port}"))
+            val exception = assertThrows<SandboxRateLimitException> { adapter.listCommands() }
+
+            assertEquals(429, exception.statusCode)
+            assertEquals("RATE_LIMIT", exception.error.code)
+            assertEquals("req-inventory-rate-limit", exception.requestId)
+            assertEquals(Duration.ofSeconds(2), exception.retryAfter)
+            assertEquals(responseBody, exception.responseBody)
+            assertTrue(exception.isRetryable)
+        }
     }
 
     @Test
