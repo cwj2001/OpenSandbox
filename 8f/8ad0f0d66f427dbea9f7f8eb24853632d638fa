@@ -1,0 +1,617 @@
+components/execd/pkg/web/controller/codeinterpreting_test.go
+  s_c1a2cfeaf2e46e::t_3711a65b4ea562 118-121,124,129-133,160-161,166-167
+  s_c1a2cfeaf2e46e::t_eb0d3b34987b76 163-164
+  s_c1a2cfeaf2e46e::t_90d05766936c48 37,59-65,108-117,153,159,168
+  s_c1a2cfeaf2e46e::t_bfad4f73d41243 122-123,125-128,134-152,154-158,162,165
+  s_3dea16c67a3e86::t_5f7530ae76a1e0 169
+sdks/sandbox/javascript/tests/commands.list.test.mjs
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 85-92,101,107,114,117,237
+  s_3769a7c8bdd589::t_dda7ce9c879f25 1-14
+  s_830b9f617d5e26::t_8f538c50ed217c 15-19,54-84,93-99,102-106,108-113,115,118
+  s_6fd3eac354d12f::t_fc029cc38be1cd 206-222,228-229,250
+  s_0d64f5366879b5::t_186aae401f296f 119,122,130-134,146-169
+  s_7e132e206c2927::t_36d2f777960845 223-227
+  s_7e132e206c2927::t_ef02186ee18e21 195,203
+  s_6fd3eac354d12f::t_0668898071c03d 20-52,170-194,196-202,204-205,230-236,238-249
+  s_2f1745f4bbde6a::t_42ada1043f950f 53,100,116,120-121,123-129,135-145
+sdks/sandbox/python/tests/test_command_service_adapter_streaming.py
+  s_6c015eec3fcdbc::t_4e1e981e5e1cd8 668,671-672,675-677,702-717
+  s_b473a40c774947::t_7dd7b28c8476e0 40,42
+  s_2f1745f4bbde6a::t_42ada1043f950f 446,455-482,507-516,518-524,527,586
+  s_1e8a647f7bca2d::t_2825dd0334d13f 408-409,412-413,452-454,673-674,678-701,718-719
+  s_0d64f5366879b5::t_186aae401f296f 493-500,503,530-537,551-570,572-579,581
+  s_57b11ffc802a80::t_417bc8911fd469 56-57,525,528,670
+  s_44fb3db0ff8ab3::t_f6b97bc4c98166 582,619-656,658-665,667
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 434,445,451
+  s_44fb3db0ff8ab3::t_3791a192b6bab1 64-68,74,87,90,113,115,125-128,224-227
+  s_830b9f617d5e26::t_8f538c50ed217c 18,39,41,43-48,309-310,399-407,410-411,414-433,435-444,447-450,483-485,487-490,538-550
+  s_d5b5d3b316a8aa::t_48f2af4b4611ff 27-29,31-32,49-55,486,491-492,501-502,504-506,517,526,529,571,580,583-585,605,614,616-617,657,666,669
+  s_28fbd3f9169c7d::t_1e120441cba63b 587-604,606-613,615,618
+components/execd/tests/test_smoke_api_inventory.py
+  s_2f45564ad2b2d9::t_e483bba723b9d2 216
+  s_eded7d31f9080c::t_744c67ded45881 1-163,166-171,173-180,209-210,213-215,217-219
+  s_eded7d31f9080c::t_5ce5ffd5a7fea7 189,206
+  s_2f45564ad2b2d9::t_3176758e5cbb4d 164-165,172,181-188,190-205,207-208,211-212
+sdks/sandbox/python/tests/test_command_inventory_capability.py
+  s_3dea16c67a3e86::t_71750cc0691c9a 1-17,19,28-29,32-33,35-36,40
+  s_b473a40c774947::t_af666580f56a47 34,89-90,92-95,100-101,103-106,118-119,121-124,129-130,132-135
+  s_b473a40c774947::t_8d081d0ed2ec3b 20-27,30-31,37-39,41-88,91,96-99,102,107-117,120,125-128,131,136-144
+  s_b473a40c774947::t_fbf94cc16eed8c 18
+sdks/sandbox/csharp/tests/OpenSandbox.Tests/CommandInventoryCapabilityTests.cs
+  s_633829efce38af::t_d3656ad268fe13 383-385,408-430
+  s_633829efce38af::t_a96f61a4ccff6e 52
+  s_633829efce38af::t_4ddde52e7e5368 158-170
+  s_9445ee527963bb::t_0a34322fc6ce77 142-156,239,259,269,304-305,307-308,310-312,314,316,321
+  s_9445ee527963bb::t_b536583b86c818 306,309,313
+  s_9445ee527963bb::t_9cd34f2084a74d 315
+  s_633829efce38af::t_480020839f12c0 434-452
+  s_633829efce38af::t_2c2e4cdedf6a54 198
+  s_9445ee527963bb::t_fc3d6c48d57ba0 322
+  s_633829efce38af::t_a16856b8d924bd 1-16,18-51,53-56,97-141,157,171-184,394-407,431-433,453-546,554-596,598-621,631-678
+  s_9445ee527963bb::t_a7880eeb39443f 317-320
+  s_633829efce38af::t_0c2b77c965b070 57-96,547-553,622-630
+  s_633829efce38af::t_4c163875aebd62 17,185-197,199-238,240-258,260-268,270-303,339-382,386-393
+  s_633829efce38af::t_780b613ce98ef8 323-338,597
+components/execd/tests/smoke.sh
+  s_3769a7c8bdd589::t_dda7ce9c879f25 127
+  s_f29e7fb9eb0470::t_62d63568023faa 17-45,48-54,56-65,122-123,126,128
+  s_2f45564ad2b2d9::t_b7e2408b8f7ce2 46-47
+  s_f29e7fb9eb0470::t_6b3a3f29f86b7d 55,66-112,117-118,124-125
+  s_5b4c4c6dab1a8b::t_bf81b5edb5ac18 116
+components/execd/pkg/web/controller/command_inventory_test.go
+  s_c1a2cfeaf2e46e::t_bfad4f73d41243 141-161,163-164,167-168,176
+  s_b17ade8680cc8b::t_c0c1a2e05e8b26 172,194
+  s_b17ade8680cc8b::t_4a66917723ca86 132-139,214
+  s_c1a2cfeaf2e46e::t_3711a65b4ea562 73-92,94-95,97-99,125-128
+  s_c1a2cfeaf2e46e::t_eb0d3b34987b76 162,165
+  s_c1a2cfeaf2e46e::t_90d05766936c48 1-72,93,96,100-124,129-131,140,166,169-171,173-175,177-193,195-213,215-219
+components/execd/pkg/runtime/command_inventory_test.go
+  s_644b3387898f55::t_c24d5861509f30 1033-1036,1044-1047,1055-1058
+  s_03e03d056c8cec::t_91b8e9bde95ea1 35-40,249-330,332-333,335-336,338-346,359-361,363-373,375-376,383-384,399-400,412-413,418-420,443-457,663-668
+  s_c918f94692c511::t_9c8fcb288dc061 1091-1095
+  s_03e03d056c8cec::t_37c49d3b5a93e1 362
+  s_03e03d056c8cec::t_cf6b33c6c8b5b1 33-34,212-237,239-245
+  s_03e03d056c8cec::t_b48d20750a1829 48,104,192
+  s_b5c00490621001::t_1d4b33cd7b3767 21,72,74,80-82,88-93,414,458-477,503,520,528,542,553-662
+  s_ccd39396a429bf::t_152e05633f12ec 894-895,898
+  s_03e03d056c8cec::t_7b7b61f4e73ccc 401
+  s_2bebcf64e2f3c4::t_565dd3501f04cd 381
+  s_03e03d056c8cec::t_fd178f139de447 18-20,27,44-47,49-71,73,75-79,83-87,94-98,100-103,105-130,191,193-194,196-211,247-248,386-398,402-410,421-442,669-677
+  s_72091cb2dc5597::t_0bd1011841d79a 819,826
+  s_03e03d056c8cec::t_d0168fc6616032 28-30,32,41-43,99,190,385,411
+  s_03e03d056c8cec::t_407a40be466934 374,377-380
+  s_2bebcf64e2f3c4::t_7990b0091ff200 382
+  s_644b3387898f55::t_aaacda10ccc5b0 1027-1032,1037-1043,1048-1054,1059-1082
+  s_bf7e86648d4614::t_fabdc97851216c 543-545
+  s_464edb7e30f0e9::t_83527dc1ff9f3c 1-17,22-23,26,678-697,700,762,814,825,828,830,920,941-944,947-948,957-964,1024,1117
+  s_ccd39396a429bf::t_a1341fa1b47583 698-699,701-761,763-813,815-818,820,822,827,829,831-893,896-897,899-919,921-940,945-946,949-956,965-997,1001-1007,1011-1023
+  s_5b28ce0a861ec8::t_5390d43408f851 821,823-824
+  s_2bebcf64e2f3c4::t_46aaff4efd1838 31,131-189,195,238,246
+  s_03e03d056c8cec::t_9e64edbb82ffde 347-358
+  s_c918f94692c511::t_ebaa0b9295fa9a 24-25,1025-1026,1083-1090,1096-1116
+  s_ccd39396a429bf::t_95327d093e5676 998-1000,1008-1010
+  s_03e03d056c8cec::t_0312cd4ba7d836 331,334,337
+  s_bf7e86648d4614::t_8c79c9f3822472 415-417,478-502,504-519,521-527,529-541,546-552
+components/execd/pkg/flag/parser_test.go
+  s_c918f94692c511::t_2f27133a71309c 106-117,141-142,144-145
+  s_c918f94692c511::t_ebaa0b9295fa9a 74-87,98-105,118-140,143,146-186
+  s_c918f94692c511::t_9c8fcb288dc061 88-97
+sdks/sandbox/go/command_inventory_test.go
+  s_b4603593634437::t_ac0482bf9a4ec5 129-135,141,146-189
+  s_b4603593634437::t_cbda90fae1e086 1-43,46-128,142-145,190-239
+  s_9445ee527963bb::t_0a34322fc6ce77 44-45,136-137
+  s_fa59c02338fb4d::t_fb81db962751bd 138-140
+components/execd/tests/smoke_api.py
+  s_2f45564ad2b2d9::t_b7e2408b8f7ce2 278
+  s_3dea16c67a3e86::t_8ed04d1f3bddec 100-101
+  s_f29e7fb9eb0470::t_f4684201a99367 90-94
+  s_c7832e666de498::t_da18032156e0e6 203-213,217-221,225-226,230-234,255,260-261,263,274,281-284
+  s_f29e7fb9eb0470::t_c4cdf8f76035f5 120-121,265-268
+  s_6a99a22fb48986::t_0b913abd94fbc9 286-287
+  s_c7832e666de498::t_dc00403d9e7d0b 236-249,252-254
+  s_f29e7fb9eb0470::t_62d63568023faa 102-107,111-114,118-119,122-128,157-162,164-168,171-181,183-186,188-189,191,193-197,200,228,250,262,264,279-280,285,533,538-543,566
+  s_f29e7fb9eb0470::t_6b3a3f29f86b7d 163,169-170,187,190,192,198,201-202,224,227,251,534-537,544
+  s_c7832e666de498::t_8fbd5b914a946d 256-259,269-273,275-277,288,298
+  s_478c5e036ea730::t_78306d0de55360 129-156,214-216,222-223
+  s_d8150064339d7e::t_00a82515347646 52-87,97-99,110,115-117,182,199
+  s_c7832e666de498::t_8bf90c6031ac33 235
+  s_f29e7fb9eb0470::t_d4675f932a53b5 545
+components/execd/pkg/runtime/command_inventory_lifecycle_test.go
+  s_9415b3e0b70cf8::t_9449161198de90 200-231,234-244,246-267
+  s_9415b3e0b70cf8::t_1420b83ed1f102 63,93
+  s_9415b3e0b70cf8::t_396fa41619bc22 23,123-151,153-156,158-185,187-194,196-199,245,268-270,308,335-358,360-362,375-376,378-380
+  s_c918f94692c511::t_25e7bb5089fc35 57-58,87-88
+  s_c918f94692c511::t_ad546a08e8d9b1 15-16,24,36-55,60-62,64-65,67-85,90-92,94,120,414,416-421,423-424,432-438,440-442,447-450,452-462,464
+  s_9415b3e0b70cf8::t_c8d9d6870275f4 152,157,186,195,271-307,309-334,359,363-368,371,373-374,377
+  s_c918f94692c511::t_dcb384505d4c5c 35,56,59,66,86,89,427,429-431,439,444,463,465-469
+  s_fa59c02338fb4d::t_b0ea27fef2190c 232-233
+  s_c918f94692c511::t_b318de71d39df6 21-22,25,107,122,412-413,415,422,425-426,428,443,445-446
+  s_9415b3e0b70cf8::t_cbe6d08e0bb524 369-370,372,381-411
+  s_c918f94692c511::t_6f0e1e15f17738 1-14,17-20,26-34,95-106,108-119,121,451,470
+sdks/sandbox/javascript/tests/types/execd-command-inventory.typecheck.ts
+  s_3dea16c67a3e86::t_71750cc0691c9a 17-21,34-44
+  s_2b2310473b07ca::t_fc9226ff2488da 1-16,22-33
+sdks/sandbox/python/tests/test_sync_command_service_adapter_streaming.py
+  s_830b9f617d5e26::t_8f538c50ed217c 18,39,41,43-48,256-257,343-350,353-354,357-375,377-386,389-392,398-399,471-488
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 376,387,393
+  s_2f1745f4bbde6a::t_42ada1043f950f 388,397,400,402-404,406,409-423,449-455,457-463,466
+  s_d5b5d3b316a8aa::t_48f2af4b4611ff 26,28,30-31,49-55,424-432,441-442,444-448,456,465,468,508,517,520,541,550,553,592,601,604
+  s_b473a40c774947::t_7dd7b28c8476e0 40,42
+  s_44fb3db0ff8ab3::t_f6b97bc4c98166 519,555-591,593-600,602
+  s_1e8a647f7bca2d::t_2825dd0334d13f 351-352,355-356,394-396,607-608,612-634,651-652
+  s_57b11ffc802a80::t_83e88211892454 56-57,464,467,521-522,605
+  s_28fbd3f9169c7d::t_1e120441cba63b 523-540,542-549,551-552,554
+  s_6c015eec3fcdbc::t_4e1e981e5e1cd8 603,606,609-611,635-650
+  s_0d64f5366879b5::t_186aae401f296f 23,401,405,407-408,433-440,443,469-470,489-507,509-516,518
+  s_44fb3db0ff8ab3::t_3791a192b6bab1 80,83,106,108,118-121,217-220
+sdks/sandbox/javascript/tsconfig.typecheck.json
+  s_5b4c4c6dab1a8b::t_65cc1c99e606c6 1-11
+sdks/sandbox/python/tests/test_command_inventory_validation.py
+  s_d926b6d9e0c363::t_4f2626711d3597 85-113,163-164,185-204
+  s_82db1a853732b0::t_1a5503c4e46209 58-84,114-121,123-139,230-233
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 242
+  s_2f1745f4bbde6a::t_42ada1043f950f 243-244
+  s_28fbd3f9169c7d::t_1e120441cba63b 165-184
+  s_82db1a853732b0::t_ce879f5b1d045d 122,140-162,205-229
+  s_6c015eec3fcdbc::t_cae262f2381d37 1-57,234-241,245-310
+sdks/sandbox/javascript/package.json
+  s_5b4c4c6dab1a8b::t_65cc1c99e606c6 46
+sdks/sandbox/kotlin/sandbox/src/test/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/service/CommandsAdapterTest.kt
+  s_2f1745f4bbde6a::t_42ada1043f950f 622,626
+  s_20cb5ecf289429::t_04940f4b21627f 705
+  s_830b9f617d5e26::t_094808a9e66c17 22,42,67-69
+  s_e643fe2cfa22f5::t_4196219281637f 28-30,34,37,39,120,627-629,673-702,704,706-708,713,726,728,748,774,776,789,801-816,819-834,836
+  s_830b9f617d5e26::t_ad62ecc82d00f4 35,536-542,565-567,570-575,604-618
+  s_02b8144a13db93::t_77971144f72d83 97,543-564,724,727,750,755-762,766-771,775,782-788,790-796,798-800
+  s_830b9f617d5e26::t_2db4bd76530d6a 66
+  s_c7725ba8bd4068::t_ed5fe6a14e44dd 733,751-754,763-765,777-780
+  s_02b8144a13db93::t_da9a48e72c4bb1 98-119,121-124,709-711,725,747,749,772-773,838-839
+  s_02b8144a13db93::t_18e46bd335ed01 797
+  s_3dea16c67a3e86::t_a127a9efda8d4e 38
+  s_20cb5ecf289429::t_92d47aa56ee1d2 635,649
+  s_e643fe2cfa22f5::t_0e2b4d037f0c8d 703,734-746,818
+  s_20cb5ecf289429::t_f2dc8d389849df 720-723
+  s_e643fe2cfa22f5::t_0fd1096fc5c89a 630-634,650-655,660,712,835
+  s_20cb5ecf289429::t_78ac93ccb231a1 639-648
+  s_2f1745f4bbde6a::t_cb18c4871ff0b5 568-569,576-603,623-625,817
+  s_e643fe2cfa22f5::t_4e4de3ae38213e 661-672
+  s_dcf1da32226662::t_831f27528169a4 70
+  s_0d64f5366879b5::t_186aae401f296f 125,619-621,636-638,656-659,714-719,729-732,781,837
+  s_fc7bf2cc7fa935::t_34392f0877287c 126
+components/execd/pkg/web/router_test.go
+  s_b17ade8680cc8b::t_ebf0ba50ce803b 76
+  s_c1a2cfeaf2e46e::t_90d05766936c48 1-38,65-75,77-88
+  s_c1a2cfeaf2e46e::t_950f3ac04f3336 47-50,53-60
+  s_c1a2cfeaf2e46e::t_bfad4f73d41243 39-46,51-52,61-64
+.github/workflows/execd-test.yml
+  s_f29e7fb9eb0470::t_62d63568023faa 145-148,300-316,320,330,337,339
+  s_c7832e666de498::t_da18032156e0e6 137-138,140-142
+  s_eded7d31f9080c::t_7350fd83aff98c 139
+  s_3dea16c67a3e86::t_57b441b943a39d 144
+  s_2f45564ad2b2d9::t_b7e2408b8f7ce2 143
+components/execd/pkg/runtime/command_inventory_fuzz_test.go
+  s_4d221a4399c535::t_c3e0a1d0234c29 29-33,35-44,53-54
+  s_fa59c02338fb4d::t_b0ea27fef2190c 5-13
+  s_03e03d056c8cec::t_5666c23b21def1 52
+  s_03e03d056c8cec::t_fd178f139de447 1-4,14-28,34,45-51,55-57
+components/execd/pkg/runtime/command_inventory_windows_test.go
+  s_4f422f1247dd1d::t_2d4247e9bf36ed 214
+  s_f29e7fb9eb0470::t_6858868ee3cf6f 168,171-172
+  s_c918f94692c511::t_ad546a08e8d9b1 1-20,22-30,33,184,194,196,199,201-209,302,304
+  s_f29e7fb9eb0470::t_664904049c5d7d 21,31-32,34-47,49-50,53-60,62-67,72-74,76,79-86,88-96,99-102,116-117,159,185-186,195,197-198,200,215,220,226,228,231,298-301,303
+  s_9415b3e0b70cf8::t_4480517b3e0e8e 48,75
+  s_9415b3e0b70cf8::t_9ae4bdbf5065cb 51,61,77-78,217-219,221-225,227,229-230
+  s_9415b3e0b70cf8::t_b8d3f5b90b2120 97-98,118-119
+  s_f29e7fb9eb0470::t_8b980c187d1c82 87,103-115,121,131-132,134-143,145-156,167,169-170,173-177,179-181,211-213,232-255,286-294
+  s_c918f94692c511::t_3bf0b020728cdb 52,183,187-193,210,216,296-297
+  s_f29e7fb9eb0470::t_8fa864b876a656 68-71
+  s_f29e7fb9eb0470::t_ffe6c654ecf2a7 120,122-130,133,144,157-158,160-166,178,182,256-285,295
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8f8ad0f0d66f427dbea9f7f8eb24853632d638fa",
+  "prompts": {},
+  "sessions": {
+    "s_02b8144a13db93": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d76d627ffeviI9B4zzwxJlKF",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_03e03d056c8cec": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0784aa9a8ffePBlI8LPL98CY97",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_0d64f5366879b5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_076f48c4dffeSAzBfcjREPCxsw",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_1e8a647f7bca2d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06bf0b8a1ffemwbFsnPZL3cKH4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_20cb5ecf289429": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05d7fb5fbffe4vw692uxiriFA2",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_28fbd3f9169c7d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_062a024feffeHb1Mq5V2M4p5jJ",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_2b2310473b07ca": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_062dc7db2ffeSIf8WORaXDGQ2b",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_2bebcf64e2f3c4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065658cfbffeo6JDj5HwkfM7cz",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_2f1745f4bbde6a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0606121f4ffeLenXfDDj5xHEQ3",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_2f45564ad2b2d9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0561f9ba4ffeixdr2VqopbcwQu",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_3769a7c8bdd589": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05c39743cffeR7wUdcBnBDD0bT",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_3dea16c67a3e86": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0bb38afb8ffe1jX2OY4PsHhA4e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_44fb3db0ff8ab3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06da2e980ffeOiAM8610VTDlgt",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_464edb7e30f0e9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07bbf34a6ffeaftZz7QXlxYrE4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_478c5e036ea730": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06539b8a0ffe7lT0F5ebzdL9SS",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_4d221a4399c535": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0781b6d85ffeaEgNnsLfnkXJD1",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_4f422f1247dd1d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_076e5ba80ffeS0lNk4gcIYYokE",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_57b11ffc802a80": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05dcf9825ffe2oFS1lwEGCmCP0",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_5b28ce0a861ec8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07a99f836ffe0AR9ExGJNuKpKv",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_5b4c4c6dab1a8b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05dc4a50cffeKUPzUoNg4woC80",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_633829efce38af": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06d926dd1ffef6i2We64GluzMz",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_644b3387898f55": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07771c7b2ffeWSKG3VlgCkI7co",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6a99a22fb48986": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_077595186ffejn678wFWF3CJlW",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6c015eec3fcdbc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06d7c28e5ffeErG2Is9IgM5XJX",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6fd3eac354d12f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065c40e1effe3oSrrXEziQMCoE",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_72091cb2dc5597": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07a7ecff6ffeLcWqQPxmO1UPiG",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_7e132e206c2927": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05684f4eeffeuW6h0CjCZJ03QF",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_82db1a853732b0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06c069f57ffejg2n9apKIHA5f3",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_830b9f617d5e26": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07794dde0ffeGeiXCM9Uj5fe5r",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_9415b3e0b70cf8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0786beb1bffefPOBUWsX0eoBKF",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_9445ee527963bb": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_060b68d49ffe2ALxU2H4LZrCIG",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_b17ade8680cc8b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05684f521ffeNvIPNCxSaQmN4R",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_b4603593634437": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06d926e13ffeXkOC3v790a3GnP",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_b473a40c774947": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065af9f06ffe65Ckkiv9GqdHN5",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_b5c00490621001": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06de43334ffekA0WJAeblLwshR",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_bf7e86648d4614": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_077c07d85ffemOoO2j762UOz4m",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c1a2cfeaf2e46e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_077b20f24ffeV9xUqjSbNbZwpX",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c7725ba8bd4068": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06de17e7dffem154vQqJe0egmL",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c7832e666de498": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_060b741a9ffeh2d61pArCsuE4P",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_c918f94692c511": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07a54941fffe6V7Fl7sbEMfT6G",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_ccd39396a429bf": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07a7158abffeOSN2q6A1TQQRZn",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_d5b5d3b316a8aa": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05dcf7621ffePZlI3GiyNr2E0B",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_d8150064339d7e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0658b28d6ffeJkCf1ixffXWt5M",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_d926b6d9e0c363": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06bc21fbfffeDpRxMY51J3KWUv",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_dcf1da32226662": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06e11cec2ffeGN3Bq07UYT2Mi0",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_e643fe2cfa22f5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_065a11c4dffeCtY2KkiSTm9z9f",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_eded7d31f9080c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05df53a11ffesAHUU6rAOHo7hL",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_f29e7fb9eb0470": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07771c884ffefPTzTMC9Hhx9a2",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_fa59c02338fb4d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_062a024b8ffeNW0t4fJZfaTNi7",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_fc7bf2cc7fa935": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0568a7b11ffeeS1sJYs3oeu0GY",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
