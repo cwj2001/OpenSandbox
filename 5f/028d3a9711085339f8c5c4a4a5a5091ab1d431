@@ -22,6 +22,7 @@ docs/components/execd.md
   s_f29e7fb9eb0470::t_0b84560c7decd3 185,190
   s_4f422f1247dd1d::t_2d4247e9bf36ed 82,84-85,87-88,90-91,95,107
   s_77d411b29282aa::t_9e986d34b9f258 65,103,160,340
+  s_f843efab962e24::t_79701c59702233 128-129,152-157
 docs/sdks/csharp.md
   s_23571ca888d389::t_cc7ef5176f8b5b 103-106,111-117,121-127
   s_23571ca888d389::t_0c9256c501dd52 118-120
@@ -120,6 +121,14 @@ docs/api/index.md
         "tool": "opencode",
         "id": "ses_07771c884ffefPTzTMC9Hhx9a2",
         "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_f843efab962e24": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a07eba-a881-7566-98b1-a6ad437de97a",
+        "model": "gpt-6-astra"
       },
       "human_author": "weijia2.chen <weijia2.chen@ly.com>"
     }
