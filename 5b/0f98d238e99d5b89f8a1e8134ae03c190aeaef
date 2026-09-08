@@ -245,6 +245,8 @@ sdks/sandbox/go/execd.go
   s_3dea16c67a3e86::t_30e7ea855dcd32 160-161
 sdks/sandbox/python/src/opensandbox/services/__init__.py
   s_b473a40c774947::t_845108a8e30bf0 22,33
+components/execd/pkg/runtime/command_cleanup_test.go
+  s_39ca9aa8d8dee7::t_22157ea4c0d5d3 194-246
 ---
 {
   "schema_version": "authorship/3.0.0",
@@ -321,6 +323,14 @@ sdks/sandbox/python/src/opensandbox/services/__init__.py
         "tool": "opencode",
         "id": "ses_0606121f4ffeLenXfDDj5xHEQ3",
         "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_39ca9aa8d8dee7": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a07ec0-5f2b-728c-bcbd-54e70e1b869c",
+        "model": "gpt-6-astra"
       },
       "human_author": "weijia2.chen <weijia2.chen@ly.com>"
     },
