@@ -170,18 +170,22 @@ public class CommandInventoryCapabilityTests
     [Fact]
     public async Task ListCommandsAsync_ShouldPropagateCancellationToken()
     {
-        CancellationToken received = default;
-        var handler = new StubHttpMessageHandler((_, cancellationToken) =>
+        var requestStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new StubHttpMessageHandler(async (_, cancellationToken) =>
         {
-            received = cancellationToken;
-            return JsonResponse(RunningPageJson());
+            requestStarted.SetResult(true);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return await JsonResponse(RunningPageJson());
         });
         IExecdCommandInventory inventory = CreateAdapter(handler);
         using var cancellation = new CancellationTokenSource();
 
-        await inventory.ListCommandsAsync(cancellationToken: cancellation.Token);
+        var request = inventory.ListCommandsAsync(cancellationToken: cancellation.Token);
+        await requestStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
 
-        received.Should().Be(cancellation.Token);
+        var act = () => request.WaitAsync(TimeSpan.FromSeconds(5));
+        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
@@ -307,11 +311,11 @@ public class CommandInventoryCapabilityTests
     public async Task ListCommandsAsync_ShouldRejectBlankNextCursor(string nextCursor)
     {
         var serializedNextCursor = JsonSerializer.Serialize(nextCursor);
-        var handler = new StubHttpMessageHandler((_, _) => JsonResponse($"""
-            {{
+        var handler = new StubHttpMessageHandler((_, _) => JsonResponse($$"""
+            {
               "commands": [],
-              "pagination": {{ "limit": 50, "nextCursor": {serializedNextCursor} }}
-            }}
+              "pagination": { "limit": 50, "nextCursor": {{serializedNextCursor}} }
+            }
             """));
         IExecdCommandInventory inventory = CreateAdapter(handler);
 
@@ -415,13 +419,13 @@ public class CommandInventoryCapabilityTests
     [InlineData("2026-07-24T10:00:00.123456789+08:00")]
     public async Task ListCommandsAsync_ShouldAcceptRfc3339NanoTimestamps(string startedAt)
     {
-        var handler = new StubHttpMessageHandler((_, _) => JsonResponse(PageWithSummary($"""
-            {{
+        var handler = new StubHttpMessageHandler((_, _) => JsonResponse(PageWithSummary($$"""
+            {
               "session": "cmd-running",
               "running": true,
               "background": true,
-              "started_at": "{startedAt}"
-            }}
+              "started_at": "{{startedAt}}"
+            }
             """)));
         IExecdCommandInventory inventory = CreateAdapter(handler);
 
@@ -481,12 +485,7 @@ public class CommandInventoryCapabilityTests
     [InlineData("{\"session\":\"cmd-running\",\"running\":true,\"background\":true,\"started_at\":\"2026-07-24T10:00:00Z\",\"unexpected\":true}")]
     public async Task ListCommandsAsync_ShouldRejectInvalidSummaryWireShape(string summary)
     {
-        var handler = new StubHttpMessageHandler((_, _) => JsonResponse($"""
-            {{
-              "commands": [{summary}],
-              "pagination": {{ "limit": 50 }}
-            }}
-            """));
+        var handler = new StubHttpMessageHandler((_, _) => JsonResponse(PageWithSummary(summary)));
         IExecdCommandInventory inventory = CreateAdapter(handler);
 
         var act = () => inventory.ListCommandsAsync();
@@ -546,11 +545,11 @@ public class CommandInventoryCapabilityTests
         }
         """;
 
-    private static string PageWithSummary(string summary) => $"""
-        {{
-          "commands": [{summary}],
-          "pagination": {{ "limit": 50 }}
-        }}
+    private static string PageWithSummary(string summary) => $$"""
+        {
+          "commands": [{{summary}}],
+          "pagination": { "limit": 50 }
+        }
         """;
 
     private sealed class LegacyCommandsAdapterFactory : IAdapterFactory
