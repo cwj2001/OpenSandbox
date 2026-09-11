@@ -601,6 +601,12 @@ public class CommandInventoryCapabilityTests
         public Task<Execution> RunAsync(string command, RunCommandOptions? options = null, ExecutionHandlers? handlers = null, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public IAsyncEnumerable<ServerStreamEvent> RunStreamAsync(IReadOnlyList<string> argv, RunCommandOptions? options = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<Execution> RunAsync(IReadOnlyList<string> argv, RunCommandOptions? options = null, ExecutionHandlers? handlers = null, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task InterruptAsync(string sessionId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
