@@ -174,6 +174,7 @@ sdks/sandbox/python/src/opensandbox/sandbox.py
   s_b473a40c774947::t_845108a8e30bf0 57,208-211
   s_b473a40c774947::t_7dd7b28c8476e0 212-214
   s_3dea16c67a3e86::t_038d65c618076a 215
+  s_f843efab962e24::t_8743167d37d167 25
 sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/converter/ExecutionConverter.kt
   s_e643fe2cfa22f5::t_0e2b4d037f0c8d 111,160,196,200-206
   s_e643fe2cfa22f5::t_68f6b9a388db23 67-69,73-75
@@ -573,6 +574,14 @@ components/execd/pkg/runtime/command_cleanup_test.go
         "model": "gpt-5.6-terra"
       },
       "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_f843efab962e24": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a07eba-a881-7566-98b1-a6ad437de97a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
     },
     "s_fa59c02338fb4d": {
       "agent_id": {
