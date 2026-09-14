@@ -96,6 +96,7 @@ components/execd/pkg/flag/parser_test.go
   s_c918f94692c511::t_2f27133a71309c 122-133,157-158,160-161
   s_c918f94692c511::t_ebaa0b9295fa9a 74,91-103,114-121,134-156,159,162-202
   s_c918f94692c511::t_9c8fcb288dc061 104-113
+  s_f843efab962e24::t_7fa3a7250f5b18 90
 sdks/sandbox/go/command_inventory_test.go
   s_b4603593634437::t_ac0482bf9a4ec5 129-135,141,146-189
   s_b4603593634437::t_cbda90fae1e086 1-43,46-128,142-145,190-239
@@ -596,6 +597,14 @@ components/execd/pkg/runtime/command_inventory_windows_test.go
         "model": "gpt-5.6-terra"
       },
       "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_f843efab962e24": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a07eba-a881-7566-98b1-a6ad437de97a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
     },
     "s_fa59c02338fb4d": {
       "agent_id": {
