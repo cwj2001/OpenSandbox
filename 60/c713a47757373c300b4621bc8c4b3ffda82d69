@@ -1,0 +1,22 @@
+components/execd/pkg/web/controller/command_inventory_test.go
+  s_b17ade8680cc8b::t_4a66917723ca86 132-139,214
+  s_b17ade8680cc8b::t_c0c1a2e05e8b26 172,194
+components/execd/pkg/web/controller/command.go
+  s_b17ade8680cc8b::t_7cf66fcc8b2828 47-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "60c713a47757373c300b4621bc8c4b3ffda82d69",
+  "prompts": {},
+  "sessions": {
+    "s_b17ade8680cc8b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05684f521ffeNvIPNCxSaQmN4R",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

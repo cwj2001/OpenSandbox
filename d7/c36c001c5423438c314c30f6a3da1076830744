@@ -1,0 +1,23 @@
+components/execd/pkg/subpathinitializer/securetree_linux.go
+  s_9766f3183ff65d::t_6acdd396ebc716 30-34,132-134,138,140,142,144,147-149,158-162
+  s_9766f3183ff65d::t_b490901676def5 163-164
+components/execd/pkg/subpathinitializer/securetree_linux_test.go
+  s_9766f3183ff65d::t_6acdd396ebc716 20,28-66
+  s_9766f3183ff65d::t_e6829c6af937c1 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "d7c36c001c5423438c314c30f6a3da1076830744",
+  "prompts": {},
+  "sessions": {
+    "s_9766f3183ff65d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_fed73e2f3ffedbjc0zFhbldx1U",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

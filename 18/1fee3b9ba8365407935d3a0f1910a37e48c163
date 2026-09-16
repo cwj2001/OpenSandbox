@@ -1,0 +1,29 @@
+components/egress/pkg/iptables/redirect_test.go
+  s_1a8b0dc96a9d3c::t_f1318aeda5ae28 1-38,63-78
+  s_1a8b0dc96a9d3c::t_85817dd1d3ef40 39-62
+components/egress/pkg/iptables/redirect.go
+  s_1a8b0dc96a9d3c::t_f8ec3197d52fce 18,29-52,86,88,95-101,112-116,141-172,176,179,185-187
+  s_1a8b0dc96a9d3c::t_44409a62eb4cb0 102-111,118-140
+  s_1a8b0dc96a9d3c::t_64c1c4bfee53a8 117
+components/egress/pkg/nftables/manager_test.go
+  s_1a8b0dc96a9d3c::t_5068d8ec025840 59-62,73-75,95
+  s_1a8b0dc96a9d3c::t_ffce85fa19f03a 63-72
+components/egress/pkg/nftables/manager.go
+  s_1a8b0dc96a9d3c::t_9619440ec1cf7d 225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "181fee3b9ba8365407935d3a0f1910a37e48c163",
+  "prompts": {},
+  "sessions": {
+    "s_1a8b0dc96a9d3c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0f59a7516ffeRq5Sn1gqsR5WDC",
+        "model": "gpt-5.5"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+sdks/sandbox/javascript/tests/commands.list.test.mjs
+  s_7e132e206c2927::t_36d2f777960845 223-227
+  s_7e132e206c2927::t_ef02186ee18e21 195,203
+sdks/sandbox/javascript/src/adapters/commandsAdapter.ts
+  s_7e132e206c2927::t_074e09b2a9781f 197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b2d814cbf3710c336966604f5b3935f709946ab5",
+  "prompts": {},
+  "sessions": {
+    "s_7e132e206c2927": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05684f4eeffeuW6h0CjCZJ03QF",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

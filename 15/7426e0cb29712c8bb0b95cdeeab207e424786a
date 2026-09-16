@@ -1,0 +1,20 @@
+sdks/sandbox/csharp/tests/OpenSandbox.Tests/CommandInventoryCapabilityTests.cs
+  s_f843efab962e24::t_1623c21d9676fd 314-315,317-318,422-423,427-428,488,548-552
+  s_f843efab962e24::t_38f2d96f18a78f 173-174,176-178,183-185,187-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "157426e0cb29712c8bb0b95cdeeab207e424786a",
+  "prompts": {},
+  "sessions": {
+    "s_f843efab962e24": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a07eba-a881-7566-98b1-a6ad437de97a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

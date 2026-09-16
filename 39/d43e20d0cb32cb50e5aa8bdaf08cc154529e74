@@ -1,0 +1,24 @@
+sdks/sandbox/python/scripts/generate_api.py
+  s_4ca29d8bf8832e::t_c424287f907c38 26,30-31,309-371,395-407,410,429-432
+  s_4ca29d8bf8832e::t_5aa1d88bec6ee5 433
+sdks/sandbox/python/tests/test_generate_api.py
+  s_4ca29d8bf8832e::t_426ddd625ff4a2 65-92
+  s_4ca29d8bf8832e::t_d0d3b2f2830d12 1-64,93-115
+  s_4ca29d8bf8832e::t_102eb52fc60c3e 116-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "39d43e20d0cb32cb50e5aa8bdaf08cc154529e74",
+  "prompts": {},
+  "sessions": {
+    "s_4ca29d8bf8832e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05638d627ffeVCSYVvCUtFs3rb",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

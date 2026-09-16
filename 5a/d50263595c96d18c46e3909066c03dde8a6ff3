@@ -1,0 +1,29 @@
+sdks/sandbox/kotlin/sandbox/src/test/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/service/CommandsAdapterTest.kt
+  s_dc3e2296db4692::t_6cefbca7c76c3a 817-818
+  s_dc3e2296db4692::t_4ba1a83432f7f2 600,609-610,612-614,625,627
+  s_dc3e2296db4692::t_a153f1600f762f 631-660
+  s_dc3e2296db4692::t_b754c4ba466fbe 599,601-608,611,615-624,626,628-630
+  s_dc3e2296db4692::t_9c623e0e0e5280 816
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/converter/ExecutionConverter.kt
+  s_dc3e2296db4692::t_1af4071982b81b 133-136
+  s_dc3e2296db4692::t_6526b02524aaaf 202-203
+  s_dc3e2296db4692::t_4ba1a83432f7f2 35,125,206-234
+  s_dc3e2296db4692::t_a153f1600f762f 33,127,137-172,200-201,204-205
+  s_dc3e2296db4692::t_6cefbca7c76c3a 32,235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "5ad50263595c96d18c46e3909066c03dde8a6ff3",
+  "prompts": {},
+  "sessions": {
+    "s_dc3e2296db4692": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_057c0952dffeEeFh2ymb1NSDz1",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

@@ -1,0 +1,57 @@
+server/configuration.md
+  s_9766f3183ff65d::t_b7b34fbc561d73 144,157,166-183
+  s_9766f3183ff65d::t_93988a661ca74b 184
+server/tests/k8s/test_kubernetes_service.py
+  s_9766f3183ff65d::t_5f47edb4d6b5cf 131-154
+  s_9766f3183ff65d::t_b08ccb1b1e2d67 127
+scripts/common/kubernetes-e2e.sh
+  s_9766f3183ff65d::t_bd69edc9c5df57 207
+docs/sdks/kotlin.md
+  s_9766f3183ff65d::t_b7b34fbc561d73 155-158
+server/opensandbox_server/services/k8s/provider_common.py
+  s_9766f3183ff65d::t_fb9d731ac9c87f 17-18,122-124,142-144,146-164,167-170,185
+  s_9766f3183ff65d::t_0ba5f38f64f268 171
+server/opensandbox_server/services/k8s/security_context.py
+  s_9766f3183ff65d::t_9a4692bb2696eb 75-83
+server/tests/test_config.py
+  s_9766f3183ff65d::t_c359fff73df65d 182-201
+docs/sdks/csharp.md
+  s_9766f3183ff65d::t_b7b34fbc561d73 256-259
+docs/examples/kubernetes-pvc-volume-mount.md
+  s_9766f3183ff65d::t_b7b34fbc561d73 36-51
+docs/sdks/go.md
+  s_9766f3183ff65d::t_b7b34fbc561d73 119-122
+server/opensandbox_server/services/k8s/volume_helper.py
+  s_9766f3183ff65d::t_fb9d731ac9c87f 20,133,137-138,141,175
+server/tests/k8s/test_batchsandbox_provider.py
+  s_9766f3183ff65d::t_c359fff73df65d 2958,2965-2966,2968-2970,2972
+  s_9766f3183ff65d::t_b08ccb1b1e2d67 58,2927,2929,2931-2933,2944-2951,3124-3125,3187
+docs/sdks/javascript.md
+  s_9766f3183ff65d::t_b7b34fbc561d73 235-238
+server/opensandbox_server/services/k8s/kubernetes_service.py
+  s_9766f3183ff65d::t_bd69edc9c5df57 393,396-406,417-418
+  s_9766f3183ff65d::t_e4ca6aa2d1f44e 407-410
+server/opensandbox_server/config.py
+  s_9766f3183ff65d::t_bd69edc9c5df57 662-669
+docs/sdks/python.md
+  s_9766f3183ff65d::t_b7b34fbc561d73 601-604
+server/opensandbox_server/services/k8s/batchsandbox_provider.py
+  s_9766f3183ff65d::t_e4ca6aa2d1f44e 329
+  s_9766f3183ff65d::t_fb9d731ac9c87f 59,85-87,188-195,313,327,332-346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "65d1753ac96211d07df7835dcfedb716a16d78da",
+  "prompts": {},
+  "sessions": {
+    "s_9766f3183ff65d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_fed73e2f3ffedbjc0zFhbldx1U",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

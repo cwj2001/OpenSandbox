@@ -1,0 +1,42 @@
+kubernetes/internal/controller/pool_physical_deletion_test.go
+  s_49bb2ab2c7f7fe::t_688a04c8e20940 1-138
+  s_49bb2ab2c7f7fe::t_d3c6947897dc6c 139-141
+kubernetes/internal/controller/allocator.go
+  s_70270090d01ee7::t_ca61b2ecac71ff 22,26,57-60,65-67,81-94,114-127,129-141,144,149,156-193,198,200-205,211,213,235-236,250,260,280,297-298,300,308,311-314,316-327,329-347
+kubernetes/apis/sandbox/v1alpha1/pool_types.go
+  s_49bb2ab2c7f7fe::t_537bff99afc0d2 123-130,141
+kubernetes/config/crd/bases/sandbox.opensandbox.io_pools.yaml
+  s_49bb2ab2c7f7fe::t_4686c5a4d0ee1e 34-37,161-166,173-176,180-183
+kubernetes/internal/controller/recycle/delete.go
+  s_49bb2ab2c7f7fe::t_66b418de1a95ba 35-37,39,42-48
+kubernetes/internal/controller/recycle/delete_test.go
+  s_49bb2ab2c7f7fe::t_c7fa14099ee3c9 44,46
+server/opensandbox_server/api/schema.py
+  s_49bb2ab2c7f7fe::t_7f6a8d430cd5d3 973-987
+server/opensandbox_server/services/k8s/pool_service.py
+  s_49bb2ab2c7f7fe::t_e3a16447a10af4 98-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "bdb2694881d906d5e776df9af61430f0ed99374f",
+  "prompts": {},
+  "sessions": {
+    "s_49bb2ab2c7f7fe": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a06685-2a6c-7551-9a71-9680701b0754",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_70270090d01ee7": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0421b-7435-74e2-b8e9-319c242e9b5a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

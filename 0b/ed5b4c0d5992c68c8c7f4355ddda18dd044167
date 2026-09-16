@@ -1,0 +1,19 @@
+sdks/sandbox/javascript/src/api/execd.ts
+  s_7e132e206c2927::t_17396fc5f27a6a 231-232,1787
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "0bed5b4c0d5992c68c8c7f4355ddda18dd044167",
+  "prompts": {},
+  "sessions": {
+    "s_7e132e206c2927": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05684f4eeffeuW6h0CjCZJ03QF",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

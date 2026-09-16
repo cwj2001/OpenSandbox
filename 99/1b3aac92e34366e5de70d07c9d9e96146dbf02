@@ -1,0 +1,33 @@
+sdks/sandbox/javascript/tests/commands.list.test.mjs
+  s_3769a7c8bdd589::t_dda7ce9c879f25 1-14
+docs/components/execd.md
+  s_bfaa3924ea3fc0::t_470aab183697fd 90-107,111
+  s_bfaa3924ea3fc0::t_34f5c955b4f551 51-56,80-82,88-89,108-110
+  s_bfaa3924ea3fc0::t_662f81deaff34e 112
+components/execd/tests/smoke.sh
+  s_3769a7c8bdd589::t_dda7ce9c879f25 127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "991b3aac92e34366e5de70d07c9d9e96146dbf02",
+  "prompts": {},
+  "sessions": {
+    "s_3769a7c8bdd589": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05c39743cffeR7wUdcBnBDD0bT",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_bfaa3924ea3fc0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05c33b987ffeLFwPOGEeQcGPDj",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

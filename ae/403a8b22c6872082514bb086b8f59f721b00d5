@@ -1,0 +1,61 @@
+components/execd/tests/smoke_api.py
+  s_f29e7fb9eb0470::t_62d63568023faa 77-106,109-121,123-127,130-145,147-148,150,152-156,159,161,165-167,170-172,178,180-182,434,439-444,467
+  s_f29e7fb9eb0470::t_f4684201a99367 54-58,265-268,270-271
+  s_f29e7fb9eb0470::t_6b3a3f29f86b7d 122,128-129,146,149,151,157-158,160,162-164,168-169,179,435-438,445
+  s_f29e7fb9eb0470::t_c4cdf8f76035f5 107-108,173-177
+  s_6a99a22fb48986::t_0b913abd94fbc9 183-184,446
+components/execd/tests/smoke.sh
+  s_f29e7fb9eb0470::t_62d63568023faa 17-54,56-65,115,121-122,125-126
+  s_f29e7fb9eb0470::t_6b3a3f29f86b7d 55,66-112,116-117,123-124
+components/execd/tests/jupyter.sh
+  s_f29e7fb9eb0470::t_62d63568023faa 20-22,24-35,37,39-40,42-46
+  s_f29e7fb9eb0470::t_c4cdf8f76035f5 38
+docs/components/execd.md
+  s_f29e7fb9eb0470::t_6b3a3f29f86b7d 23-24,26,28-30
+  s_f29e7fb9eb0470::t_0b84560c7decd3 92-98
+  s_f29e7fb9eb0470::t_62d63568023faa 80-91,159-160,172-173,181
+  s_4f422f1247dd1d::t_2d4247e9bf36ed 48-68
+  s_acc6d17be10ea0::t_0d759aa45757e0 182
+.github/workflows/execd-test.yml
+  s_f29e7fb9eb0470::t_62d63568023faa 115,117-120,170-186,190,200,207,209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "ae403a8b22c6872082514bb086b8f59f721b00d5",
+  "prompts": {},
+  "sessions": {
+    "s_4f422f1247dd1d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_076e5ba80ffeS0lNk4gcIYYokE",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6a99a22fb48986": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_077595186ffejn678wFWF3CJlW",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_acc6d17be10ea0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06b08908fffeH7YITfT1Q5ZPpb",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_f29e7fb9eb0470": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_07771c884ffefPTzTMC9Hhx9a2",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
