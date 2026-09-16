@@ -13,6 +13,7 @@
 // limitations under the License.
 
 using System.Text.Json.Serialization;
+using OpenSandbox.Core;
 
 namespace OpenSandbox.Models;
 
@@ -820,6 +821,85 @@ public class SandboxMetadataPatch : Dictionary<string, string?>
     public SandboxMetadataPatch(IDictionary<string, string?> dictionary) : base(dictionary)
     {
     }
+}
+
+/// <summary>
+/// Request to update the CPU and memory resources of a running sandbox.
+/// </summary>
+public class PatchSandboxResourcesRequest
+{
+    /// <summary>
+    /// Gets or sets the requested CPU and memory limits.
+    /// </summary>
+    [JsonPropertyName("resourceLimits")]
+    public IReadOnlyDictionary<string, string>? ResourceLimits { get; set; }
+
+    /// <summary>
+    /// Gets or sets the requested CPU and memory reservations.
+    /// </summary>
+    [JsonPropertyName("resourceRequests")]
+    public IReadOnlyDictionary<string, string>? ResourceRequests { get; set; }
+
+    internal void Validate()
+    {
+        ValidateResources(nameof(ResourceLimits), ResourceLimits);
+        ValidateResources(nameof(ResourceRequests), ResourceRequests);
+
+        if (ResourceLimits == null && ResourceRequests == null)
+        {
+            throw new InvalidArgumentException("At least one of resourceLimits or resourceRequests must be specified.");
+        }
+    }
+
+    private static void ValidateResources(string propertyName, IReadOnlyDictionary<string, string>? resources)
+    {
+        if (resources == null)
+        {
+            return;
+        }
+
+        if (resources.Count == 0)
+        {
+            throw new InvalidArgumentException($"{propertyName} must not be empty when specified.");
+        }
+
+        foreach (var resource in resources)
+        {
+            if (resource.Key is not ("cpu" or "memory"))
+            {
+                throw new InvalidArgumentException($"{propertyName} may only contain cpu and memory.");
+            }
+
+            if (string.IsNullOrWhiteSpace(resource.Value))
+            {
+                throw new InvalidArgumentException($"{propertyName} values must not be blank.");
+            }
+        }
+    }
+}
+
+/// <summary>
+/// Desired resource values accepted in a new sandbox generation.
+/// </summary>
+public class PatchSandboxResourcesResponse
+{
+    /// <summary>
+    /// Gets or sets the generation carrying the requested resources.
+    /// </summary>
+    [JsonPropertyName("generation")]
+    public required int Generation { get; set; }
+
+    /// <summary>
+    /// Gets or sets the accepted CPU and memory limits.
+    /// </summary>
+    [JsonPropertyName("resourceLimits")]
+    public required IReadOnlyDictionary<string, string> ResourceLimits { get; set; }
+
+    /// <summary>
+    /// Gets or sets the accepted CPU and memory reservations.
+    /// </summary>
+    [JsonPropertyName("resourceRequests")]
+    public required IReadOnlyDictionary<string, string> ResourceRequests { get; set; }
 }
 
 /// <summary>

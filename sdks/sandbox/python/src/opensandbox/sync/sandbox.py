@@ -48,6 +48,7 @@ from opensandbox.models.sandboxes import (
     SandboxLifecycle,
     SandboxMetrics,
     SandboxRenewResponse,
+    SandboxResourcesPatchResponse,
     SnapshotInfo,
     Volume,
 )
@@ -318,6 +319,18 @@ class SandboxSync:
         """
         return self._sandbox_service.patch_sandbox_metadata(self.id, patch)
 
+    def patch_resources(
+        self,
+        resource_limits: dict[str, str] | None = None,
+        resource_requests: dict[str, str] | None = None,
+    ) -> SandboxResourcesPatchResponse:
+        """Request an in-place CPU and memory resize for this sandbox."""
+        return self._sandbox_service.patch_sandbox_resources(
+            self.id,
+            resource_limits=resource_limits,
+            resource_requests=resource_requests,
+        )
+
     def create_snapshot(self, name: str | None = None) -> SnapshotInfo:
         """Create a persistent snapshot from this sandbox (blocking)."""
         return self._sandbox_service.create_snapshot(
@@ -572,12 +585,16 @@ class SandboxSync:
             )
             sandbox_id = response.id
             budget = ReadinessBudget(ready_timeout, health_check_polling_interval)
-            execd_endpoint = budget.endpoint_sync(lambda: sandbox_service.get_sandbox_endpoint(
-                response.id, DEFAULT_EXECD_PORT, config.use_server_proxy
-            ))
-            egress_endpoint = budget.endpoint_sync(lambda: sandbox_service.get_sandbox_endpoint(
-                response.id, DEFAULT_EGRESS_PORT, config.use_server_proxy
-            ))
+            execd_endpoint = budget.endpoint_sync(
+                lambda: sandbox_service.get_sandbox_endpoint(
+                    response.id, DEFAULT_EXECD_PORT, config.use_server_proxy
+                )
+            )
+            egress_endpoint = budget.endpoint_sync(
+                lambda: sandbox_service.get_sandbox_endpoint(
+                    response.id, DEFAULT_EGRESS_PORT, config.use_server_proxy
+                )
+            )
 
             sandbox = cls(
                 sandbox_id=response.id,
@@ -676,12 +693,16 @@ class SandboxSync:
         try:
             sandbox_service = factory.create_sandbox_service()
             budget = ReadinessBudget(connect_timeout, health_check_polling_interval)
-            execd_endpoint = budget.endpoint_sync(lambda: sandbox_service.get_sandbox_endpoint(
-                sandbox_id, DEFAULT_EXECD_PORT, config.use_server_proxy
-            ))
-            egress_endpoint = budget.endpoint_sync(lambda: sandbox_service.get_sandbox_endpoint(
-                sandbox_id, DEFAULT_EGRESS_PORT, config.use_server_proxy
-            ))
+            execd_endpoint = budget.endpoint_sync(
+                lambda: sandbox_service.get_sandbox_endpoint(
+                    sandbox_id, DEFAULT_EXECD_PORT, config.use_server_proxy
+                )
+            )
+            egress_endpoint = budget.endpoint_sync(
+                lambda: sandbox_service.get_sandbox_endpoint(
+                    sandbox_id, DEFAULT_EGRESS_PORT, config.use_server_proxy
+                )
+            )
 
             sandbox = cls(
                 sandbox_id=sandbox_id,
@@ -758,12 +779,16 @@ class SandboxSync:
             sandbox_service.resume_sandbox(sandbox_id)
 
             budget = ReadinessBudget(resume_timeout, health_check_polling_interval)
-            execd_endpoint = budget.endpoint_sync(lambda: sandbox_service.get_sandbox_endpoint(
-                sandbox_id, DEFAULT_EXECD_PORT, config.use_server_proxy
-            ))
-            egress_endpoint = budget.endpoint_sync(lambda: sandbox_service.get_sandbox_endpoint(
-                sandbox_id, DEFAULT_EGRESS_PORT, config.use_server_proxy
-            ))
+            execd_endpoint = budget.endpoint_sync(
+                lambda: sandbox_service.get_sandbox_endpoint(
+                    sandbox_id, DEFAULT_EXECD_PORT, config.use_server_proxy
+                )
+            )
+            egress_endpoint = budget.endpoint_sync(
+                lambda: sandbox_service.get_sandbox_endpoint(
+                    sandbox_id, DEFAULT_EGRESS_PORT, config.use_server_proxy
+                )
+            )
 
             sandbox = cls(
                 sandbox_id=sandbox_id,

@@ -31,11 +31,14 @@ from opensandbox_server.api.schema import (
     ListSandboxesRequest,
     ListSandboxesResponse,
     PatchSandboxMetadataRequest,
+    PatchSandboxResourcesRequest,
+    PatchSandboxResourcesResponse,
     RenewSandboxExpirationRequest,
     RenewSandboxExpirationResponse,
     Sandbox,
 )
 from opensandbox_server.services.diagnostics import DiagnosticResult
+from opensandbox_server.services.constants import SandboxErrorCodes
 from opensandbox_server.services.validators import ensure_valid_port
 
 
@@ -72,7 +75,9 @@ class SandboxService(ABC):
             str: Detected local IP address, or 127.0.0.1 as a safe fallback.
         """
         try:
-            target = ("2001:4860:4860::8888", 80, 0, 0) if family == socket.AF_INET6 else ("8.8.8.8", 80)
+            target = (
+                ("2001:4860:4860::8888", 80, 0, 0) if family == socket.AF_INET6 else ("8.8.8.8", 80)
+            )
             with socket.socket(family, socket.SOCK_DGRAM) as sock:
                 sock.connect(target)
                 ip = sock.getsockname()[0]
@@ -215,9 +220,27 @@ class SandboxService(ABC):
         pass
 
     @abstractmethod
-    def patch_sandbox_metadata(self, sandbox_id: str, patch: PatchSandboxMetadataRequest) -> Sandbox:
+    def patch_sandbox_metadata(
+        self, sandbox_id: str, patch: PatchSandboxMetadataRequest
+    ) -> Sandbox:
         """Patch sandbox metadata via JSON Merge Patch (RFC 7396). Non-null adds/replaces, null deletes, absent keeps."""
         pass
+
+    def patch_sandbox_resources(
+        self,
+        sandbox_id: str,
+        request: PatchSandboxResourcesRequest,
+    ) -> PatchSandboxResourcesResponse:
+        """Request an in-place CPU and memory resize when the runtime supports it."""
+        from fastapi import HTTPException, status
+
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail={
+                "code": SandboxErrorCodes.API_NOT_SUPPORTED,
+                "message": "This sandbox runtime does not support in-place resource resize.",
+            },
+        )
 
     @staticmethod
     def _is_system_label(key: str) -> bool:
@@ -347,9 +370,14 @@ class SandboxService(ABC):
         pass
 
     @abstractmethod
-    def get_endpoint(self, sandbox_id: str, port: int, resolve_internal: bool = False,
-                     expires: Optional[int] = None,
-                     use_proxy_host: bool = False) -> Endpoint:
+    def get_endpoint(
+        self,
+        sandbox_id: str,
+        port: int,
+        resolve_internal: bool = False,
+        expires: Optional[int] = None,
+        use_proxy_host: bool = False,
+    ) -> Endpoint:
         """
         Get sandbox access endpoint.
 

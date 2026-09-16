@@ -87,6 +87,7 @@ from opensandbox.models.sandboxes import (
     SandboxInfo,
     SandboxLifecycle,
     SandboxMetrics,
+    SandboxResourcesPatchResponse,
     SandboxState,
     SandboxStatus,
     Volume,
@@ -156,6 +157,7 @@ __all__ = [
     "SandboxImageAuth",
     "SandboxFilter",
     "SandboxMetrics",
+    "SandboxResourcesPatchResponse",
     "PagedSandboxInfos",
     "PaginationInfo",
     # Volume models

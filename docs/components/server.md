@@ -283,7 +283,9 @@ Response:
 
 **Resource limits**: The request above limits the sandbox to 0.5 CPU cores (`500m`) and 512 MiB of memory (`512Mi`). With the Docker runtime, invalid CPU or memory limits return HTTP 400 (`INVALID_PARAMETER`).
 
-**Other lifecycle calls** (same `OPEN-SANDBOX-API-KEY` header): `GET /v1/sandboxes/{id}`, `POST /v1/sandboxes/{id}/pause`, `POST /v1/sandboxes/{id}/resume`, `GET /v1/sandboxes/{id}/endpoints/{port}` (append `?use_server_proxy=true` when needed), `POST .../renew-expiration`, `DELETE /v1/sandboxes/{id}`. Full request/response shapes: **Swagger UI** above or OpenAPI under [specs/](/api/).
+**Other lifecycle calls** (same `OPEN-SANDBOX-API-KEY` header): `GET /v1/sandboxes/{id}`, `POST /v1/sandboxes/{id}/pause`, `POST /v1/sandboxes/{id}/resume`, `PATCH /v1/sandboxes/{id}/resources` (experimental in-place CPU/memory resize for running, non-pooled Kubernetes BatchSandboxes), `GET /v1/sandboxes/{id}/endpoints/{port}` (append `?use_server_proxy=true` when needed), `POST .../renew-expiration`, `DELETE /v1/sandboxes/{id}`. Full request/response shapes: **Swagger UI** above or OpenAPI under [specs/](/api/).
+
+`PATCH /v1/sandboxes/{id}/resources` accepts a non-empty `resourceLimits` and/or `resourceRequests` map containing only `cpu` and `memory`. It returns `202` after recording a new desired-resource generation; the Kubernetes controller applies it through the Pod `resize` subresource. This is unavailable for Pool allocations, non-Kubernetes runtimes, GPUs and other extended resources. A `202` is not a guarantee that the kubelet has completed the resize: node capacity, QoS class and runtime policy can defer or reject it.
 
 When a server-proxied HTTP route cannot connect to the selected sandbox backend,
 the server returns HTTP `502` with error code `BACKEND_CONNECTION_FAILED`. Use the

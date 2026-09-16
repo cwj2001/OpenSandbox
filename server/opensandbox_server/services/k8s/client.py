@@ -23,7 +23,13 @@ from functools import partial
 from typing import Any, Dict, List, Optional, Tuple
 
 from kubernetes import client, config
-from kubernetes.client import ApiException, CoreV1Api, CustomObjectsApi, NodeV1Api, V1APIResourceList
+from kubernetes.client import (
+    ApiException,
+    CoreV1Api,
+    CustomObjectsApi,
+    NodeV1Api,
+    V1APIResourceList,
+)
 
 from opensandbox_server.config import KubernetesRuntimeConfig
 from opensandbox_server.services.k8s.informer import WorkloadInformer
@@ -93,8 +99,9 @@ class K8sClient:
             self._node_v1_api = client.NodeV1Api()
         return self._node_v1_api
 
-
-    def _lookup_informer(self, group: str, version: str, plural: str, namespace: str) -> Optional[WorkloadInformer]:
+    def _lookup_informer(
+        self, group: str, version: str, plural: str, namespace: str
+    ) -> Optional[WorkloadInformer]:
         """Return an existing informer without starting one. Used by write paths
         to invalidate cache entries; never auto-create on writes since list paths
         own the lazy-start contract."""
@@ -163,7 +170,6 @@ class K8sClient:
         stops with ``stop_informers``.
         """
         return self._get_informer(group, version, plural, namespace, event_handler)
-
 
     def create_custom_object(
         self,
@@ -331,19 +337,23 @@ class K8sClient:
         namespace: str,
         plural: str,
         name: str,
-        body: Dict[str, Any],
+        body: Dict[str, Any] | List[Dict[str, Any]],
+        content_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Patch a namespaced custom resource."""
         if self._write_limiter:
             self._write_limiter.acquire()
-        obj = self.get_custom_objects_api().patch_namespaced_custom_object(
-            group=group,
-            version=version,
-            namespace=namespace,
-            plural=plural,
-            name=name,
-            body=body,
-        )
+        kwargs: Dict[str, Any] = {
+            "group": group,
+            "version": version,
+            "namespace": namespace,
+            "plural": plural,
+            "name": name,
+            "body": body,
+        }
+        if content_type is not None:
+            kwargs["_content_type"] = content_type
+        obj = self.get_custom_objects_api().patch_namespaced_custom_object(**kwargs)
         informer = self._lookup_informer(group, version, plural, namespace)
         if informer:
             informer.invalidate()
@@ -464,7 +474,6 @@ class K8sClient:
             namespace=namespace,
             body=body,
         )
-
 
     def list_pods(
         self,

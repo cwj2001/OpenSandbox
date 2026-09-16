@@ -48,6 +48,26 @@ export interface PlatformSpec extends Record<string, unknown> {
 
 export type ResourceLimits = Record<string, string>;
 
+export type SandboxResourceValues =
+  | { cpu: string; memory?: string }
+  | { cpu?: string; memory: string };
+
+export type SandboxResourcePatch =
+  | {
+    resourceLimits: SandboxResourceValues;
+    resourceRequests?: SandboxResourceValues;
+  }
+  | {
+    resourceLimits?: SandboxResourceValues;
+    resourceRequests: SandboxResourceValues;
+  };
+
+export interface SandboxResourcePatchResponse {
+  generation: number;
+  resourceLimits: ResourceLimits;
+  resourceRequests: ResourceLimits;
+}
+
 export type NetworkRuleAction = "allow" | "deny";
 
 export interface NetworkRule extends Record<string, unknown> {

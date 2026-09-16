@@ -38,6 +38,7 @@ Defines the complete lifecycle interfaces for creating, managing, and destroying
 - `POST /sandboxes/{sandboxId}/resume` - Resume a paused sandbox
 - `POST /sandboxes/{sandboxId}/renew-expiration` - Renew sandbox expiration (TTL)
 - `PATCH /sandboxes/{sandboxId}/metadata` - Patch sandbox metadata (JSON Merge Patch, RFC 7396)
+- `PATCH /sandboxes/{sandboxId}/resources` - Request asynchronous in-place CPU/memory resize for a running, non-Pool Kubernetes BatchSandbox
 - `GET /sandboxes/{sandboxId}/endpoints/{port}` - Get an access endpoint for a service port
 
 **Optional `Sandbox.allocation` response field:**

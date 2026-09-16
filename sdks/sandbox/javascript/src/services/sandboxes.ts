@@ -27,6 +27,8 @@ import type {
   SandboxId,
   SandboxInfo,
   SandboxMetadataPatch,
+  SandboxResourcePatch,
+  SandboxResourcePatchResponse,
 } from "../models/sandboxes.js";
 
 export interface Sandboxes {
@@ -40,6 +42,10 @@ export interface Sandboxes {
     sandboxId: SandboxId,
     patch: SandboxMetadataPatch,
   ): Promise<SandboxInfo>;
+  patchSandboxResources(
+    sandboxId: SandboxId,
+    patch: SandboxResourcePatch,
+  ): Promise<SandboxResourcePatchResponse>;
   deleteSandbox(sandboxId: SandboxId): Promise<void>;
 
   pauseSandbox(sandboxId: SandboxId): Promise<void>;

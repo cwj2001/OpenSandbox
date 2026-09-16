@@ -32,6 +32,8 @@ import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxImageSpec
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxInfo
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxLifecycle
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxRenewResponse
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatch
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatchResponse
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotFilter
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotInfo
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.Volume
@@ -47,9 +49,13 @@ import com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter.Sandbox
 import com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter.SandboxModelConverter.toSnapshotInfo
 import com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter.toSandboxApiException
 import com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter.toSandboxException
+import com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter.jsonParser
 import com.alibaba.opensandbox.sandbox.transport.RequestDeadline
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
@@ -227,6 +233,70 @@ internal class SandboxesAdapter(
         } catch (e: Exception) {
             throw e.toSandboxException()
         }
+    }
+
+    override fun patchSandboxResources(
+        sandboxId: String,
+        request: SandboxResourcePatch,
+    ): SandboxResourcePatchResponse {
+        return try {
+            patchSandboxResourcesRaw(sandboxId, request)
+        } catch (e: Exception) {
+            throw e.toSandboxException()
+        }
+    }
+
+    private fun patchSandboxResourcesRaw(
+        sandboxId: String,
+        request: SandboxResourcePatch,
+    ): SandboxResourcePatchResponse {
+        val url =
+            provider.config.getBaseUrl().toHttpUrl().newBuilder()
+                .addPathSegment("sandboxes")
+                .addPathSegment(sandboxId)
+                .addPathSegment("resources")
+                .build()
+        val payload = mutableMapOf<String, Map<String, String>>()
+        request.resourceLimits?.let { payload["resourceLimits"] = it }
+        request.resourceRequests?.let { payload["resourceRequests"] = it }
+        val body =
+            Serializer.kotlinxSerializationJson
+                .encodeToString(payload)
+                .toRequestBody("application/json".toMediaType())
+        val httpRequest =
+            Request.Builder()
+                .url(url)
+                .patch(body)
+                .header("Accept", "application/json")
+                .build()
+
+        provider.authenticatedClient.newCall(httpRequest).execute().use { response ->
+            val responseBody = response.body?.string().orEmpty()
+            if (response.isSuccessful) {
+                return responseBody.toSandboxResourcePatchResponse()
+            }
+            throw response.toSandboxApiException(responseBody) { statusCode, bodyText ->
+                "Failed to patch sandbox resources. Status code: $statusCode, Body: $bodyText"
+            }
+        }
+    }
+
+    private fun String.toSandboxResourcePatchResponse(): SandboxResourcePatchResponse {
+        val root = jsonParser.parseToJsonElement(this).jsonObject
+        val generation =
+            root["generation"]?.jsonPrimitive?.int
+                ?: throw IllegalStateException("Resource resize response missing generation")
+        require(generation >= 1) { "Resource resize response generation must be at least 1" }
+
+        fun resources(name: String): Map<String, String> =
+            root[name]?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content }
+                ?: throw IllegalStateException("Resource resize response missing $name")
+
+        return SandboxResourcePatchResponse(
+            generation = generation,
+            resourceLimits = resources("resourceLimits"),
+            resourceRequests = resources("resourceRequests"),
+        )
     }
 
     private fun patchSandboxMetadataRaw(

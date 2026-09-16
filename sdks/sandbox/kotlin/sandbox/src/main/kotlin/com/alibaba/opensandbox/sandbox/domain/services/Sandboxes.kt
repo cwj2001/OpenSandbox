@@ -27,6 +27,8 @@ import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxFilter
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxImageSpec
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxInfo
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxLifecycle
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatch
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatchResponse
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxRenewResponse
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotFilter
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotInfo
@@ -191,6 +193,22 @@ interface Sandboxes {
         sandboxId: String,
         patch: Map<String, String?>,
     ): SandboxInfo
+
+    /**
+     * Requests an asynchronous CPU and memory resource update for a running sandbox.
+     *
+     * @param sandboxId Unique identifier of the sandbox
+     * @param request Requested CPU and memory limits or reservations
+     * @return Desired resource values accepted for a new sandbox generation
+     */
+    fun patchSandboxResources(
+        sandboxId: String,
+        request: SandboxResourcePatch,
+    ): SandboxResourcePatchResponse {
+        throw UnsupportedOperationException(
+            "Sandbox resource resize is not supported by this Sandboxes implementation",
+        )
+    }
 
     fun createSnapshot(
         sandboxId: String,

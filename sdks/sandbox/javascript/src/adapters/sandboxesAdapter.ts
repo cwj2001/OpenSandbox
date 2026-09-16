@@ -35,6 +35,8 @@ import type {
   SandboxId,
   SandboxInfo,
   SandboxMetadataPatch,
+  SandboxResourcePatch,
+  SandboxResourcePatchResponse,
 } from "../models/sandboxes.js";
 
 type ApiCreateSandboxRequest =
@@ -49,6 +51,10 @@ type ApiPatchSandboxMetadataRequest =
   LifecyclePaths["/sandboxes/{sandboxId}/metadata"]["patch"]["requestBody"]["content"]["application/json"];
 type ApiPatchSandboxMetadataOk =
   LifecyclePaths["/sandboxes/{sandboxId}/metadata"]["patch"]["responses"][200]["content"]["application/json"];
+type ApiPatchSandboxResourcesRequest =
+  LifecyclePaths["/sandboxes/{sandboxId}/resources"]["patch"]["requestBody"]["content"]["application/json"];
+type ApiPatchSandboxResourcesOk =
+  LifecyclePaths["/sandboxes/{sandboxId}/resources"]["patch"]["responses"][202]["content"]["application/json"];
 type ApiRenewSandboxExpirationRequest =
   LifecyclePaths["/sandboxes/{sandboxId}/renew-expiration"]["post"]["requestBody"]["content"]["application/json"];
 type ApiRenewSandboxExpirationOk =
@@ -229,6 +235,23 @@ export class SandboxesAdapter implements Sandboxes {
       throw new Error("Patch sandbox metadata failed: unexpected response shape");
     }
     return this.mapSandboxInfo(ok);
+  }
+
+  async patchSandboxResources(
+    sandboxId: SandboxId,
+    patch: SandboxResourcePatch,
+  ): Promise<SandboxResourcePatchResponse> {
+    const body: ApiPatchSandboxResourcesRequest = patch;
+    const { data, error, response } = await this.client.PATCH("/sandboxes/{sandboxId}/resources", {
+      params: { path: { sandboxId } },
+      body,
+    });
+    throwOnOpenApiFetchError({ error, response }, "Patch sandbox resources failed");
+    const ok = data as ApiPatchSandboxResourcesOk | undefined;
+    if (!ok || typeof ok !== "object") {
+      throw new Error("Patch sandbox resources failed: unexpected response shape");
+    }
+    return ok as SandboxResourcePatchResponse;
   }
 
   async deleteSandbox(sandboxId: SandboxId): Promise<void> {

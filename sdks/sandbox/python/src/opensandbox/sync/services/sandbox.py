@@ -37,6 +37,7 @@ from opensandbox.models.sandboxes import (
     SandboxInfo,
     SandboxLifecycle,
     SandboxRenewResponse,
+    SandboxResourcesPatchResponse,
     SnapshotFilter,
     SnapshotInfo,
     Volume,
@@ -143,6 +144,15 @@ class SandboxesSync(Protocol):
         """
         ...
 
+    def patch_sandbox_resources(
+        self,
+        sandbox_id: str,
+        resource_limits: dict[str, str] | None = None,
+        resource_requests: dict[str, str] | None = None,
+    ) -> SandboxResourcesPatchResponse:
+        """Request an in-place CPU and memory resize for a sandbox."""
+        ...
+
     def get_sandbox_endpoint(
         self, sandbox_id: str, port: int, use_server_proxy: bool = False
     ) -> SandboxEndpoint:
@@ -163,7 +173,10 @@ class SandboxesSync(Protocol):
         ...
 
     def get_signed_sandbox_endpoint(
-        self, sandbox_id: str, port: int, expires: int,
+        self,
+        sandbox_id: str,
+        port: int,
+        expires: int,
         use_server_proxy: bool = False,
     ) -> SandboxEndpoint:
         """

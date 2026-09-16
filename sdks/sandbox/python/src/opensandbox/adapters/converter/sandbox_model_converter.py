@@ -22,14 +22,18 @@ similar to the Kotlin SDK SandboxModelConverter.
 This converter is designed to work with openapi-python-client generated models,
 which use attrs for model definitions.
 """
+
 from datetime import datetime, timedelta, timezone
 from typing import Literal, cast
 
 from opensandbox.api.lifecycle.models import (
+    CPUAndMemoryResources,
     CreateSandboxResponse,
     Endpoint,
     ListSandboxesResponse,
     ListSnapshotsResponse,
+    PatchSandboxResourcesRequest,
+    PatchSandboxResourcesResponse,
     RenewSandboxExpirationRequest,
     RenewSandboxExpirationResponse,
     Sandbox,
@@ -46,7 +50,7 @@ from opensandbox.api.lifecycle.models import (
 )
 from opensandbox.api.lifecycle.models.create_sandbox_request import CreateSandboxRequest
 from opensandbox.api.lifecycle.models.image_spec import ImageSpec
-from opensandbox.api.lifecycle.types import Unset
+from opensandbox.api.lifecycle.types import UNSET, Unset
 from opensandbox.models.sandboxes import (
     CreateSnapshotRequest,
     CredentialProxyConfig,
@@ -62,6 +66,7 @@ from opensandbox.models.sandboxes import (
     SandboxInfo,
     SandboxLifecycle,
     SandboxRenewResponse,
+    SandboxResourcesPatchResponse,
     SandboxStatus,
     SnapshotInfo,
     SnapshotStatus,
@@ -91,6 +96,47 @@ class SandboxModelConverter:
         if isinstance(value, dict):
             return value
         return None
+
+    @staticmethod
+    def to_api_patch_sandbox_resources_request(
+        resource_limits: dict[str, str] | None,
+        resource_requests: dict[str, str] | None,
+    ) -> PatchSandboxResourcesRequest:
+        """Convert and validate an in-place sandbox resource resize request."""
+        resources = {
+            "resourceLimits": resource_limits,
+            "resourceRequests": resource_requests,
+        }
+        if not any(resources.values()):
+            raise ValueError(
+                "At least one non-empty resource_limits or resource_requests map is required"
+            )
+
+        for name, values in resources.items():
+            if values is None:
+                continue
+            if not values:
+                raise ValueError(f"{name} must not be empty when provided")
+            unsupported = set(values) - {"cpu", "memory"}
+            if unsupported:
+                raise ValueError(
+                    f"{name} may only contain cpu and memory, got {sorted(unsupported)}"
+                )
+            if any(not value for value in values.values()):
+                raise ValueError(f"{name} values must not be empty")
+
+        return PatchSandboxResourcesRequest(
+            resource_limits=(
+                CPUAndMemoryResources.from_dict(resource_limits)
+                if resource_limits is not None
+                else UNSET
+            ),
+            resource_requests=(
+                CPUAndMemoryResources.from_dict(resource_requests)
+                if resource_requests is not None
+                else UNSET
+            ),
+        )
 
     @staticmethod
     def to_api_image_spec(spec: SandboxImageSpec) -> ImageSpec:
@@ -155,7 +201,9 @@ class SandboxModelConverter:
                 access_key_id=volume.ossfs.access_key_id,
                 access_key_secret=volume.ossfs.access_key_secret,
                 version=OSSFSVersion(volume.ossfs.version),
-                options=volume.ossfs.options if volume.ossfs.options is not None else UNSET,
+                options=volume.ossfs.options
+                if volume.ossfs.options is not None
+                else UNSET,
             )
 
         api_sub_path = UNSET
@@ -280,7 +328,9 @@ class SandboxModelConverter:
             )
 
         api_extensions = (
-            CreateSandboxRequestExtensions.from_dict(extensions) if extensions else UNSET
+            CreateSandboxRequestExtensions.from_dict(extensions)
+            if extensions
+            else UNSET
         )
 
         api_platform = UNSET
@@ -312,14 +362,10 @@ class SandboxModelConverter:
         # Convert volumes to API model
         api_volumes = UNSET
         if volumes is not None and len(volumes) > 0:
-            api_volumes = [
-                SandboxModelConverter.to_api_volume(v) for v in volumes
-            ]
+            api_volumes = [SandboxModelConverter.to_api_volume(v) for v in volumes]
 
         image = (
-            SandboxModelConverter.to_api_image_spec(spec)
-            if spec is not None
-            else UNSET
+            SandboxModelConverter.to_api_image_spec(spec) if spec is not None else UNSET
         )
         api_resource_requests = UNSET
         if resource_requests:
@@ -453,6 +499,24 @@ class SandboxModelConverter:
         return SandboxRenewResponse(expires_at=api_response.expires_at)
 
     @staticmethod
+    def to_sandbox_resources_patch_response(
+        api_response: PatchSandboxResourcesResponse,
+    ) -> SandboxResourcesPatchResponse:
+        """Convert an accepted resource resize response to the public model."""
+        if not isinstance(api_response, PatchSandboxResourcesResponse):
+            raise TypeError(
+                f"Expected PatchSandboxResourcesResponse, got {type(api_response).__name__}"
+            )
+
+        return SandboxResourcesPatchResponse(
+            generation=api_response.generation,
+            resource_limits=dict(api_response.resource_limits.additional_properties),
+            resource_requests=dict(
+                api_response.resource_requests.additional_properties
+            ),
+        )
+
+    @staticmethod
     def to_sandbox_create_response(
         api_response: CreateSandboxResponse,
     ) -> SandboxCreateResponse:
@@ -461,11 +525,23 @@ class SandboxModelConverter:
         from opensandbox.models.sandboxes import SandboxCreateResponse
 
         platform: PlatformSpec | None = None
-        if hasattr(api_response, "platform") and not isinstance(api_response.platform, Unset):
+        if hasattr(api_response, "platform") and not isinstance(
+            api_response.platform, Unset
+        ):
             platform = PlatformSpec.model_validate(
                 {
-                    "os": str(getattr(api_response.platform.os, "value", api_response.platform.os)),
-                    "arch": str(getattr(api_response.platform.arch, "value", api_response.platform.arch)),
+                    "os": str(
+                        getattr(
+                            api_response.platform.os, "value", api_response.platform.os
+                        )
+                    ),
+                    "arch": str(
+                        getattr(
+                            api_response.platform.arch,
+                            "value",
+                            api_response.platform.arch,
+                        )
+                    ),
                 }
             )
 
@@ -498,7 +574,9 @@ class SandboxModelConverter:
                 username_val = getattr(auth_obj, "username", None)
                 password_val = getattr(auth_obj, "password", None)
                 if isinstance(username_val, str) and isinstance(password_val, str):
-                    auth = SandboxImageAuth(username=username_val, password=password_val)
+                    auth = SandboxImageAuth(
+                        username=username_val, password=password_val
+                    )
             domain_image_spec = SandboxImageSpec(
                 image=api_sandbox.image.uri,
                 auth=auth,
@@ -519,11 +597,23 @@ class SandboxModelConverter:
             expires_at = None
 
         platform: PlatformSpec | None = None
-        if hasattr(api_sandbox, "platform") and not isinstance(api_sandbox.platform, Unset):
+        if hasattr(api_sandbox, "platform") and not isinstance(
+            api_sandbox.platform, Unset
+        ):
             platform = PlatformSpec.model_validate(
                 {
-                    "os": str(getattr(api_sandbox.platform.os, "value", api_sandbox.platform.os)),
-                    "arch": str(getattr(api_sandbox.platform.arch, "value", api_sandbox.platform.arch)),
+                    "os": str(
+                        getattr(
+                            api_sandbox.platform.os, "value", api_sandbox.platform.os
+                        )
+                    ),
+                    "arch": str(
+                        getattr(
+                            api_sandbox.platform.arch,
+                            "value",
+                            api_sandbox.platform.arch,
+                        )
+                    ),
                 }
             )
 

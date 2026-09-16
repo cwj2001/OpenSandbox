@@ -261,6 +261,34 @@ public class SandboxesAdapterTests
     }
 
     [Fact]
+    public async Task PatchSandboxResourcesAsync_ShouldSendResourceContractAndParseAcceptedGeneration()
+    {
+        var handler = new CapturePatchResourcesRequestHandler();
+        var client = new HttpClient(handler);
+        var wrapper = new HttpClientWrapper(client, "http://localhost:8080/v1");
+        var adapter = new SandboxesAdapter(wrapper);
+
+        var result = await adapter.PatchSandboxResourcesAsync(
+            "sbx-5",
+            new PatchSandboxResourcesRequest
+            {
+                ResourceLimits = new Dictionary<string, string> { ["cpu"] = "1", ["memory"] = "1Gi" },
+                ResourceRequests = new Dictionary<string, string> { ["cpu"] = "500m", ["memory"] = "512Mi" }
+            });
+
+        handler.Method.Should().Be(HttpMethod.Patch);
+        handler.PathAndQuery.Should().Be("/v1/sandboxes/sbx-5/resources");
+        using var json = JsonDocument.Parse(handler.RequestBody!);
+        json.RootElement.GetProperty("resourceLimits").GetProperty("cpu").GetString().Should().Be("1");
+        json.RootElement.GetProperty("resourceLimits").GetProperty("memory").GetString().Should().Be("1Gi");
+        json.RootElement.GetProperty("resourceRequests").GetProperty("cpu").GetString().Should().Be("500m");
+        json.RootElement.GetProperty("resourceRequests").GetProperty("memory").GetString().Should().Be("512Mi");
+        result.Generation.Should().Be(2);
+        result.ResourceLimits.Should().ContainKey("cpu").WhoseValue.Should().Be("1");
+        result.ResourceRequests.Should().ContainKey("memory").WhoseValue.Should().Be("512Mi");
+    }
+
+    [Fact]
     public async Task ListSnapshotsAsync_ShouldIncludeExactNameFilter()
     {
         var handler = new CaptureListSnapshotsHandler();
@@ -365,6 +393,33 @@ public class SandboxesAdapterTests
                 Content = new StringContent(payload, Encoding.UTF8, "application/json")
             };
             return response;
+        }
+    }
+
+    private sealed class CapturePatchResourcesRequestHandler : HttpMessageHandler
+    {
+        public HttpMethod? Method { get; private set; }
+        public string? PathAndQuery { get; private set; }
+        public string? RequestBody { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Method = request.Method;
+            PathAndQuery = request.RequestUri?.PathAndQuery;
+            RequestBody = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync();
+            const string payload = """
+            {
+              "generation": 2,
+              "resourceLimits": { "cpu": "1", "memory": "1Gi" },
+              "resourceRequests": { "cpu": "500m", "memory": "512Mi" }
+            }
+            """;
+            return new HttpResponseMessage(HttpStatusCode.Accepted)
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
         }
     }
 

@@ -24,6 +24,8 @@ from opensandbox_server.api.schema import (
     ListSandboxesResponse,
     NetworkPolicy,
     PatchSandboxMetadataRequest,
+    PatchSandboxResourcesRequest,
+    PatchSandboxResourcesResponse,
     RenewSandboxExpirationRequest,
     RenewSandboxExpirationResponse,
     Sandbox,
@@ -90,6 +92,13 @@ class CompositeSandboxService(SandboxService, ExtensionService):
         self, sandbox_id: str, patch: PatchSandboxMetadataRequest
     ) -> Sandbox:
         return self._backend(sandbox_id).patch_sandbox_metadata(sandbox_id, patch)
+
+    def patch_sandbox_resources(
+        self,
+        sandbox_id: str,
+        request: PatchSandboxResourcesRequest,
+    ) -> PatchSandboxResourcesResponse:
+        return self._backend(sandbox_id).patch_sandbox_resources(sandbox_id, request)
 
     def delete_sandbox(self, sandbox_id: str) -> None:
         self._backend(sandbox_id).delete_sandbox(sandbox_id)

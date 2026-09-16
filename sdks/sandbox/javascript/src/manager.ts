@@ -24,6 +24,8 @@ import type {
   SandboxId,
   SandboxInfo,
   SandboxMetadataPatch,
+  SandboxResourcePatch,
+  SandboxResourcePatchResponse,
   SnapshotInfo,
 } from "./models/sandboxes.js";
 import type { Sandboxes } from "./services/sandboxes.js";
@@ -110,6 +112,13 @@ export class SandboxManager {
     patch: SandboxMetadataPatch,
   ): Promise<SandboxInfo> {
     return this.sandboxes.patchSandboxMetadata(sandboxId, patch);
+  }
+
+  patchSandboxResources(
+    sandboxId: SandboxId,
+    patch: SandboxResourcePatch,
+  ): Promise<SandboxResourcePatchResponse> {
+    return this.sandboxes.patchSandboxResources(sandboxId, patch);
   }
 
   killSandbox(sandboxId: SandboxId): Promise<void> {

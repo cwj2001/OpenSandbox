@@ -47,6 +47,8 @@ import type {
   SandboxInfo,
   SandboxLifecycle,
   SandboxMetadataPatch,
+  SandboxResourcePatch,
+  SandboxResourcePatchResponse,
   Volume,
 } from "./models/sandboxes.js";
 import { ReadinessBudget, validatePollingInterval } from "./internal/readiness.js";
@@ -729,6 +731,10 @@ export class Sandbox {
 
   async patchMetadata(patch: SandboxMetadataPatch): Promise<SandboxInfo> {
     return await this.sandboxes.patchSandboxMetadata(this.id, patch);
+  }
+
+  async patchResources(patch: SandboxResourcePatch): Promise<SandboxResourcePatchResponse> {
+    return await this.sandboxes.patchSandboxResources(this.id, patch);
   }
 
   async getEgressPolicy(): Promise<NetworkPolicy> {

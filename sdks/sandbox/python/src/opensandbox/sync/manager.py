@@ -30,6 +30,7 @@ from opensandbox.models.sandboxes import (
     SandboxFilter,
     SandboxInfo,
     SandboxRenewResponse,
+    SandboxResourcesPatchResponse,
     SnapshotFilter,
     SnapshotInfo,
 )
@@ -182,6 +183,20 @@ class SandboxManagerSync:
         """
         logger.info(f"Patching metadata for sandbox: {sandbox_id}")
         return self._sandbox_service.patch_sandbox_metadata(sandbox_id, patch)
+
+    def patch_sandbox_resources(
+        self,
+        sandbox_id: str,
+        resource_limits: dict[str, str] | None = None,
+        resource_requests: dict[str, str] | None = None,
+    ) -> SandboxResourcesPatchResponse:
+        """Request an in-place CPU and memory resize for a sandbox."""
+        logger.info(f"Patching resources for sandbox: {sandbox_id}")
+        return self._sandbox_service.patch_sandbox_resources(
+            sandbox_id,
+            resource_limits=resource_limits,
+            resource_requests=resource_requests,
+        )
 
     def kill_sandbox(self, sandbox_id: str) -> None:
         """

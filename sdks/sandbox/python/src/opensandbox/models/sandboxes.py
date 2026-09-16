@@ -273,7 +273,10 @@ class CredentialMatch(BaseModel):
     """Request match for a Credential Vault binding."""
 
     schemes: list[Literal["https", "http"]] | None = Field(default=None)
-    ports: list[int] | None = Field(default=None, deprecated="Port is derived from scheme (https→443, http→80). Values other than 80 or 443 are rejected by the server.")
+    ports: list[int] | None = Field(
+        default=None,
+        deprecated="Port is derived from scheme (https→443, http→80). Values other than 80 or 443 are rejected by the server.",
+    )
     hosts: list[str] = Field(description="Exact FQDNs or leftmost-label wildcards.")
     methods: list[str] | None = Field(default=None)
     paths: list[str] | None = Field(default=None)
@@ -777,6 +780,21 @@ class SandboxRenewResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class SandboxResourcesPatchResponse(BaseModel):
+    """Response returned after accepting an in-place sandbox resource resize."""
+
+    generation: int = Field(
+        ge=1,
+        description="Generation carrying the desired resource configuration.",
+    )
+    resource_limits: dict[str, str] = Field(
+        description="Accepted CPU and memory resource limits.",
+    )
+    resource_requests: dict[str, str] = Field(
+        description="Accepted CPU and memory resource requests.",
+    )
+
+
 class SandboxEndpoint(BaseModel):
     """
     Connection endpoint information for a sandbox.
@@ -899,9 +917,7 @@ class SnapshotFilter(BaseModel):
         description="Filter by source sandbox id",
         alias="sandbox_id",
     )
-    name: str | None = Field(
-        default=None, description="Filter by exact snapshot name"
-    )
+    name: str | None = Field(default=None, description="Filter by exact snapshot name")
     states: list[str] | None = Field(
         default=None, description="Filter by snapshot states"
     )

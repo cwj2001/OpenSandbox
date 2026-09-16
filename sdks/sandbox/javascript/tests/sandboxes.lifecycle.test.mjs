@@ -26,6 +26,43 @@ function createAdapter() {
   return { adapter: new SandboxesAdapter(client), rawRequests, requests };
 }
 
+test("patchSandboxResources sends the resource patch and returns the accepted generation", async () => {
+  const requests = [];
+  const client = {
+    async PATCH(path, options) {
+      requests.push({ path, options });
+      return {
+        data: {
+          generation: 3,
+          resourceLimits: { cpu: "1", memory: "1Gi" },
+          resourceRequests: { cpu: "500m", memory: "512Mi" },
+        },
+        response: new Response(null, { status: 202 }),
+      };
+    },
+  };
+  const adapter = new SandboxesAdapter(client);
+  const patch = {
+    resourceLimits: { cpu: "1", memory: "1Gi" },
+    resourceRequests: { cpu: "500m", memory: "512Mi" },
+  };
+
+  const result = await adapter.patchSandboxResources("sandbox-1", patch);
+
+  assert.deepEqual(requests, [{
+    path: "/sandboxes/{sandboxId}/resources",
+    options: {
+      params: { path: { sandboxId: "sandbox-1" } },
+      body: patch,
+    },
+  }]);
+  assert.deepEqual(result, {
+    generation: 3,
+    resourceLimits: { cpu: "1", memory: "1Gi" },
+    resourceRequests: { cpu: "500m", memory: "512Mi" },
+  });
+});
+
 test("createSandbox forwards lifecycle hooks in the standard request body", async () => {
   const { adapter, requests } = createAdapter();
   const lifecycle = {

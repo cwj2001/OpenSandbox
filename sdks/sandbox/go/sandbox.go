@@ -317,6 +317,12 @@ func (s *Sandbox) PatchMetadata(ctx context.Context, patch MetadataPatch) (*Sand
 	return s.lifecycle.PatchSandboxMetadata(ctx, s.id, patch)
 }
 
+// PatchResources requests an in-place CPU and memory resource resize for this
+// sandbox.
+func (s *Sandbox) PatchResources(ctx context.Context, req PatchSandboxResourcesRequest) (*PatchSandboxResourcesResponse, error) {
+	return s.lifecycle.PatchSandboxResources(ctx, s.id, req)
+}
+
 // IsHealthy checks whether the sandbox's execd service is responsive.
 func (s *Sandbox) IsHealthy(ctx context.Context) bool {
 	if s.execd == nil {

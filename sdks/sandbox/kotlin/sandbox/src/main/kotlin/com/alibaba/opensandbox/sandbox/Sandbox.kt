@@ -34,6 +34,8 @@ import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxInfo
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxLifecycle
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxMetrics
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxRenewResponse
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatch
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatchResponse
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotInfo
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.Volume
 import com.alibaba.opensandbox.sandbox.domain.services.Commands
@@ -605,6 +607,17 @@ class Sandbox internal constructor(
      */
     fun patchMetadata(patch: Map<String, String?>): SandboxInfo {
         return sandboxService.patchSandboxMetadata(id, patch)
+    }
+
+    /**
+     * Requests an asynchronous CPU and memory resource update for this sandbox.
+     *
+     * @param request Requested CPU and memory limits or reservations
+     * @return Desired resource values accepted for a new sandbox generation
+     * @throws SandboxException if the operation fails
+     */
+    fun patchResources(request: SandboxResourcePatch): SandboxResourcePatchResponse {
+        return sandboxService.patchSandboxResources(id, request)
     }
 
     fun createSnapshot(name: String? = null): SnapshotInfo = sandboxService.createSnapshot(id, name)

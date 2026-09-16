@@ -440,6 +440,55 @@ async def test_patch_sandbox_metadata_sends_metadata_body(
 
 
 @pytest.mark.asyncio
+async def test_patch_sandbox_resources_sends_camel_case_body_and_returns_accepted_generation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sandbox_id = str(uuid4())
+    captured = {}
+
+    async def _patch_resources(*, client, sandbox_id, body):
+        from opensandbox.api.lifecycle.models.patch_sandbox_resources_response import (
+            PatchSandboxResourcesResponse,
+        )
+        from opensandbox.api.lifecycle.models.resource_limits import ResourceLimits
+
+        captured["sandbox_id"] = sandbox_id
+        captured["body"] = body.to_dict()
+        return _Resp(
+            status_code=202,
+            parsed=PatchSandboxResourcesResponse(
+                generation=3,
+                resource_limits=ResourceLimits.from_dict({"cpu": "1", "memory": "1Gi"}),
+                resource_requests=ResourceLimits.from_dict(
+                    {"cpu": "500m", "memory": "512Mi"}
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        "opensandbox.api.lifecycle.api.sandboxes.patch_sandboxes_sandbox_id_resources.asyncio_detailed",
+        _patch_resources,
+    )
+
+    result = await SandboxesAdapter(ConnectionConfig()).patch_sandbox_resources(
+        sandbox_id,
+        resource_limits={"cpu": "1", "memory": "1Gi"},
+        resource_requests={"cpu": "500m", "memory": "512Mi"},
+    )
+
+    assert captured == {
+        "sandbox_id": sandbox_id,
+        "body": {
+            "resourceLimits": {"cpu": "1", "memory": "1Gi"},
+            "resourceRequests": {"cpu": "500m", "memory": "512Mi"},
+        },
+    }
+    assert result.generation == 3
+    assert result.resource_limits == {"cpu": "1", "memory": "1Gi"}
+    assert result.resource_requests == {"cpu": "500m", "memory": "512Mi"}
+
+
+@pytest.mark.asyncio
 async def test_renew_sandbox_expiration_sends_timezone_aware(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -582,9 +631,7 @@ def test_sync_list_snapshots_forwards_name_filter(
     )
 
     adapter = SyncSandboxesAdapter(ConnectionConfigSync())
-    listed = adapter.list_snapshots(
-        SnapshotFilter(name="toolchain:python@rev-1")
-    )
+    listed = adapter.list_snapshots(SnapshotFilter(name="toolchain:python@rev-1"))
 
     assert listed.snapshot_infos[0].id == "snap-1"
     assert len(calls) == 1

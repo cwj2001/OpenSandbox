@@ -171,6 +171,16 @@ func (c *LifecycleClient) PatchSandboxMetadata(ctx context.Context, id string, p
 	return &resp, nil
 }
 
+// PatchSandboxResources requests an in-place CPU and memory resource resize
+// for a sandbox.
+func (c *LifecycleClient) PatchSandboxResources(ctx context.Context, id string, req PatchSandboxResourcesRequest) (*PatchSandboxResourcesResponse, error) {
+	var resp PatchSandboxResourcesResponse
+	if err := c.doRequest(ctx, "PATCH", "/sandboxes/"+url.PathEscape(id)+"/resources", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 // DeleteSandbox deletes a sandbox, scheduling it for termination.
 func (c *LifecycleClient) DeleteSandbox(ctx context.Context, id string) error {
 	return c.doRequest(ctx, "DELETE", "/sandboxes/"+url.PathEscape(id), nil, nil)

@@ -27,6 +27,8 @@ import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.PagedSnapshotInfo
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxFilter
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxInfo
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxRenewResponse
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatch
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatchResponse
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotFilter
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotInfo
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotState
@@ -163,6 +165,22 @@ class SandboxManager internal constructor(
     ): SandboxInfo {
         logger.info("Patching metadata for sandbox: {}", sandboxId)
         return sandboxService.patchSandboxMetadata(sandboxId, patch)
+    }
+
+    /**
+     * Requests an asynchronous CPU and memory resource update for a sandbox.
+     *
+     * @param sandboxId Sandbox ID to update
+     * @param request Requested CPU and memory limits or reservations
+     * @return Desired resource values accepted for a new sandbox generation
+     * @throws SandboxException if the operation fails
+     */
+    fun patchSandboxResources(
+        sandboxId: String,
+        request: SandboxResourcePatch,
+    ): SandboxResourcePatchResponse {
+        logger.info("Patching resources for sandbox: {}", sandboxId)
+        return sandboxService.patchSandboxResources(sandboxId, request)
     }
 
     /**

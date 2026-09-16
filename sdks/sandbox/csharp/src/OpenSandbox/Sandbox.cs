@@ -501,6 +501,25 @@ public sealed class Sandbox : IAsyncDisposable
     }
 
     /// <summary>
+    /// Requests an asynchronous CPU and memory resource update for this sandbox.
+    /// </summary>
+    /// <param name="request">The requested CPU and memory limits or reservations.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The desired resources accepted for a new sandbox generation.</returns>
+    /// <exception cref="SandboxApiException">Thrown when the sandbox API returns an error.</exception>
+    public Task<PatchSandboxResourcesResponse> PatchResourcesAsync(
+        PatchSandboxResourcesRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (_sandboxes is not ISandboxResourceResizer resourceResizer)
+        {
+            throw new NotSupportedException("The configured sandbox lifecycle adapter does not support resource resize.");
+        }
+
+        return resourceResizer.PatchSandboxResourcesAsync(Id, request, cancellationToken);
+    }
+
+    /// <summary>
     /// Checks if the sandbox is healthy.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>

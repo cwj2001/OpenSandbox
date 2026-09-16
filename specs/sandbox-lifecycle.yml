@@ -648,6 +648,70 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /sandboxes/{sandboxId}/resources:
+    parameters:
+      - $ref: '#/components/parameters/SandboxId'
+    patch:
+      tags: [Sandboxes]
+      summary: Request an in-place CPU and memory resize
+      description: |
+        Asynchronously updates the desired CPU and memory requests or limits for
+        a running, non-pooled Kubernetes BatchSandbox. The controller applies the
+        template change to the running Pod through Kubernetes' `resize`
+        subresource; this endpoint returning `202` means only that the desired
+        update was accepted, not that kubelet has completed it.
+
+        This operation is unsupported for Pool-backed sandboxes, non-Kubernetes
+        runtimes, GPU or other extended resources, and sandboxes that are not
+        currently running. Kubernetes can defer or reject a resize according to
+        node capacity, QoS and container runtime constraints.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchSandboxResourcesRequest'
+            example:
+              resourceLimits:
+                cpu: "1"
+                memory: "1Gi"
+              resourceRequests:
+                cpu: "500m"
+                memory: "512Mi"
+      responses:
+        '202':
+          description: Desired resources were recorded in a new BatchSandbox generation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatchSandboxResourcesResponse'
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/XRequestId'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          description: The resource resize request failed schema validation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '501':
+          description: The selected runtime or Pool allocation does not support in-place resource resize.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /sandboxes/{sandboxId}/snapshots:
     post:
       tags: [Snapshots]
@@ -1601,6 +1665,44 @@ components:
         project: "new-project"
         team: null
         environment: "production"
+
+    PatchSandboxResourcesRequest:
+      type: object
+      description: |
+        Partial update for CPU and memory resource requirements. At least one of
+        `resourceLimits` or `resourceRequests` is required. Each supplied map
+        must be non-empty and may only contain `cpu` and `memory`; omitted keys
+        retain their current values.
+      properties:
+        resourceLimits:
+          $ref: '#/components/schemas/CPUAndMemoryResources'
+        resourceRequests:
+          $ref: '#/components/schemas/CPUAndMemoryResources'
+      additionalProperties: false
+    PatchSandboxResourcesResponse:
+      type: object
+      required: [generation, resourceLimits, resourceRequests]
+      properties:
+        generation:
+          type: integer
+          minimum: 1
+          description: BatchSandbox generation carrying the desired resources.
+        resourceLimits:
+          $ref: '#/components/schemas/ResourceLimits'
+        resourceRequests:
+          $ref: '#/components/schemas/ResourceLimits'
+      additionalProperties: false
+    CPUAndMemoryResources:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        cpu:
+          type: string
+          minLength: 1
+        memory:
+          type: string
+          minLength: 1
 
     CreateSandboxRequest:
       type: object

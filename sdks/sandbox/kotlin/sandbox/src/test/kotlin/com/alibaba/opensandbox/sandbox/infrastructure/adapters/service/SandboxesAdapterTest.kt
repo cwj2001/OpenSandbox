@@ -29,6 +29,7 @@ import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.PlatformSpec
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxFilter
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxImageSpec
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxLifecycle
+import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxResourcePatch
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxState
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SnapshotFilter
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.Volume
@@ -729,6 +730,42 @@ class SandboxesAdapterTest {
         val payload = Json.parseToJsonElement(request.body.readUtf8()).jsonObject
         assertEquals(JsonNull, payload["team"])
         assertEquals("production", payload["env"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `patchSandboxResources should send resource contract and parse accepted generation`() {
+        val sandboxId = "sandbox-id"
+        val responseBody =
+            """
+            {
+                "generation": 2,
+                "resourceLimits": { "cpu": "1", "memory": "1Gi" },
+                "resourceRequests": { "cpu": "500m", "memory": "512Mi" }
+            }
+            """.trimIndent()
+        mockWebServer.enqueue(MockResponse().setBody(responseBody).setResponseCode(202))
+
+        val result =
+            sandboxesAdapter.patchSandboxResources(
+                sandboxId,
+                SandboxResourcePatch.builder()
+                    .resourceLimits(mapOf("cpu" to "1", "memory" to "1Gi"))
+                    .resourceRequests(mapOf("cpu" to "500m", "memory" to "512Mi"))
+                    .build(),
+            )
+
+        assertEquals(2, result.generation)
+        assertEquals("1Gi", result.resourceLimits["memory"])
+        assertEquals("500m", result.resourceRequests["cpu"])
+
+        val request = mockWebServer.takeRequest()
+        assertEquals("PATCH", request.method)
+        assertEquals("/v1/sandboxes/$sandboxId/resources", request.path)
+        val payload = Json.parseToJsonElement(request.body.readUtf8()).jsonObject
+        assertEquals("1", payload["resourceLimits"]!!.jsonObject["cpu"]!!.jsonPrimitive.content)
+        assertEquals("1Gi", payload["resourceLimits"]!!.jsonObject["memory"]!!.jsonPrimitive.content)
+        assertEquals("500m", payload["resourceRequests"]!!.jsonObject["cpu"]!!.jsonPrimitive.content)
+        assertEquals("512Mi", payload["resourceRequests"]!!.jsonObject["memory"]!!.jsonPrimitive.content)
     }
 
     @Test

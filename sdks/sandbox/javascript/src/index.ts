@@ -81,6 +81,9 @@ export type {
   SandboxInfo,
   SandboxLifecycle,
   SandboxMetadataPatch,
+  SandboxResourcePatch,
+  SandboxResourcePatchResponse,
+  SandboxResourceValues,
   Volume,
 } from "./models/sandboxes.js";
 

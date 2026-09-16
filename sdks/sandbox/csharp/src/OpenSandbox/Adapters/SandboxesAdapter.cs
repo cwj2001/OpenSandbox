@@ -24,7 +24,7 @@ namespace OpenSandbox.Adapters;
 /// <summary>
 /// Adapter for the sandbox lifecycle service.
 /// </summary>
-internal sealed class SandboxesAdapter : ISandboxes
+internal sealed class SandboxesAdapter : ISandboxes, ISandboxResourceResizer
 {
     private readonly HttpClientWrapper _client;
     private readonly EndpointCache? _endpointCache;
@@ -105,6 +105,29 @@ internal sealed class SandboxesAdapter : ISandboxes
             patch,
             cancellationToken).ConfigureAwait(false);
         return ParseSandboxInfo(response);
+    }
+
+    public async Task<PatchSandboxResourcesResponse> PatchSandboxResourcesAsync(
+        string sandboxId,
+        PatchSandboxResourcesRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(sandboxId))
+        {
+            throw new InvalidArgumentException("Sandbox ID must not be null or empty.");
+        }
+
+        if (request == null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
+        request.Validate();
+
+        var response = await _client.PatchAsync<JsonElement>(
+            $"/sandboxes/{Uri.EscapeDataString(sandboxId)}/resources",
+            request,
+            cancellationToken).ConfigureAwait(false);
+        return ParsePatchSandboxResourcesResponse(response);
     }
 
     public async Task DeleteSandboxAsync(
@@ -315,6 +338,34 @@ internal sealed class SandboxesAdapter : ISandboxes
         return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.Object
             ? property.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString() ?? string.Empty)
             : null;
+    }
+
+    private static PatchSandboxResourcesResponse ParsePatchSandboxResourcesResponse(JsonElement element)
+    {
+        var generation = element.GetProperty("generation").GetInt32();
+        if (generation < 1)
+        {
+            throw new SandboxApiException("Invalid generation in resource resize response");
+        }
+
+        return new PatchSandboxResourcesResponse
+        {
+            Generation = generation,
+            ResourceLimits = ParseRequiredStringMap(element, "resourceLimits"),
+            ResourceRequests = ParseRequiredStringMap(element, "resourceRequests")
+        };
+    }
+
+    private static IReadOnlyDictionary<string, string> ParseRequiredStringMap(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.Object)
+        {
+            throw new SandboxApiException($"Missing {propertyName} in resource resize response");
+        }
+
+        return property.EnumerateObject().ToDictionary(
+            p => p.Name,
+            p => p.Value.GetString() ?? throw new SandboxApiException($"Invalid {propertyName}.{p.Name} in resource resize response"));
     }
 
     private static SandboxInfo ParseSandboxInfo(JsonElement element)

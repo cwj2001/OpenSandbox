@@ -47,6 +47,12 @@ func (m *SandboxManager) PatchSandboxMetadata(ctx context.Context, sandboxID str
 	return m.lifecycle.PatchSandboxMetadata(ctx, sandboxID, patch)
 }
 
+// PatchSandboxResources requests an in-place CPU and memory resource resize
+// for a sandbox by ID.
+func (m *SandboxManager) PatchSandboxResources(ctx context.Context, sandboxID string, req PatchSandboxResourcesRequest) (*PatchSandboxResourcesResponse, error) {
+	return m.lifecycle.PatchSandboxResources(ctx, sandboxID, req)
+}
+
 // KillSandbox terminates a sandbox by ID.
 func (m *SandboxManager) KillSandbox(ctx context.Context, sandboxID string) error {
 	return m.lifecycle.DeleteSandbox(ctx, sandboxID)

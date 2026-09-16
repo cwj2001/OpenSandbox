@@ -52,6 +52,7 @@ from opensandbox.models.sandboxes import (
     SandboxInfo,
     SandboxLifecycle,
     SandboxRenewResponse,
+    SandboxResourcesPatchResponse,
     SnapshotFilter,
     SnapshotInfo,
     Volume,
@@ -284,6 +285,38 @@ class SandboxesAdapter(Sandboxes):
             return SandboxModelConverter.to_sandbox_info(parsed)
         except Exception as e:
             logger.warning(f"Failed to patch sandbox {sandbox_id} metadata: {e}")
+            raise ExceptionConverter.to_sandbox_exception(e) from e
+
+    async def patch_sandbox_resources(
+        self,
+        sandbox_id: str,
+        resource_limits: dict[str, str] | None = None,
+        resource_requests: dict[str, str] | None = None,
+    ) -> SandboxResourcesPatchResponse:
+        """Request an in-place CPU and memory resize for a sandbox."""
+        try:
+            from opensandbox.api.lifecycle.api.sandboxes import (
+                patch_sandboxes_sandbox_id_resources,
+            )
+            from opensandbox.api.lifecycle.models import PatchSandboxResourcesResponse
+
+            response_obj = await patch_sandboxes_sandbox_id_resources.asyncio_detailed(
+                client=await self._get_client(),
+                sandbox_id=sandbox_id,
+                body=SandboxModelConverter.to_api_patch_sandbox_resources_request(
+                    resource_limits,
+                    resource_requests,
+                ),
+            )
+            handle_api_error(response_obj, f"Patch sandbox {sandbox_id} resources")
+            parsed = require_parsed(
+                response_obj,
+                PatchSandboxResourcesResponse,
+                f"Patch sandbox {sandbox_id} resources",
+            )
+            return SandboxModelConverter.to_sandbox_resources_patch_response(parsed)
+        except Exception as e:
+            logger.warning(f"Failed to patch sandbox {sandbox_id} resources: {e}")
             raise ExceptionConverter.to_sandbox_exception(e) from e
 
     async def create_snapshot(

@@ -274,6 +274,20 @@ type ListSandboxesResponse struct {
 // Non-nil values add or replace keys. Nil values delete keys.
 type MetadataPatch map[string]*string
 
+// PatchSandboxResourcesRequest is the request body for changing a sandbox's
+// CPU and memory resource limits or requests.
+type PatchSandboxResourcesRequest struct {
+	ResourceLimits   ResourceLimits `json:"resourceLimits,omitempty"`
+	ResourceRequests ResourceLimits `json:"resourceRequests,omitempty"`
+}
+
+// PatchSandboxResourcesResponse is returned after a resource resize is accepted.
+type PatchSandboxResourcesResponse struct {
+	Generation       int            `json:"generation"`
+	ResourceLimits   ResourceLimits `json:"resourceLimits"`
+	ResourceRequests ResourceLimits `json:"resourceRequests"`
+}
+
 type ListSnapshotsResponse struct {
 	Items      []SnapshotInfo `json:"items"`
 	Pagination PaginationInfo `json:"pagination"`
