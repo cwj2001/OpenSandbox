@@ -1,0 +1,184 @@
+sdks/sandbox/python/src/opensandbox/sync/manager.py
+  s_bc94b77c075d6a::t_e819c68f7ee4e6 33,187-200
+sdks/sandbox/go/lifecycle_resources_test.go
+  s_f6a1b4a7fcc510::t_67f7dd9e2e0099 1-75
+sdks/sandbox/csharp/src/OpenSandbox/Models/Sandboxes.cs
+  s_bc94b77c075d6a::t_45c167f3bd3b57 16
+  s_bc94b77c075d6a::t_76e58efe2275de 826-865,867,869-872,874-904
+  s_b86e5d0413e1e3::t_06ac0c57bba956 866,868,873
+server/tests/k8s/test_k8s_client.py
+  s_b86e5d0413e1e3::t_b19ea7b999d0cf 25,28,32,35,37,44,46,55-58,71-74,85,88-91,99,106,113,120,184,195-200,420,428,440,444,473-477,518,542,577,579
+  s_b86e5d0413e1e3::t_b353ec904e72bc 456,478,486,489-511,578
+sdks/sandbox/csharp/src/OpenSandbox/Sandbox.cs
+  s_bc94b77c075d6a::t_b1d916cea80d13 503-521
+sdks/sandbox/python/src/opensandbox/sync/services/sandbox.py
+  s_b86e5d0413e1e3::t_1991468449ad70 40,147-155,176-179
+sdks/sandbox/python/src/opensandbox/api/lifecycle/api/sandboxes/patch_sandboxes_sandbox_id_resources.py
+  s_b86e5d0413e1e3::t_757351e3ff38e6 1-293
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/patch_sandbox_resources_response.py
+  s_b86e5d0413e1e3::t_55011df2f00433 1-96
+server/opensandbox_server/services/k8s/client.py
+  s_b86e5d0413e1e3::t_328a6be65d6986 26-32,102-104,340-341,346-356
+sdks/sandbox/python/src/opensandbox/adapters/sandboxes_adapter.py
+  s_b86e5d0413e1e3::t_a71ca39e436c98 55,290-321
+sdks/sandbox/python/src/opensandbox/services/sandbox.py
+  s_b86e5d0413e1e3::t_22e8f06402a3e8 39,146-154,175-178
+sdks/sandbox/go/lifecycle.go
+  s_b86e5d0413e1e3::t_049e15ac3cb2cc 174-183
+server/opensandbox_server/api/lifecycle.py
+  s_b86e5d0413e1e3::t_49a402fba3c353 41-42,70,79-90,106-108,142-145,150-155,157-162,183,190,193-196,201,205,218-225,232-234,260-262,264-271,273-276,283-285,295-340,346-353,355-358,364-366,391,397-404,406-409,415-417,444-451,453-456,462-464,493-500,502-505,512-514,540,550-557,559-562,571-573,591-594,600-602,604-606,608-613,632-639,647-649,663-670,672-675,682-684,697,705-712,722-728
+server/tests/test_routes_sandbox_resources.py
+  s_b86e5d0413e1e3::t_34664171defd6d 1-77
+  s_b86e5d0413e1e3::t_29b60964383cd6 78-79
+sdks/sandbox/python/src/opensandbox/models/__init__.py
+  s_b076521f3e9158::t_4b08ccabbc5b42 90,160
+kubernetes/internal/controller/batchsandbox_resource_resize.go
+  s_b86e5d0413e1e3::t_7387218e4f526f 1-82
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/Sandbox.kt
+  s_bc94b77c075d6a::t_02ac18e3e048eb 37-38
+  s_bc94b77c075d6a::t_eaa215a0215580 612-622
+sdks/sandbox/csharp/src/OpenSandbox/Adapters/SandboxesAdapter.cs
+  s_bc94b77c075d6a::t_38b7356258b5a8 27,110-114,124-132,343-369
+  s_bc94b77c075d6a::t_f48ed81552a60c 370
+  s_bc94b77c075d6a::t_4b3eae2f727608 115-123
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/domain/models/sandboxes/SandboxResourcePatch.kt
+  s_bc94b77c075d6a::t_b64a8b899b5486 1-73
+sdks/sandbox/javascript/src/services/sandboxes.ts
+  s_b076521f3e9158::t_9cbc18b7bba1cf 30-31,45-48
+kubernetes/internal/controller/batchsandbox_resource_resize_test.go
+  s_b86e5d0413e1e3::t_57e1f8faa7eacc 1-21,23,26,28-56,78-88,92-115
+  s_b86e5d0413e1e3::t_18c1f149d1e752 22
+  s_b86e5d0413e1e3::t_1f6d88ba1fadfb 24-25
+  s_b86e5d0413e1e3::t_e4263ba07fbfb7 27,57-77,89-91
+server/opensandbox_server/services/k8s/workload_provider.py
+  s_b86e5d0413e1e3::t_bc719a126f9624 46,50,96,101,105,110,124,129,133,138,143,148,153-165,170,173,178,183,186,191,207-209
+server/tests/k8s/test_batchsandbox_provider_resource_resize.py
+  s_b86e5d0413e1e3::t_494a74dd8e5999 1-77
+  s_b86e5d0413e1e3::t_61131f5e1f1a2b 81-85
+  s_b86e5d0413e1e3::t_8a032178fc8db1 78-80
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/service/SandboxesAdapter.kt
+  s_bc94b77c075d6a::t_a8559fe70b26d2 238-301
+  s_bc94b77c075d6a::t_fad21708195214 35-36,52,56-58
+sdks/sandbox/go/manager.go
+  s_b86e5d0413e1e3::t_44d36a640127a7 50-55
+sdks/sandbox/csharp/src/OpenSandbox/SandboxManager.cs
+  s_bc94b77c075d6a::t_93a453aa8cad8f 142-164
+sdks/sandbox/javascript/src/manager.ts
+  s_b076521f3e9158::t_3a31f30bb559c2 27-28,117-123
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/domain/services/Sandboxes.kt
+  s_bc94b77c075d6a::t_5ec3fb7f484fc9 30-31
+  s_bc94b77c075d6a::t_9da8562f448a97 197-212
+specs/sandbox-lifecycle.yml
+  s_b86e5d0413e1e3::t_92f5903d31c4fa 651-714,1669-1706
+docs/api/index.md
+  s_b86e5d0413e1e3::t_fc0e20308f20ad 41
+sdks/sandbox/csharp/tests/OpenSandbox.Tests/SandboxesAdapterTests.cs
+  s_bc94b77c075d6a::t_a7725d00dbebb8 425
+  s_bc94b77c075d6a::t_2d948528d24f73 263
+  s_bc94b77c075d6a::t_482b8374556266 264-290,399-422,424
+  s_bc94b77c075d6a::t_539bf7d80eb507 423
+sdks/sandbox/python/src/opensandbox/adapters/converter/sandbox_model_converter.py
+  s_b86e5d0413e1e3::t_b5ae614e0af2ba 25,30,35-36,53,69,100-140,204-206,331-333,365,368,501-518,528-530,533-544,577-579,600-602,605-616
+sdks/sandbox/javascript/src/api/lifecycle.ts
+  s_b86e5d0413e1e3::t_f684363408033f 21-54,200-203,548-642,933-1000,1366-1385,1419-1430,1642-1659,1833-1938,2030-2109,2145-2258
+sdks/sandbox/python/src/opensandbox/sync/sandbox.py
+  s_b86e5d0413e1e3::t_f0efee2a8f3cf0 51,322-333,588-597,696-705,782-791
+sdks/sandbox/go/sandbox.go
+  s_b86e5d0413e1e3::t_509c1f128769a4 320-325
+sdks/sandbox/javascript/tests/sandboxes.lifecycle.test.mjs
+  s_b076521f3e9158::t_17941d2ecca69a 29-65
+kubernetes/internal/controller/batchsandbox_controller.go
+  s_b86e5d0413e1e3::t_cb3269839f17a8 89,221-223
+docs/components/server.md
+  s_b86e5d0413e1e3::t_862177e5efa8e2 286-288
+sdks/sandbox/python/src/opensandbox/sandbox.py
+  s_b86e5d0413e1e3::t_a66beee8a094bc 53,345-356,620-629,737-746,820-829
+sdks/sandbox/csharp/src/OpenSandbox/Services/ISandboxResourceResizer.cs
+  s_bc94b77c075d6a::t_6f9e5c8e53c66d 1-37
+server/opensandbox_server/services/sandbox_service.py
+  s_b86e5d0413e1e3::t_773c2325d5fd05 34-35,41,78-80,223-225,229-244,373-380
+sdks/sandbox/javascript/src/sandbox.ts
+  s_b076521f3e9158::t_d83726c005c8ec 50-51,736-739
+sdks/sandbox/kotlin/sandbox/src/test/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/service/SandboxesAdapterTest.kt
+  s_bc94b77c075d6a::t_ab06859bbb2b02 32,735-768
+  s_bc94b77c075d6a::t_66af8e3b6f46f7 769-770
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/SandboxManager.kt
+  s_bc94b77c075d6a::t_207cca67623dbc 170-185
+  s_bc94b77c075d6a::t_a233b29851e9a2 30-31
+sdks/sandbox/python/src/opensandbox/manager.py
+  s_bc94b77c075d6a::t_ee832d5aaf22a6 36,204-217
+sdks/sandbox/go/types.go
+  s_b86e5d0413e1e3::t_150c011c11d090 277-290
+sdks/sandbox/python/tests/test_sandbox_service_adapter_lifecycle.py
+  s_b86e5d0413e1e3::t_0ab27b8c98f8f8 442-490,634
+sdks/sandbox/javascript/src/models/sandboxes.ts
+  s_b076521f3e9158::t_f3c4baacd92e28 51-70
+kubernetes/config/rbac/role.yaml
+  s_b86e5d0413e1e3::t_a7461016f80859 35-40
+server/opensandbox_server/services/composite_service.py
+  s_b86e5d0413e1e3::t_84fbcfbe271628 27-28,96-102
+sdks/sandbox/python/src/opensandbox/models/sandboxes.py
+  s_b86e5d0413e1e3::t_9793a43411fa1b 276-279,783-797,920
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/cpu_and_memory_resources.py
+  s_b86e5d0413e1e3::t_2025ea9bd570c9 1-67
+server/tests/k8s/test_kubernetes_service.py
+  s_b86e5d0413e1e3::t_15b964d238902c 2523-2548,2556-2566,2574-2576
+  s_b86e5d0413e1e3::t_cdc023fa07d27d 2553-2555
+  s_b86e5d0413e1e3::t_d3d0879079a6ea 2517-2518
+  s_b86e5d0413e1e3::t_a0be6be32a8357 2520-2522,2549-2551
+  s_b86e5d0413e1e3::t_6df092dff2c907 39,53,56-63,66,68,73,79,82,86,88-90,92,95,101-102,132-135,137,163-165,208-210,213,263-265,330-331,335-337,351-352,356-358,385-386,390-392,411,431-432,436-438,477-478,482-484,503-504,519-521,534-536,552-553,586-588,604-605,620-622,631,673,717,753,766-768,774,787-789,795,845-847,854-856,881-883,915-917,922,928,938,940,942,947-964,966,969-973,976,986,988,1003,1030,1040,1042-1045,1070,1074,1121,1171,1174-1176,1197-1199,1226-1228,1254-1256,1294,1307,1324,1345-1348,1350,1356,1359,1362,1402-1404,1430-1432,1439-1441,1475-1477,1484-1486,1501-1503,1508,1515,1517,1519,1539,1565,1721,1752,1762-1764,1783-1785,1795,1813-1815,1927,1987,2061,2103,2128,2140,2148,2169,2181,2202,2219-2221,2256-2258,2290-2293,2295,2298,2302,2320,2329-2332,2334,2337,2343,2347,2356,2372,2381-2384,2386,2389,2391,2397,2428-2430,2432,2439,2443,2447,2449,2451,2453,2456,2458,2461,2463,2465,2467,2470,2478,2491-2516,2519,2552
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/__init__.py
+  s_b86e5d0413e1e3::t_0e81c5d2ead64a 22-25,38-43,48,61-62,67,85-88,101-106,111,124-125,130
+server/opensandbox_server/services/k8s/kubernetes_service.py
+  s_b86e5d0413e1e3::t_32e91ed02cf83a 30,45-47,53-58,64-67,78-81,145,148,262,274,287-288,294,331,341,346,351,359-360,612-614,977,998-999,1135,1145,1184,1193,1196,1215,1217-1218,1352-1356,1363-1365,1403-1473,1536,1570-1574
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/patch_sandbox_resources_request.py
+  s_b86e5d0413e1e3::t_fd7631809649f5 1-91
+server/opensandbox_server/api/schema.py
+  s_b86e5d0413e1e3::t_afdc29c9b5fc95 33,38,49,79,87,94-133,139-141,392,460-462,464-466,474,479,506,721,723-728,746-748,756,758-763,776,778-780,793-798,811-813,829-841,845,850,877,889,918,942,954,963,968,984,1002,1014,1017-1019,1021-1023,1033,1042,1047,1062,1077,1082,1091,1100,1107,1122,1127,1164,1195,1210,1221,1246,1254,1259,1287,1336,1360-1363,1367-1369,1385,1394
+sdks/sandbox/javascript/src/adapters/sandboxesAdapter.ts
+  s_b076521f3e9158::t_fa2cb37b6dd45a 38-39,54-57,240-256
+sdks/sandbox/javascript/src/index.ts
+  s_b076521f3e9158::t_1368350af36d76 84-86
+server/opensandbox_server/services/k8s/batchsandbox_provider.py
+  s_b86e5d0413e1e3::t_b7238784c086fd 117,151-153,196,214,216,218,235,322-324,354,405,514,558,582-584,606-608,617-619,643-705,711-712,798,801-803,822,825,827,846-854,930-936,988,998-1000
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "28e99c46696271b8abbc27fcf608e48de6d299ed",
+  "prompts": {},
+  "sessions": {
+    "s_b076521f3e9158": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0a980-2dbb-706b-8b94-926dd632dd9b",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_b86e5d0413e1e3": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0a957-b569-75b0-8441-5eeaf0cf924c",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_bc94b77c075d6a": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0a980-2dd3-77a2-8ffa-261d223ca17d",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_f6a1b4a7fcc510": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0a980-2da4-70db-b075-087242929db4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
