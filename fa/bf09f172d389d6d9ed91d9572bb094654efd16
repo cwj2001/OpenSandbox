@@ -1,0 +1,21 @@
+components/execd/pkg/web/router.go
+  s_b17ade8680cc8b::t_9786579369c76b 161-163
+components/execd/pkg/web/router_test.go
+  s_b17ade8680cc8b::t_ebf0ba50ce803b 76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "fabf09f172d389d6d9ed91d9572bb094654efd16",
+  "prompts": {},
+  "sessions": {
+    "s_b17ade8680cc8b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_05684f521ffeNvIPNCxSaQmN4R",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

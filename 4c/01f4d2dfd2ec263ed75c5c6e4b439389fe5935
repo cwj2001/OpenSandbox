@@ -1,0 +1,26 @@
+components/execd/tests/test_smoke_api_inventory.py
+  s_2f45564ad2b2d9::t_3176758e5cbb4d 164-165,172,181-188,190-205,207-208,211-212
+  s_2f45564ad2b2d9::t_e483bba723b9d2 216
+components/execd/tests/smoke.sh
+  s_2f45564ad2b2d9::t_b7e2408b8f7ce2 46-47
+components/execd/tests/smoke_api.py
+  s_2f45564ad2b2d9::t_b7e2408b8f7ce2 278
+.github/workflows/execd-test.yml
+  s_2f45564ad2b2d9::t_b7e2408b8f7ce2 123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "4c01f4d2dfd2ec263ed75c5c6e4b439389fe5935",
+  "prompts": {},
+  "sessions": {
+    "s_2f45564ad2b2d9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_0561f9ba4ffeixdr2VqopbcwQu",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}

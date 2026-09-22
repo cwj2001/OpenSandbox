@@ -1,0 +1,50 @@
+sdks/sandbox/python/tests/test_default_generated_client_regression.py
+  s_6c015eec3fcdbc::t_cae262f2381d37 1-20,23-37,39
+  s_6c015eec3fcdbc::t_29168ca5257c05 21,38
+  s_6c015eec3fcdbc::t_e53e30882d62a7 22,40
+sdks/sandbox/python/scripts/generate_api.py
+  s_44fb3db0ff8ab3::t_66128e844c484e 185,187,189-192,194-195,200
+  s_ff4f0082843cfc::t_69ef79760e2b7d 206-208
+  s_ff4f0082843cfc::t_4f4928b3f1399a 29-31,57-110,112-122,124-128,130-157
+  s_ff4f0082843cfc::t_3167c4af8f02ec 129
+  s_6c015eec3fcdbc::t_8963f3fd211ce8 186,188,193,199,211-218
+  s_6c015eec3fcdbc::t_78eae0af2e66c6 26
+sdks/sandbox/python/tests/test_generate_api.py
+  s_ff4f0082843cfc::t_77cc728ce177c9 109-121
+  s_ff4f0082843cfc::t_3167c4af8f02ec 16
+  s_ff4f0082843cfc::t_c45fad9ba49078 1-15
+  s_ff4f0082843cfc::t_4490c0e5d06b85 48-65,87-106,176-201,243-246
+  s_ff4f0082843cfc::t_914dc3382eba2a 17-47,66-86,107-108,122-175,202-242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "25ead8045561c64fee2f614e9fac773ae3116cb6",
+  "prompts": {},
+  "sessions": {
+    "s_44fb3db0ff8ab3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06da2e980ffeOiAM8610VTDlgt",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_6c015eec3fcdbc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06d7c28e5ffeErG2Is9IgM5XJX",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    },
+    "s_ff4f0082843cfc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_06c116b57ffekFLhEtvK8GGJ37",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "weijia2.chen <weijia2.chen@ly.com>"
+    }
+  }
+}
