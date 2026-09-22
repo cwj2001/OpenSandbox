@@ -1,0 +1,21 @@
+kubernetes/cmd/image-committer/qemu_snapshot.go
+  s_c833870fe27a44::t_573233582b01d7 98-105
+kubernetes/cmd/image-committer/main.go
+  s_c833870fe27a44::t_fe5bee589aabb8 226-229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9df10661cf4bdd44a4d5fc665a0576c5997b3cf8",
+  "prompts": {},
+  "sessions": {
+    "s_c833870fe27a44": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0c855-af43-76a9-8dca-7d24c8cb5307",
+        "model": "gemini-3.8-flash-high"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
