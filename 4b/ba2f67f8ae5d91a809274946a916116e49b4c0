@@ -1,0 +1,36 @@
+kubernetes/cmd/controller/main.go
+  s_c833870fe27a44::t_ee5e1ea3c8bf1b 460
+kubernetes/internal/controller/apis.go
+  s_c833870fe27a44::t_5c6523c0bebb0b 36-39
+  s_c833870fe27a44::t_706df6e883db41 35
+kubernetes/internal/controller/batchsandbox_controller.go
+  s_c833870fe27a44::t_ff62f8f92cf495 86
+kubernetes/internal/controller/batchsandbox_pause_resume_test.go
+  s_c833870fe27a44::t_1a7bd6fdad4bbe 3190-3265
+kubernetes/internal/controller/batchsandbox_pause_resume.go
+  s_c833870fe27a44::t_cd147061ee059c 485-486
+  s_c833870fe27a44::t_ab038c7e815a8a 467-468
+  s_c833870fe27a44::t_9f740bd6603fb2 586-599
+  s_c833870fe27a44::t_1f1815ec1678d0 457-462,466,473-478,482
+  s_c833870fe27a44::t_3e909974f859f6 622-635,640-663
+  s_c833870fe27a44::t_0ad9847dc22000 483-484
+kubernetes/internal/controller/pool_controller.go
+  s_c833870fe27a44::t_c8570eb5735a02 216-217
+  s_c833870fe27a44::t_41a05a2fd74207 128-130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4bba2f67f8ae5d91a809274946a916116e49b4c0",
+  "prompts": {},
+  "sessions": {
+    "s_c833870fe27a44": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0c855-af43-76a9-8dca-7d24c8cb5307",
+        "model": "gemini-3.8-flash-high"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
