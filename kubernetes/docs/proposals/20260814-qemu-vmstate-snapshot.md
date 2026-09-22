@@ -222,8 +222,9 @@ not capture mounted volume contents.
 4. Export the QEMU migration stream through a file descriptor passed to QEMU
    over QMP and compress it with zstd.
 5. Wait for migration completion; the source QEMU enters `postmigrate`.
-6. Freeze the outer containers, remove temporary helpers, and commit rootfs
-   images.
+6. Freeze companion outer containers (leaving the QEMU container unfrozen to
+   avoid kernel worker freeze deadlocks while QEMU remains quiesced in postmigrate),
+   remove temporary helpers, and commit rootfs images.
 7. Build and push the standard VM state image and rootfs images.
 8. Resolve all registry manifest digests and update the complete
    `SandboxSnapshot.status` in one status write.
@@ -296,7 +297,9 @@ Existing objects without `status.format` are interpreted as `rootfs-v1`.
 - **Tag mutation:** tags are publication handles only; restore always uses the
   manifest digest.
 - **Probe restart during checkpoint:** the QEMU workload contract requires a
-  checkpoint-aware supervisor/liveness path.
+  checkpoint-aware supervisor/liveness path; for internal BatchSandbox pause,
+  workload-controlled processes must not independently resume the source VM via QMP
+  or restart QEMU before source Pod deletion.
 - **Mounted writable disks:** reject them in v1 instead of producing an
   incomplete snapshot.
 - **Node-level worker privileges:** isolate snapshot-capable nodes and use

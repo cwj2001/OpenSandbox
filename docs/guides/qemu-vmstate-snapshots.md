@@ -41,7 +41,12 @@ image must:
 2. generate an OpenSandbox launch manifest from the effective QEMU settings;
 3. keep each writable Guest overlay captured by v1 in the container rootfs;
 4. recognize the OpenSandbox restore environment and add QEMU `-incoming`;
-5. become Ready only after the QMP socket and Guest service are available.
+5. become Ready only after the QMP socket and Guest service are available;
+6. for an internal BatchSandbox pause snapshot, ensure that workload-controlled
+   processes do not independently resume the source VM via QMP (e.g. `cont`) or
+   restart the source QEMU process after migration export and before the source
+   Pod is deleted (this does not restrict the snapshot worker from resuming the
+   source on failure, or during standalone public snapshots).
 
 ### Declare the Pod template contract
 
@@ -204,7 +209,7 @@ and must not overwrite the restored writable overlay.
 1. The controller resolves the annotated QEMU container and schedules the snapshot Job on the same node.
 2. The worker validates that every writable overlay declared as `capture: rootfs` is outside the container's Kubernetes volume mount paths.
 3. The worker uses QMP migration to export VM state, compresses it with zstd, and puts it into a standard container image.
-4. After QEMU reaches post-migration state, the worker freezes the outer containers, commits their root filesystems, and pushes both image types.
+4. After QEMU reaches post-migration state, the worker freezes companion outer containers (leaving the QEMU container unfrozen to avoid kernel worker freeze deadlocks while QEMU remains quiesced in postmigrate), commits their root filesystems, and pushes both image types.
 5. The controller publishes rootfs and VMState manifest digests atomically, then removes the source Pod.
 6. On resume, a loader init container restores and verifies the VMState files in an `emptyDir`. It is appended after all user init containers.
 7. The recreated QEMU container consumes the migration stream. Other outer-container processes start normally from the Pod template.
