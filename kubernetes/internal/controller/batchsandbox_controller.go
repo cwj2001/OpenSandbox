@@ -83,6 +83,7 @@ type BatchSandboxReconciler struct {
 	StatusRVExpectation expectations.ResourceVersionExpectation
 	// ResumePullSecret is the K8s Secret name for pulling snapshot images during resume.
 	ResumePullSecret string
+	Allocator        Allocator
 }
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete

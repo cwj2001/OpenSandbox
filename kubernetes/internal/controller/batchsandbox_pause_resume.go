@@ -454,21 +454,36 @@ func (r *BatchSandboxReconciler) completePause(ctx context.Context, bs *sandboxv
 				return err
 			}
 			patch := client.MergeFrom(latest.DeepCopy())
+			if latest.Annotations == nil {
+				latest.Annotations = make(map[string]string)
+			}
+			if latest.Spec.PoolRef != "" {
+				latest.Annotations[AnnotationOriginPoolRef] = latest.Spec.PoolRef
+			}
 			latest.Spec.Template = pooledTemplate.DeepCopy()
 			latest.Spec.PoolRef = ""
 			controllerutil.RemoveFinalizer(latest, finalizerPoolAllocation)
-			if latest.Annotations != nil {
-				delete(latest.Annotations, annoAllocReleaseKey)
-			}
+			delete(latest.Annotations, annoAllocReleaseKey)
+			delete(latest.Annotations, annoAllocStatusKey)
+			delete(latest.Annotations, annoAllocReleasedKey)
 			return r.Patch(ctx, latest, patch)
 		}); err != nil {
 			return err
 		}
+		if bs.Annotations == nil {
+			bs.Annotations = make(map[string]string)
+		}
+		if bs.Spec.PoolRef != "" {
+			bs.Annotations[AnnotationOriginPoolRef] = bs.Spec.PoolRef
+		}
 		bs.Spec.Template = pooledTemplate.DeepCopy()
 		bs.Spec.PoolRef = ""
 		controllerutil.RemoveFinalizer(bs, finalizerPoolAllocation)
-		if bs.Annotations != nil {
-			delete(bs.Annotations, annoAllocReleaseKey)
+		delete(bs.Annotations, annoAllocReleaseKey)
+		delete(bs.Annotations, annoAllocStatusKey)
+		delete(bs.Annotations, annoAllocReleasedKey)
+		if r.Allocator != nil && wasPooled {
+			r.Allocator.ReleasePodsAllocation(ctx, bs.Namespace, bs.Annotations[AnnotationOriginPoolRef], []string{pods[0].Name})
 		}
 		log.Info("Detached pooled BatchSandbox after pause", "sourcePod", pods[0].Name)
 	}
@@ -568,7 +583,20 @@ func (r *BatchSandboxReconciler) continueResume(ctx context.Context, bs *sandbox
 		}
 		imageMap[c.ContainerName] = immutableImage
 	}
-	if snapshot.Status.Format == sandboxv1alpha1.SandboxSnapshotFormatQEMUV1 {
+	isWarmResumeEligible := false
+	if snapshot.Status.Format == sandboxv1alpha1.SandboxSnapshotFormatQEMUV1 && bs.Annotations != nil {
+		origPool := bs.Annotations[AnnotationOriginPoolRef]
+		warmOptIn := bs.Annotations[AnnotationQEMUWarmWorkerResume] == "true"
+		if warmOptIn && origPool != "" {
+			pool := &sandboxv1alpha1.Pool{}
+			if err := r.Get(ctx, types.NamespacedName{Namespace: bs.Namespace, Name: origPool}, pool); err == nil {
+				if pool.DeletionTimestamp.IsZero() && pool.Status.Available > 0 {
+					isWarmResumeEligible = true
+				}
+			}
+		}
+	}
+	if snapshot.Status.Format == sandboxv1alpha1.SandboxSnapshotFormatQEMUV1 && !isWarmResumeEligible {
 		if bs.Spec.Template == nil {
 			msg := "qemu-v1 restore requires a concrete pod template"
 			_ = r.ackPauseWithPhase(ctx, bs, sandboxv1alpha1.BatchSandboxPhasePaused, "")
@@ -591,21 +619,48 @@ func (r *BatchSandboxReconciler) continueResume(ctx context.Context, bs *sandbox
 		}
 		patch := client.MergeFrom(latest.DeepCopy())
 
-		if latest.Spec.Template != nil {
-			for i := range latest.Spec.Template.Spec.Containers {
-				if img, ok := imageMap[latest.Spec.Template.Spec.Containers[i].Name]; ok {
-					latest.Spec.Template.Spec.Containers[i].Image = img
+		warmPoolEligible := false
+		targetPoolRef := ""
+		if snapshot.Status.Format == sandboxv1alpha1.SandboxSnapshotFormatQEMUV1 && latest.Annotations != nil {
+			// Check if warm resume is requested or if original pool ref was saved
+			origPool := latest.Annotations[AnnotationOriginPoolRef]
+			warmOptIn := latest.Annotations[AnnotationQEMUWarmWorkerResume] == "true"
+			if warmOptIn && origPool != "" {
+				pool := &sandboxv1alpha1.Pool{}
+				if err := r.Get(ctx, types.NamespacedName{Namespace: latest.Namespace, Name: origPool}, pool); err == nil {
+					if pool.DeletionTimestamp.IsZero() && pool.Status.Available > 0 {
+						// Verify pool compatibility
+						warmPoolEligible = true
+						targetPoolRef = origPool
+					}
 				}
 			}
-			if err := injectQEMURestore(latest.Spec.Template, snapshot); err != nil {
-				return err
-			}
-			ensureImagePullSecret(latest.Spec.Template, r.ResumePullSecret)
 		}
 
-		if latest.Spec.PoolRef != "" {
-			latest.Spec.PoolRef = ""
-			controllerutil.RemoveFinalizer(latest, finalizerPoolAllocation)
+		if warmPoolEligible && targetPoolRef != "" {
+			// Warm resume: re-bind to the compatible pool instead of launching a cold standalone pod
+			log.Info("Compatible warm pool found for QEMU resume, reusing pool capacity", "sandbox", latest.Name, "pool", targetPoolRef)
+			latest.Spec.PoolRef = targetPoolRef
+			if !controllerutil.ContainsFinalizer(latest, finalizerPoolAllocation) {
+				controllerutil.AddFinalizer(latest, finalizerPoolAllocation)
+			}
+		} else {
+			// Cold resume fallback: clear poolRef and inject standalone restore init container
+			if latest.Spec.Template != nil {
+				for i := range latest.Spec.Template.Spec.Containers {
+					if img, ok := imageMap[latest.Spec.Template.Spec.Containers[i].Name]; ok {
+						latest.Spec.Template.Spec.Containers[i].Image = img
+					}
+				}
+				if err := injectQEMURestore(latest.Spec.Template, snapshot); err != nil {
+					return err
+				}
+				ensureImagePullSecret(latest.Spec.Template, r.ResumePullSecret)
+			}
+			if latest.Spec.PoolRef != "" {
+				latest.Spec.PoolRef = ""
+				controllerutil.RemoveFinalizer(latest, finalizerPoolAllocation)
+			}
 		}
 
 		if err := r.Patch(ctx, latest, patch); err != nil {

@@ -457,6 +457,7 @@ func main() {
 		ResumePullSecret:    resumePullSecret,
 		ProfileStore:        profileStore,
 		StatusRVExpectation: expectations.NewResourceVersionExpectation(),
+		Allocator:           poolAllocator,
 	}).SetupWithManager(mgr, batchSandboxConcurrency); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BatchSandbox")
 		os.Exit(1)

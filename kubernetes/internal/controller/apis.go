@@ -32,6 +32,11 @@ const (
 
 	finalizerTaskCleanup    = "batch-sandbox.sandbox.opensandbox.io/task-cleanup"
 	finalizerPoolAllocation = "pool.sandbox.opensandbox.io/pool-allocation"
+
+	// AnnotationQEMUWarmWorkerResume opts in to compatible warm-worker reuse on resume.
+	AnnotationQEMUWarmWorkerResume = "sandbox.opensandbox.io/qemu-warm-worker-resume"
+	// AnnotationOriginPoolRef preserves the original pool reference when paused.
+	AnnotationOriginPoolRef = "sandbox.opensandbox.io/origin-pool-ref"
 )
 
 // annotationSandboxEndpoints Use the exported constant from pkg/utils

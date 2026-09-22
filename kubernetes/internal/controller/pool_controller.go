@@ -125,6 +125,9 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	defer func() {
 		log.Info("Reconcile finished", "duration", time.Since(start).String(), "requeueAfter", result.RequeueAfter.String(), "error", retErr)
 	}()
+	if req.Name == "" {
+		return ctrl.Result{}, nil
+	}
 	pool := &sandboxv1alpha1.Pool{}
 	if err := r.Get(ctx, req.NamespacedName, pool); err != nil {
 		if errors.IsNotFound(err) {
@@ -210,7 +213,8 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resul
 	batchSandboxes := make([]*sandboxv1alpha1.BatchSandbox, 0, len(batchSandboxList.Items))
 	for i := range batchSandboxList.Items {
 		batchSandbox := batchSandboxList.Items[i]
-		if batchSandbox.Spec.Template != nil {
+		// Include pure pool sandboxes (template == nil) or warm resume sandboxes opting in
+		if batchSandbox.Spec.Template != nil && batchSandbox.Annotations[AnnotationQEMUWarmWorkerResume] != "true" {
 			continue
 		}
 		batchSandboxes = append(batchSandboxes, &batchSandbox)

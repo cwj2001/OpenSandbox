@@ -3187,5 +3187,81 @@ func TestInjectQEMURestorePreservesUserInitContainersAndIsIdempotent(t *testing.
 	assert.Equal(t, expectedStorage, restore.Resources.Limits[corev1.ResourceEphemeralStorage])
 }
 
+func TestContinueResume_QEMUWarmWorkerResume(t *testing.T) {
+	snapshot := &sandboxv1alpha1.SandboxSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-bs-pause",
+			Namespace: "default",
+		},
+		Spec: sandboxv1alpha1.SandboxSnapshotSpec{SandboxName: "test-bs"},
+		Status: sandboxv1alpha1.SandboxSnapshotStatus{
+			Phase:  sandboxv1alpha1.SandboxSnapshotPhaseSucceed,
+			Format: sandboxv1alpha1.SandboxSnapshotFormatQEMUV1,
+			Containers: []sandboxv1alpha1.ContainerSnapshot{
+				{ContainerName: "main", ImageURI: "registry/test-bs-main", ImageDigest: "sha256:" + strings.Repeat("1", 64)},
+			},
+			VirtualMachine: &sandboxv1alpha1.VirtualMachineSnapshot{
+				ImageURI:       "registry/test-bs-vmstate",
+				ImageDigest:    "sha256:" + strings.Repeat("2", 64),
+				ManifestDigest: "sha256:" + strings.Repeat("3", 64),
+				Compatibility: sandboxv1alpha1.QEMUCompatibility{
+					Architecture: "amd64",
+					QEMUVersion:  "9.1.0",
+					MachineType:  "pc-q35-9.1",
+				},
+			},
+		},
+	}
+	pool := &sandboxv1alpha1.Pool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "qemu-pool",
+			Namespace: "default",
+		},
+		Status: sandboxv1alpha1.PoolStatus{
+			Available: 1,
+		},
+	}
+	bs := &sandboxv1alpha1.BatchSandbox{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "test-bs",
+			Namespace:  "default",
+			Generation: 2,
+			UID:        "test-uid",
+			Annotations: map[string]string{
+				AnnotationQEMUWarmWorkerResume: "true",
+				AnnotationOriginPoolRef:        "qemu-pool",
+			},
+		},
+		Spec: sandboxv1alpha1.BatchSandboxSpec{
+			Pause:    ptr.To(false),
+			Replicas: ptr.To(int32(1)),
+			Template: &corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"sandbox.opensandbox.io/qemu-container": "main",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "main", Image: "old-img"}},
+				},
+			},
+		},
+		Status: sandboxv1alpha1.BatchSandboxStatus{
+			PauseObservedGeneration: 2,
+			Phase:                   sandboxv1alpha1.BatchSandboxPhaseResuming,
+		},
+	}
+	r := newTestReconciler(bs, snapshot, pool)
+
+	result, err := r.continueResume(context.Background(), bs)
+	require.NoError(t, err)
+	assert.True(t, result.RequeueAfter > 0)
+
+	updated := &sandboxv1alpha1.BatchSandbox{}
+	require.NoError(t, r.Get(context.Background(), types.NamespacedName{Namespace: "default", Name: "test-bs"}, updated))
+	assert.Equal(t, "qemu-pool", updated.Spec.PoolRef, "poolRef must be restored when warm worker resume is eligible")
+	assert.Contains(t, updated.Finalizers, finalizerPoolAllocation, "finalizerPoolAllocation must be added back")
+}
+
 // Ensure ctrl.Result type is used
 var _ = ctrl.Result{}
