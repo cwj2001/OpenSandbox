@@ -95,6 +95,14 @@ func runQEMUSnapshot(request snapshot.Request, recovery *snapshotRecovery) error
 	defer os.RemoveAll(capture.workDir)
 
 	for _, container := range request.Containers {
+		// The QEMU virtual machine has already been stopped and its migration stream
+		// captured via QMP in captureQEMUState. On cgroup v2 kernels, pausing the
+		// container cgroup hosting KVM can hang indefinitely waiting for kernel worker
+		// threads (e.g. kvm-nx-lpage-recovery) which do not process freeze signals.
+		// Therefore, we only pause non-QEMU companion containers, or try best-effort.
+		if container.Name == request.QEMU.ContainerName {
+			continue
+		}
 		containerID := containerIDs[container.Name]
 		if err := pauseContainer(containerID); err != nil {
 			return fmt.Errorf("pause container %q after QEMU checkpoint: %w", container.Name, err)

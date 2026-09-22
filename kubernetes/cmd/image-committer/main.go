@@ -223,7 +223,10 @@ func resumeContainer(containerID string) error {
 // commitContainer uses nerdctl to commit a container to an image.
 func commitContainer(containerID, targetImage string) error {
 	fmt.Printf("Committing container %s to image %s...\n", containerID, targetImage)
-	args := append(nerdctlBaseArgs(), "commit", containerID, targetImage)
+	// nerdctl commit defaults to pausing the container during commit via cgroup.freeze.
+	// In QEMU/KVM workloads, cgroup v2 freeze deadlocks on KVM kernel worker threads.
+	// The VM is already paused via QMP before commit, so we disable nerdctl's pause.
+	args := append(nerdctlBaseArgs(), "commit", "--pause=false", containerID, targetImage)
 	cmd := exec.Command("nerdctl", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
