@@ -1,0 +1,72 @@
+components/execd/pkg/runtime/command_status.go
+  s_37bb930866c8f6::t_65d59d64f606cd 92,111,116,121
+components/execd/pkg/runtime/types.go
+  s_a883bad66ed5ac::t_3a455e8b5b6386 27-36
+components/execd/pkg/web/controller/sse_correlation_test.go
+  s_37bb930866c8f6::t_0471579cd90689 1-323
+  s_a883bad66ed5ac::t_4cae886f30129c 324
+components/execd/pkg/runtime/command_signal_test.go
+  s_37bb930866c8f6::t_cb2e765bd7272d 260,303
+components/execd/pkg/runtime/command.go
+  s_37bb930866c8f6::t_2789a4792c208d 217-219,226,239,245,279,293,368,373,381-383,388,402,410,444,457,472,476
+components/execd/pkg/runtime/command_common.go
+  s_37bb930866c8f6::t_f4e62f32820954 21,24,42-65
+docs/architecture/data-plane/execd.md
+  s_37bb930866c8f6::t_4a80a8a7d92ba9 157-164
+components/execd/pkg/web/controller/sse_correlation_unix_test.go
+  s_37bb930866c8f6::t_f9141381e86691 62,82
+  s_37bb930866c8f6::t_b4238c23229dc0 1-61,63-81,83-122
+components/execd/pkg/runtime/command_log_test.go
+  s_37bb930866c8f6::t_5ea2c87bba6e19 319-324
+  s_37bb930866c8f6::t_19f56f4dd87edd 141-144,186-187,232
+  s_37bb930866c8f6::t_6b3c0b360b8754 311-313,315-317
+  s_37bb930866c8f6::t_3cb869c897974e 270-278,286-288,314
+  s_37bb930866c8f6::t_fd991b5354557b 1-140,145-185,188-231,233-261,265-266,282,292,296,302-303,305,309-310,318,325,329
+  s_37bb930866c8f6::t_281d4fd5b9f8ef 267-269,279-281
+  s_37bb930866c8f6::t_03c1c9b6ad815a 293-295
+  s_37bb930866c8f6::t_b16645d06fe1e9 304
+  s_37bb930866c8f6::t_44be73024f4167 306-307
+  s_37bb930866c8f6::t_c576ff452314da 326-328
+  s_37bb930866c8f6::t_8cf0492907eb07 283-285,289-291
+  s_37bb930866c8f6::t_5916ebd21bd059 297-301
+  s_37bb930866c8f6::t_24f1c9a5691796 262-264,308
+components/execd/pkg/runtime/command_log_linux_test.go
+  s_37bb930866c8f6::t_78328894f550e4 1-22,26,28-101,146
+  s_37bb930866c8f6::t_bb75b9d32c2e9f 23-25,27,102-145
+components/execd/pkg/web/controller/basic.go
+  s_37bb930866c8f6::t_cf5c8273524873 32-35
+components/execd/pkg/runtime/reset.go
+  s_37bb930866c8f6::t_a42b273d53ac02 58
+components/execd/pkg/runtime/interrupt_windows.go
+  s_37bb930866c8f6::t_edb1c6beff9449 45,52,57,60,73
+components/execd/pkg/web/controller/sse.go
+  s_37bb930866c8f6::t_c0f4194c6e2115 86-94,96-98,263-272,275,297,300
+components/execd/pkg/runtime/command_windows.go
+  s_37bb930866c8f6::t_9ab31db3455e99 37-39,44,57,81,95,126,130,138-140,145,153,169,185,206,210
+components/execd/pkg/runtime/interrupt.go
+  s_37bb930866c8f6::t_4bce121a011a4c 46,66,70,77,86,92,105,108,114,120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cc51bc799679451e2090be4713a89e3e76b16bfb",
+  "prompts": {},
+  "sessions": {
+    "s_37bb930866c8f6": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1ab63-acd3-7181-b716-baf5c82c152c",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": null
+    },
+    "s_a883bad66ed5ac": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1ab4c-0037-705f-b0ea-d0af55efc922",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": null
+    }
+  }
+}
