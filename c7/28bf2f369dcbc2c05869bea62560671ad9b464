@@ -1,0 +1,29 @@
+kubernetes/cmd/image-committer/qemu_snapshot.go
+  s_c833870fe27a44::t_573233582b01d7 98-99,101,103-105
+  s_c833870fe27a44::t_c7d1a3234d1203 102,169-172
+  s_c833870fe27a44::t_e87c0b21763175 100,173-174
+docs/guides/qemu-vmstate-snapshots.md
+  s_c833870fe27a44::t_21dd362606c90f 45-49
+  s_c833870fe27a44::t_3e6696bfd2e5bf 44,212
+kubernetes/cmd/image-committer/main.go
+  s_c833870fe27a44::t_fe5bee589aabb8 226-229
+kubernetes/docs/proposals/20260814-qemu-vmstate-snapshot.md
+  s_c833870fe27a44::t_33b3ecb2f71725 300-302
+  s_c833870fe27a44::t_305085e7776421 225-227
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c728bf2f369dcbc2c05869bea62560671ad9b464",
+  "prompts": {},
+  "sessions": {
+    "s_c833870fe27a44": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a0c855-af43-76a9-8dca-7d24c8cb5307",
+        "model": "gemini-3.8-flash-high"
+      },
+      "human_author": null
+    }
+  }
+}
