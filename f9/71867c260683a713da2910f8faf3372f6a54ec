@@ -1,0 +1,57 @@
+components/execd/pkg/runtime/command_log_test.go
+  s_37bb930866c8f6::t_19f56f4dd87edd 140-143,185-186,231
+  s_37bb930866c8f6::t_fd991b5354557b 1-139,144-184,187-230,232-260
+  s_37bb930866c8f6::t_24f1c9a5691796 261-263
+components/execd/pkg/web/controller/sse_correlation_unix_test.go
+  s_37bb930866c8f6::t_f9141381e86691 62,82
+  s_37bb930866c8f6::t_b4238c23229dc0 1-61,63-81,83-122
+components/execd/pkg/web/controller/sse_correlation_test.go
+  s_37bb930866c8f6::t_0471579cd90689 1-323
+  s_a883bad66ed5ac::t_4cae886f30129c 324
+components/execd/pkg/runtime/types.go
+  s_a883bad66ed5ac::t_3a455e8b5b6386 27-36
+components/execd/pkg/runtime/command.go
+  s_37bb930866c8f6::t_2789a4792c208d 218-222,229,242,248,282,296,371,376,385-389,394,408,416,450,463,478,482
+components/execd/pkg/runtime/command_signal_test.go
+  s_37bb930866c8f6::t_cb2e765bd7272d 260,303
+components/execd/pkg/runtime/command_status.go
+  s_37bb930866c8f6::t_65d59d64f606cd 92,111,116,121
+components/execd/pkg/runtime/command_windows.go
+  s_37bb930866c8f6::t_9ab31db3455e99 38-42,47,60,84,98,129,133,142-146,151,159,175,191,212,216
+components/execd/pkg/runtime/interrupt.go
+  s_37bb930866c8f6::t_4bce121a011a4c 46,66,70,77,86,92,105,108,114,120
+components/execd/pkg/runtime/interrupt_windows.go
+  s_37bb930866c8f6::t_edb1c6beff9449 45,52,57,60,73
+components/execd/pkg/runtime/reset.go
+  s_37bb930866c8f6::t_a42b273d53ac02 58
+components/execd/pkg/web/controller/basic.go
+  s_37bb930866c8f6::t_cf5c8273524873 32-35
+components/execd/pkg/web/controller/sse.go
+  s_37bb930866c8f6::t_c0f4194c6e2115 86-94,96-98,263-272,275,297,300
+docs/architecture/data-plane/execd.md
+  s_37bb930866c8f6::t_4a80a8a7d92ba9 157-162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f971867c260683a713da2910f8faf3372f6a54ec",
+  "prompts": {},
+  "sessions": {
+    "s_37bb930866c8f6": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1ab63-acd3-7181-b716-baf5c82c152c",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_a883bad66ed5ac": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1ab4c-0037-705f-b0ea-d0af55efc922",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
