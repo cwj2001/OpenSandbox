@@ -1,0 +1,20 @@
+components/execd/pkg/runtime/command_log_linux_test.go
+  h_80542e13e8372a 37-40,108-111
+components/execd/pkg/runtime/command_log_test.go
+  h_80542e13e8372a 22,65,67-90,94-97,169,231-234,289-292,336-339
+components/execd/pkg/web/controller/sse_correlation_test.go
+  h_80542e13e8372a 25,27,44,46-69,104-107,144-147,189-192,226-229,281
+components/execd/pkg/web/controller/sse_correlation_unix_test.go
+  h_80542e13e8372a 50-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "27ef91722d5dd229811dde892534a4d045727156",
+  "prompts": {},
+  "humans": {
+    "h_80542e13e8372a": {
+      "author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
