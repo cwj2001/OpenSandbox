@@ -1,0 +1,101 @@
+components/execd/pkg/web/controller/sse.go
+  s_6b02b2663671f0::t_7727e2934c8b6b 254,259-260,278,281
+  s_37bb930866c8f6::t_c0f4194c6e2115 86
+components/execd/go.mod
+  s_6b02b2663671f0::t_47f66fbd61795f 22
+docs/architecture/data-plane/execd.md
+  s_f27f6dc090a3cf::t_e7d7b0b61ed3ba 158,160,162
+components/execd/pkg/runtime/command_log_test.go
+  s_37bb930866c8f6::t_19f56f4dd87edd 162,197
+  s_6b02b2663671f0::t_5c32142c925d23 18,66,75-79,98-100,102-105,107-109,111,114-118,121,157-161,183-184,187-188
+  s_37bb930866c8f6::t_fd991b5354557b 124,133-156,164-171,173-178,180,195,201,203
+  h_80542e13e8372a 125,172
+  s_a883bad66ed5ac::t_e156e3d49f6609 132,181,192-194,196,198-200,202,204-230
+components/execd/pkg/web/controller/sse_correlation_test.go
+  s_37bb930866c8f6::t_0471579cd90689 145,150-155,157-162,164-166,179,187-188,190-192,200,208-209
+  h_80542e13e8372a 146
+  s_a883bad66ed5ac::t_fd1b0787d97ef4 211-232,234-250,253-260
+  s_a883bad66ed5ac::t_4cae886f30129c 210
+  s_6b02b2663671f0::t_0a627f14dd68a4 42,51-55,74-99,169-174,176-178,180-182,184,201-204,233,261
+  s_a883bad66ed5ac::t_18b4f82a6ff05f 189,193-195
+  s_37bb930866c8f6::t_a5a4d7efa63f6e 167
+  s_37bb930866c8f6::t_6e2ce5b72748e4 186
+  s_a883bad66ed5ac::t_c1886d82e271f4 196-198
+  s_6b02b2663671f0::t_004ce9a0024b8e 205
+  s_37bb930866c8f6::t_6d6a69f18672c6 207
+  s_a883bad66ed5ac::t_852c37e2d0cae1 22
+components/execd/pkg/log/log_test.go
+  s_a883bad66ed5ac::t_9c8c01d579663f 42-53
+  s_6b02b2663671f0::t_3834940adf96fa 1,15,18-20,26-27,30-34,36-41,55-63,65,68-76,78-85,87
+  s_a883bad66ed5ac::t_dd4cf076d28868 54
+components/execd/pkg/runtime/types.go
+  s_a883bad66ed5ac::t_3a455e8b5b6386 27-29
+components/execd/pkg/runtime/command_status.go
+  s_37bb930866c8f6::t_65d59d64f606cd 92,111,116,121
+components/execd/pkg/web/controller/basic.go
+  s_37bb930866c8f6::t_cf5c8273524873 32-33
+components/execd/pkg/runtime/interrupt_windows.go
+  s_6b02b2663671f0::t_16e0fc840a927c 57,73
+  s_37bb930866c8f6::t_edb1c6beff9449 60
+components/execd/pkg/runtime/command_windows.go
+  s_6b02b2663671f0::t_7bee1bd989f457 79,163
+  s_37bb930866c8f6::t_9ab31db3455e99 37,123,134
+  s_f27f6dc090a3cf::t_1a7723ffa28865 52-53,144-145,194
+components/execd/pkg/runtime/command_common.go
+  s_37bb930866c8f6::t_f4e62f32820954 40-42,45
+components/execd/pkg/log/log.go
+  s_f27f6dc090a3cf::t_a3cff17033a6b6 19,84-102,106,115-122
+  s_6b02b2663671f0::t_e19f8b3cb3d66e 24-25,30-35,41,59,67-72,75,123-124,126,130,134
+  s_a883bad66ed5ac::t_9a52c120fb4120 103-105,107-114
+components/execd/pkg/web/controller/sse_correlation_unix_test.go
+  s_6b02b2663671f0::t_50ebe6699b9012 101-116,119-120
+components/execd/pkg/runtime/interrupt.go
+  s_6b02b2663671f0::t_e949d7f49d45b1 70,77,86,92,105,114,120
+  s_37bb930866c8f6::t_4bce121a011a4c 108
+components/execd/pkg/runtime/command.go
+  s_37bb930866c8f6::t_2789a4792c208d 217,364,376
+  s_6b02b2663671f0::t_c5640e7e6f0407 276,436
+  s_f27f6dc090a3cf::t_d83379053ce63b 234-235,392-393,458
+components/execd/pkg/runtime/exit_error.go
+  s_f27f6dc090a3cf::t_53a4ff15c7e655 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b4e7a73f9afb8947d762c558ab3a53d4b2765680",
+  "prompts": {},
+  "sessions": {
+    "s_37bb930866c8f6": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1ab63-acd3-7181-b716-baf5c82c152c",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": null
+    },
+    "s_6b02b2663671f0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1aeac-a80e-70ed-828f-994d51ab599f",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_a883bad66ed5ac": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1ab4c-0037-705f-b0ea-d0af55efc922",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": null
+    },
+    "s_f27f6dc090a3cf": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1af02-7de8-7276-bb4a-1acc284e67bd",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": null
+    }
+  }
+}
