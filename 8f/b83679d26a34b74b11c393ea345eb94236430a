@@ -1,0 +1,61 @@
+components/execd/pkg/web/controller/sse_correlation_test.go
+  s_6b02b2663671f0::t_0a627f14dd68a4 44,53-57,76-101,152,164,166-171,173-181,210-211,213,216-224,295,308-315,409,420-424,428-429,431-432,447,449-459,461-468,498,508,521
+  s_6b02b2663671f0::t_aca2dc3adc2f01 234-293,522
+  s_6b02b2663671f0::t_17d07f67b50430 225-226,228
+  s_a883bad66ed5ac::t_fd1b0787d97ef4 476-497,499-507,509-520
+components/execd/pkg/runtime/command_log_linux_test.go
+  s_6b02b2663671f0::t_4c2aad82666f7a 92-96,132-136
+components/execd/pkg/runtime/command_log_test.go
+  s_6b02b2663671f0::t_5c32142c925d23 18,66,75-79,98-123,215,221-244,312-316,318,320-328,371-378,381,405-411
+  s_6b02b2663671f0::t_633175df3314c3 412-479
+components/execd/pkg/web/controller/sse.go
+  s_6b02b2663671f0::t_7727e2934c8b6b 270,292-296,298-333
+  s_6b02b2663671f0::t_a5afffe53612c5 334-336
+  s_6b02b2663671f0::t_4fd7099e467569 25-26,107,136,145,162,171,184,197,257,260,338,353
+components/execd/pkg/log/log_test.go
+  s_6b02b2663671f0::t_3834940adf96fa 1-65
+components/execd/go.mod
+  s_6b02b2663671f0::t_47f66fbd61795f 22
+components/execd/pkg/log/log.go
+  s_6b02b2663671f0::t_e19f8b3cb3d66e 23-24,29-34,40,58,66-71,74,83-88,90,94,98
+components/execd/pkg/runtime/command.go
+  s_6b02b2663671f0::t_c5640e7e6f0407 218,225,238,244,278,292,372,382,387,401,409,443,456,475
+components/execd/pkg/runtime/command_common.go
+  s_6b02b2663671f0::t_760b59113aa60f 30-31,53-94,98-101,111-113
+components/execd/pkg/runtime/command_windows.go
+  s_6b02b2663671f0::t_7bee1bd989f457 38,43,56,80,94,129,139,144,152,168,184,209
+components/execd/pkg/runtime/interrupt.go
+  s_6b02b2663671f0::t_e949d7f49d45b1 26-27,72,79,88,94,107,116,122
+components/execd/pkg/runtime/interrupt_windows.go
+  s_6b02b2663671f0::t_16e0fc840a927c 27-29,59,75
+components/execd/pkg/web/controller/isolated_session.go
+  s_6b02b2663671f0::t_bd925bbf982821 322,357,372
+components/execd/pkg/web/controller/sse_correlation_unix_test.go
+  s_6b02b2663671f0::t_50ebe6699b9012 100-114,117-118,127-130
+docs/architecture/data-plane/execd.md
+  s_6b02b2663671f0::t_bd5cd732c19780 158,160,162,164-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8fb83679d26a34b74b11c393ea345eb94236430a",
+  "prompts": {},
+  "sessions": {
+    "s_6b02b2663671f0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1aeac-a80e-70ed-828f-994d51ab599f",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_a883bad66ed5ac": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1ab4c-0037-705f-b0ea-d0af55efc922",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
