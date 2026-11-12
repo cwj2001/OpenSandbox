@@ -107,9 +107,11 @@ func startAudit(ctx context.Context, level audit.Level, mode string, proxy *dnsp
 }
 
 // newLogSink logs audit events at info on their own logger, so lowering
-// OPENSANDBOX_EGRESS_LOG_LEVEL never silences the audit trail.
+// OPENSANDBOX_EGRESS_LOG_LEVEL never silences the audit trail. Sampling is
+// off: every event shares one message, and the default sampler would keep
+// only every 100th past 100 per second — a loss no Stats counter would see.
 func newLogSink() audit.Sink {
-	base := slogger.MustNew(slogger.Config{Level: "info"})
+	base := slogger.MustNew(slogger.Config{Level: "info", DisableSampling: true})
 	if extra := telemetry.EgressLogFields(); len(extra) > 0 {
 		base = base.With(extra...)
 	}

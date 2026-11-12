@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -37,6 +38,7 @@ const (
 	nfulnlMsgConfig  = nfnlSubsysULOG<<8 | 1
 	nfulaCfgCmd      = 1
 	nfulaCfgMode     = 2
+	nfulaCfgTimeout  = 3
 	nfulaCfgQThresh  = 4
 	nfulaCfgFlags    = 6
 	nfulnlCfgCmdBind = 1
@@ -53,11 +55,16 @@ const (
 	// nflogCopyRange covers an IPv6 header, bounded extension headers and the
 	// transport ports; nothing past the ports is ever copied to userspace.
 	nflogCopyRange = 128
-	// Deliver every copy at once: batching (the kernel default is up to 1s)
-	// would skew event timestamps, and the audit rules' rate limit already
-	// bounds the message rate to one per new connection.
-	nflogQThreshold  = 1
-	nflogRecvBuffer  = 4 << 20
+	// Deliver in small batches: one receive per copy costs the sidecar a
+	// syscall per new connection, which under a connection flood competes
+	// with the DNS proxy for CPU. A batch is flushed at 64 copies or after
+	// 10ms, so observed_at trails the verdict by at most ~10ms (the kernel
+	// default flush timeout of 1s would skew it far more).
+	nflogQThreshold   = 64
+	nflogFlushTimeout = 1 // 1/100 s
+	// The buffer only absorbs bursts under the processing cap below; kept
+	// small so a backlog cannot delay observed_at by more than about a second.
+	nflogRecvBuffer  = 512 << 10
 	nflogRecvTimeout = 500_000 // µs; bounds how long the reader ignores ctx
 )
 
@@ -115,6 +122,7 @@ func openNFLog(group uint16, recvBuffer int) (*nflogSocket, error) {
 	binary.BigEndian.PutUint32(mode, nflogCopyRange)
 	mode[4] = nfulnlCopyPacket
 	cfg := append(nlAttr(nfulaCfgMode, mode), nlAttr(nfulaCfgQThresh, be32(nflogQThreshold))...)
+	cfg = append(cfg, nlAttr(nfulaCfgTimeout, be32(nflogFlushTimeout))...)
 	// Per-instance sequence numbers make every receive-buffer overrun an
 	// exact, reported loss count instead of a silent one.
 	cfg = append(cfg, nlAttr(nfulaCfgFlags, binary.BigEndian.AppendUint16(nil, nfulnlCfgFSeq))...)
@@ -163,10 +171,35 @@ func (s *nflogSocket) configure(group uint16, attrs []byte) error {
 	}
 }
 
+// The reader processes at most maxCopiesPerSecond copies, in windows of
+// copyWindow. Past a window's share it stops reading until the window ends:
+// the socket buffer fills, the kernel drops further copies, and the sequence
+// check counts each one as lost_kernel. During a connection flood this caps
+// the CPU audit takes from the DNS proxy sharing the sidecar's quota: with a
+// 0.25-core sidecar, 2000/s still doubled DNS p99 under a flood, while 500/s
+// left it at the unaudited level. Bursts above the rate wait in the socket
+// buffer instead of being dropped.
+const (
+	maxCopiesPerSecond = 500
+	copyWindow         = 100 * time.Millisecond
+	copiesPerWindow    = maxCopiesPerSecond * int(copyWindow) / int(time.Second)
+)
+
 // read returns nil when ctx is done and the error that stopped it otherwise.
 func (s *nflogSocket) read(ctx context.Context, observeSeq func(uint32), overrun func(), handle func(prefix string, payload []byte)) error {
 	buf := make([]byte, 1<<16)
+	windowEnd, copies := time.Now().Add(copyWindow), 0
 	for ctx.Err() == nil {
+		if now := time.Now(); !now.Before(windowEnd) {
+			windowEnd, copies = now.Add(copyWindow), 0
+		} else if copies >= copiesPerWindow {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(time.Until(windowEnd)):
+			}
+			continue
+		}
 		n, _, err := unix.Recvfrom(s.fd, buf, 0)
 		if err != nil {
 			switch {
@@ -180,14 +213,16 @@ func (s *nflogSocket) read(ctx context.Context, observeSeq func(uint32), overrun
 			}
 			continue
 		}
-		forEachNFLogPacket(buf[:n], observeSeq, handle)
+		copies += forEachNFLogPacket(buf[:n], observeSeq, handle)
 	}
 	return nil
 }
 
 // forEachNFLogPacket reports the sequence number of every NFULNL_MSG_PACKET
-// in a netlink datagram, then calls handle with its prefix and payload.
-func forEachNFLogPacket(b []byte, observeSeq func(uint32), handle func(prefix string, payload []byte)) {
+// in a netlink datagram, then calls handle with its prefix and payload. It
+// returns how many packet messages the datagram held.
+func forEachNFLogPacket(b []byte, observeSeq func(uint32), handle func(prefix string, payload []byte)) int {
+	packets := 0
 	forEachNetlinkMessage(b, func(typ uint16, _ uint32, data []byte) {
 		if typ != nfulnlMsgPacket || len(data) < nfgenMsgLen {
 			return
@@ -206,10 +241,12 @@ func forEachNFLogPacket(b []byte, observeSeq func(uint32), handle func(prefix st
 				}
 			}
 		})
+		packets++
 		if payload != nil {
 			handle(prefix, payload)
 		}
 	})
+	return packets
 }
 
 func forEachNetlinkMessage(b []byte, fn func(typ uint16, seq uint32, data []byte)) {

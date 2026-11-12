@@ -165,11 +165,11 @@ func TestNftAuditKernelVerdictsAndEvents(t *testing.T) {
 	}
 }
 
-// TestNftAuditKernelAccountsForEveryConnection floods the audited chain with
-// far more new flows than the detailed-event budget and checks the stream's
-// conservation law against the kernel: every flow is either an individual
-// event, inside an aggregate, or counted lost by the NFLOG sequence check —
-// never silently missing.
+// TestNftAuditKernelAccountsForEveryConnection floods the audited chain far
+// past the reader's processing cap and checks the stream's conservation law
+// against the kernel: every flow is either an individual event, inside an
+// aggregate, or counted lost by the NFLOG sequence check — never silently
+// missing.
 func TestNftAuditKernelAccountsForEveryConnection(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
@@ -186,39 +186,53 @@ func TestNftAuditKernelAccountsForEveryConnection(t *testing.T) {
 
 	// Every send is a new 5-tuple (distinct destination port), so each is one
 	// conntrack-new packet and one NFLOG copy; denied and allowed alternate.
+	send := func(from, to int) {
+		for i := from; i < to; i++ {
+			dst := "198.51.100.7"
+			if i%2 == 1 {
+				dst = "203.0.113.9"
+			}
+			conn, err := net.Dial("udp", net.JoinHostPort(dst, strconv.Itoa(10000+i)))
+			require.NoError(t, err)
+			_, _ = conn.Write([]byte("x"))
+			conn.Close()
+		}
+	}
 	const flows = 20000
 	start := time.Now()
-	for i := 0; i < flows; i++ {
-		dst := "198.51.100.7"
-		if i%2 == 1 {
-			dst = "203.0.113.9"
-		}
-		conn, err := net.Dial("udp", net.JoinHostPort(dst, strconv.Itoa(10000+i)))
-		require.NoError(t, err)
-		_, _ = conn.Write([]byte("x"))
-		conn.Close()
-	}
+	send(0, flows)
 	t.Logf("sent %d flows in %v", flows, time.Since(start))
 
 	accounted := func(s audit.Stats) uint64 {
 		return s.Detailed + s.Aggregated + s.Deduplicated + s.LostKernel + s.LostUndecodable
 	}
-	require.Eventually(t, func() bool { return accounted(collector.Stats()) == flows }, 30*time.Second, 50*time.Millisecond,
+	// Let the reader drain its buffer at the processing cap; copies the kernel
+	// dropped after the last delivered one are counted when the next copy
+	// arrives, so a sentinel flow closes the count.
+	var last uint64
+	require.Eventually(t, func() bool {
+		cur := accounted(collector.Stats())
+		settled := cur == last && cur > 0
+		last = cur
+		return settled
+	}, 60*time.Second, time.Second)
+	send(flows, flows+1)
+	require.Eventually(t, func() bool { return accounted(collector.Stats()) == flows+1 }, 30*time.Second, 100*time.Millisecond,
 		"every flow must be accounted for: %+v", collector.Stats())
 	collector.Close(5 * time.Second)
 
 	stats := collector.Stats()
 	t.Logf("stats: %+v", stats)
-	require.Positive(t, stats.Aggregated, "the flood must exceed the detailed budget")
+	require.Positive(t, stats.LostKernel, "the flood must exceed the reader's processing cap")
 	require.Zero(t, stats.Deduplicated, "every flow is a distinct 5-tuple")
-	require.Equal(t, uint64(flows), accounted(stats))
+	require.Equal(t, uint64(flows+1), accounted(stats))
 	var inStream uint64
 	for _, e := range sink.snapshot() {
 		if e.Layer == audit.LayerL4 {
 			inStream += max(e.Count, 1)
 		}
 	}
-	require.Equal(t, stats.Detailed+stats.Aggregated, inStream, "the stream carries every accounted flow")
+	require.Equal(t, stats.Detailed+stats.Aggregated, inStream, "the stream carries every flow it did not count as lost")
 }
 
 func setupAuditLink(t *testing.T, ctx context.Context) {
