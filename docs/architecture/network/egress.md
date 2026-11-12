@@ -20,6 +20,7 @@ Egress is how a sandbox gets a network policy instead of open internet access. I
 | Credential Vault | Secrets stay in the sidecar; credentials are injected into matching outbound requests |
 | Transparent TLS interception (L7) | See, control, and authenticate outbound HTTPS — production-usable mechanism, experimental configuration surface |
 | Fail-closed startup | If enforcement cannot be installed, the sidecar exits — it never runs as a no-op |
+| [Outbound audit](#outbound-audit) | Opt-in per-DNS-query and per-connection allow/deny events, including literal-IP dials |
 
 ## How interception works
 
@@ -131,6 +132,58 @@ On shutdown, the sidecar keeps DNS and network rules working while in-flight del
 ## Observability (OpenTelemetry)
 
 When the platform configures an OTLP endpoint, the sidecar exports per-sandbox metrics: denied request counts, DNS query outcomes (denied-by-policy and resolver-failure are deliberately separate counters — alerting on the wrong one inverts the diagnosis), nftables update failures, and process resource usage. Cardinality is bounded: no queried domain or destination ever becomes a label. See [telemetry](/guides/telemetry#egress-sidecar) for the metric list and export configuration.
+
+## Outbound audit
+
+Outbound audit answers "which destinations did this sandbox reach, and which were blocked?" — one structured event per DNS decision and, under `dns+nft`, one per new TCP/UDP connection, allowed or denied, including connections to literal IPs that never touched DNS. It is off by default and is an operator setting: `OPENSANDBOX_EGRESS_AUDIT` is not on the per-request env allowlist, so a sandbox cannot turn it off. Until the server exposes it, set it in a custom egress image (`ENV OPENSANDBOX_EGRESS_AUDIT=conn`), the same way as the [always-rule files](/guides/network-isolation#approach-1-global-enforced-isolation-via-egress-sidecar-deny-always).
+
+| `OPENSANDBOX_EGRESS_AUDIT` | Events |
+|---|---|
+| `off` (default) | None. The nftables ruleset is byte-for-byte the unaudited one. |
+| `dns` | One `egress.audit.dns` event per query the DNS proxy decides. |
+| `conn` | DNS events plus one `egress.audit.connection` event per new TCP/UDP connection. Requires `dns+nft`; otherwise it runs at `dns` and says so in the stream. |
+
+Like the other egress logs, the stream is JSON on stdout, one `opensandbox.event` name per kind: `egress.audit.dns`, `egress.audit.connection`, and `egress.audit.stream` for events about the stream itself. Egress produces it; shipping, retention and access control belong to your log pipeline. It is written on its own logger at `info`, so lowering `OPENSANDBOX_EGRESS_LOG_LEVEL` never silences it.
+
+```json
+{"ts":"2026-11-12T04:28:20.401Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.stream","reason":"started","boot_id":"9f2c…","seq":1,"observed_at":"2026-11-12T04:28:20.400Z","coverage":["dns","l4"]}
+{"ts":"2026-11-12T04:28:20.466Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.dns","reason":"policy","boot_id":"9f2c…","seq":2,"observed_at":"2026-11-12T04:28:20.465Z","decision":"allow","domain":"pypi.org","dns_query_type":"A","dns_response_code":"NOERROR","resolved_ips":["151.101.0.223"]}
+{"ts":"2026-11-12T04:28:21.132Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.connection","reason":"dns_lease","boot_id":"9f2c…","seq":3,"observed_at":"2026-11-12T04:28:21.131Z","decision":"allow","domain":"pypi.org","proto":"tcp","dst_ip":"151.101.0.223","dst_port":443,"dns_seen":true}
+{"ts":"2026-11-12T04:28:21.140Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.connection","reason":"ip_rule","boot_id":"9f2c…","seq":4,"observed_at":"2026-11-12T04:28:21.139Z","decision":"deny","proto":"tcp","dst_ip":"10.96.0.10","dst_port":5432,"dns_seen":false,"rule":"10.96.0.0/12","rule_source":"platform"}
+{"ts":"2026-11-12T04:28:23.001Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.connection","reason":"default","boot_id":"9f2c…","seq":5,"observed_at":"2026-11-12T04:28:22.010Z","decision":"deny","proto":"udp","dst_ip":"203.0.113.9","dst_port":9999,"dns_seen":false,"count":4210,"window_start":"2026-11-12T04:28:22.010Z","window_end":"2026-11-12T04:28:22.998Z"}
+```
+
+| Field | Meaning |
+|---|---|
+| `opensandbox.event` | `egress.audit.dns`, `egress.audit.connection`, or `egress.audit.stream`. A `dns` allow means the name was allowed to resolve, not that a connection followed. |
+| `decision` | `allow` or `deny` — the verdict already taken by the DNS proxy or the nftables chain. |
+| `reason` | `dns`: `policy` or `unknown_source`. `connection`: the rule family that decided — `dns_lease` (address learned from an allowed DNS answer), `ip_rule` (IP/CIDR rule), `port_rule` (port-scoped rule, including `reachable.ports.cap`), `dot`, `doh`, or `default` (`defaultAction`). `stream`: see [Completeness](#completeness). |
+| `observed_at` | When the sidecar saw the query or connection. `ts` is when the line was written and can trail it under load. |
+| `rule`, `rule_source` | For `ip_rule`/`port_rule`: the matching rule (`10.96.0.0/12`, `ports 25`, `reachable.ports.cap`) and whether it came from the platform overlay (`platform`) or the sandbox policy (`user`). Read from the policy when the event is emitted, so a policy changed in between can leave it empty. |
+| `domain`, `dns_seen` | For connections: the name this address was last answered for by the sidecar's DNS proxy (kept for 30 minutes or the TTL, whichever is longer). `dns_seen: false` marks a literal-IP dial or a name resolved some other way. |
+| `proto`, `dst_ip`, `dst_port` | The connection's destination, named as in execd's eBPF `connect` events so the two can be joined per sandbox: egress says what the policy decided, execd which process dialed. |
+| `dns_query_type`, `dns_response_code`, `resolved_ips` | For DNS events: the query type, the code returned to the client, and up to 32 answered addresses. |
+| `count`, `window_start`, `window_end` | An aggregated event: `count` queries or connections with these fields, first and last seen in the window (see [Completeness](#completeness)). |
+| `boot_id`, `seq` | `seq` counts 1, 2, 3, … per `boot_id` (one per sidecar run) in output order. |
+
+**How connection events are produced.** Each new-connection verdict rule in the chain is preceded by a twin rule with the same match and no verdict, which sends an NFLOG copy of conntrack-`new` TCP/UDP packets (IP and transport headers only, 128 bytes) with the decision and reason in its log prefix. Evaluation always falls through to the original verdict rule, so verdicts and their order are unchanged; infrastructure accepts and the established-connection path are never logged, so an established connection costs nothing. The sidecar binds the NFLOG group before the first ruleset is installed. TCP SYN retransmits and repeated packets of a denied UDP flow are folded into one event per connection attempt for 30 seconds.
+
+### Completeness
+
+An audit trail with silent holes is not one, so the stream accounts for every query and connection the sidecar observes, and reports every gap in-stream:
+
+- **Nothing is dropped for volume.** Individual events are budgeted at 1000 per second (burst 2000). Over budget — or when the writer falls behind its 4096-event queue — events are folded into per-second aggregates keyed by event, decision, reason, domain and destination, so a flood costs per-attempt detail, never a count. A window holds 1024 keys; beyond that, keys fold into one aggregate per event, decision and reason without a destination. The kernel rules carry no rate limit, because a kernel limiter would drop copies silently.
+- **Kernel delivery is counted exactly.** NFLOG copies carry per-instance sequence numbers, so receive-buffer overruns become an exact `lost_kernel` count. A TCP SYN retransmit is a copy of its own, so this bounds the lost connections from above. Loss after the last delivered copy is counted when the next copy arrives; until then heartbeat and stopped events say so in `detail`.
+- **Gaps are events.** `egress.audit.stream` events describe the stream: `started` (with `coverage`, and a `detail` when L4 is unavailable), `degraded` (a layer stopped while running), `gap` (`lost_kernel`/`lost_undecodable` over `window_start`–`window_end`), `heartbeat` (every minute, cumulative `detailed`/`aggregated`/`deduplicated`/`lost_*` totals) and `stopped` (final totals, after the last aggregates are flushed). Per run, `detailed + aggregated + deduplicated + lost_kernel + lost_undecodable` is every query and L4 copy the sidecar observed; `deduplicated` counts copies folded into an earlier event of the same 5-tuple within 30 seconds (retransmits, repeated packets of a denied UDP flow, or a new attempt that happened to reuse the 5-tuple).
+- **Downstream can detect the rest.** A crash, or a writer slower than the 2-second shutdown flush, loses queued events without a record; so does anything lost after stdout. Both show up as a `seq` gap, a missing `stopped` event for a `boot_id`, or heartbeats that stop: alert on those, on `egress.audit.lost_total`, and on `egress.audit.l4.active = 0` where `conn` is expected.
+
+### Limits
+
+- Audit never takes the sidecar down or changes a verdict. Before installing audit rules the sidecar checks, in a hookless scratch table, that the kernel accepts the log statement (`nft_log`); if that check or the NFLOG bind fails (missing module, no `CAP_NET_ADMIN`), it audits DNS only, records why in the `started` event, and reports `egress.audit.l4.active = 0`.
+- Established-flow teardown drops (`dropEstablished`) are not logged.
+- With transparent MITM, the workload's own dial to an intercepted port is redirected to the local listener and accepted as infrastructure, so it is not logged; the connection mitmproxy then opens upstream passes the chain and is logged like any other. With a chained upstream proxy that connection is itself an infrastructure accept, so intercepted flows are not logged at L4.
+- The DNS proxy's own upstream queries and infrastructure names (such as an upstream-proxy hostname) are not sandbox activity and are not logged. `log_skip.always` quiets only the `egress.outbound` line, never audit events.
+- Not supported with the fast-sandbox profile or the experimental revision runtime; there, as with an unknown value, the sidecar logs a warning and runs without audit.
 
 ## Experimental strict Vault v2 writes
 

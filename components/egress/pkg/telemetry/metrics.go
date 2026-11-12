@@ -44,8 +44,11 @@ var (
 	tlsRegistryBudget       metric.Int64Histogram
 	credentialResolutions   metric.Int64Counter
 	credentialResolutionDur metric.Float64Histogram
+	auditLost               metric.Int64Counter
+	auditAggregated         metric.Int64Counter
 
 	lastNftRuleCount atomic.Int64
+	auditL4Active    atomic.Bool
 )
 
 // Bounded reason values for RecordDNSQueryFailed. A closed set keeps the counter's
@@ -66,6 +69,14 @@ const (
 	DNSReplyStageDeny          = "deny"
 	DNSReplyStageUpstreamError = "upstream_error"
 	DNSReplyStageAnswer        = "answer"
+)
+
+// Bounded reason values for RecordAuditLost.
+const (
+	// AuditLostKernel counts L4 copies the kernel numbered but could not
+	// deliver to the sidecar (NFLOG sequence gaps).
+	AuditLostKernel      = "kernel"
+	AuditLostUndecodable = "undecodable"
 )
 
 // Bounded operation values for RecordNftablesUpdateFailed.
@@ -233,6 +244,39 @@ func registerEgressMetrics() error {
 		return err
 	}
 
+	auditLost, err = meter.Int64Counter(
+		"egress.audit.lost_total",
+		metric.WithDescription("Audit observations lost without an individual or aggregated event, by reason "+
+			"(kernel, undecodable). Each loss is also reported in-stream by an audit gap event; verdicts are unaffected."),
+	)
+	if err != nil {
+		return err
+	}
+	auditAggregated, err = meter.Int64Counter(
+		"egress.audit.aggregated_total",
+		metric.WithDescription("Queries and connections over the detailed-event budget, recorded inside "+
+			"aggregated audit events (counted, but without per-attempt detail)."),
+	)
+	if err != nil {
+		return err
+	}
+	_, err = meter.Int64ObservableGauge(
+		"egress.audit.l4.active",
+		metric.WithDescription("1 while per-connection (L4) audit collection is running, else 0 "+
+			"(audit off, dns level, dns-only mode, or NFLOG unavailable)."),
+		metric.WithInt64Callback(func(ctx context.Context, obs metric.Int64Observer) error {
+			var v int64
+			if auditL4Active.Load() {
+				v = 1
+			}
+			obs.Observe(v, egressMetricOpt())
+			return nil
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
 	_, err = meter.Int64ObservableGauge(
 		"egress.nftables.rules.count",
 		metric.WithDescription("Approximate policy size after last static apply"),
@@ -390,6 +434,26 @@ func RecordNftablesUpdateFailed(operation string) {
 		return
 	}
 	nftUpdateFailed.Add(context.Background(), 1, egressMetricOptWith(attribute.String("operation", operation)))
+}
+
+// RecordAuditLost counts audit observations lost without an event. reason
+// must be one of the AuditLost* constants.
+func RecordAuditLost(reason string, n int64) {
+	if auditLost == nil {
+		return
+	}
+	auditLost.Add(context.Background(), n, egressMetricOptWith(attribute.String("reason", reason)))
+}
+
+func RecordAuditAggregated() {
+	if auditAggregated == nil {
+		return
+	}
+	auditAggregated.Add(context.Background(), 1, egressMetricOpt())
+}
+
+func SetAuditL4Active(active bool) {
+	auditL4Active.Store(active)
 }
 
 // Closed-set credential resolution outcomes (OSEP-0025 R10); tenant-provided
