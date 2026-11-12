@@ -33,7 +33,8 @@ import (
 )
 
 // createNftManager is non-nil only when mode includes the nft token (e.g. dns+nft).
-func createNftManager(mode string, upstream *mitmproxy.UpstreamProxySpec) (nftApplier, error) {
+// auditGroup > 0 adds the audit NFLOG rules (see startAudit).
+func createNftManager(mode string, upstream *mitmproxy.UpstreamProxySpec, auditGroup uint16) (nftApplier, error) {
 	if !constants.ModeUsesNft(mode) {
 		return nil, nil
 	}
@@ -41,6 +42,7 @@ func createNftManager(mode string, upstream *mitmproxy.UpstreamProxySpec) (nftAp
 	if err != nil {
 		return nil, err
 	}
+	opts.AuditLogGroup = auditGroup
 	return nftables.NewManagerWithOptions(opts), nil
 }
 

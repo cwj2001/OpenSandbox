@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/alibaba/opensandbox/egress/pkg/audit"
 	"github.com/alibaba/opensandbox/egress/pkg/constants"
 	"github.com/alibaba/opensandbox/egress/pkg/log"
 	"github.com/alibaba/opensandbox/egress/pkg/policy"
@@ -70,6 +71,10 @@ type Options struct {
 	// exempt that rewritten tuple ahead of port-scoped rules or every
 	// intercepted flow is dropped (see the rule below). 0 emits nothing.
 	MitmRedirectPort int
+	// AuditLogGroup, when > 0, adds a non-terminal NFLOG copy to this group
+	// ahead of every new-connection verdict rule (see writeVerdict). 0 emits
+	// nothing and leaves the ruleset byte-for-byte unchanged.
+	AuditLogGroup uint16
 }
 
 type Manager struct {
@@ -431,36 +436,41 @@ func buildRuleset(p *policy.NetworkPolicy, opts Options, drops EstablishedDrops)
 	} else {
 		fmt.Fprintf(&b, "add rule inet %s %s ct state established,related accept\n", tableName, chainName)
 	}
+	// New-connection verdicts. Everything above is infrastructure or the
+	// established path and is never audited.
 	if opts.BlockDoT {
-		fmt.Fprintf(&b, "add rule inet %s %s tcp dport 853 drop\n", tableName, chainName)
-		fmt.Fprintf(&b, "add rule inet %s %s udp dport 853 drop\n", tableName, chainName)
+		writeVerdict(&b, opts, "tcp dport 853", "drop", audit.ReasonDoT)
+		writeVerdict(&b, opts, "udp dport 853", "drop", audit.ReasonDoT)
 	}
 	if opts.BlockDoH443 {
 		if len(dohBlockV4) == 0 && len(dohBlockV6) == 0 {
 			// strict: drop all 443 when enabled but no blocklist provided
-			fmt.Fprintf(&b, "add rule inet %s %s tcp dport 443 drop\n", tableName, chainName)
+			writeVerdict(&b, opts, "tcp dport 443", "drop", audit.ReasonDoH)
 		} else {
 			if len(dohBlockV4) > 0 {
-				fmt.Fprintf(&b, "add rule inet %s %s ip daddr @%s tcp dport 443 drop\n", tableName, chainName, dohBlockV4Set)
+				writeVerdict(&b, opts, fmt.Sprintf("ip daddr @%s tcp dport 443", dohBlockV4Set), "drop", audit.ReasonDoH)
 			}
 			if len(dohBlockV6) > 0 {
-				fmt.Fprintf(&b, "add rule inet %s %s ip6 daddr @%s tcp dport 443 drop\n", tableName, chainName, dohBlockV6Set)
+				writeVerdict(&b, opts, fmt.Sprintf("ip6 daddr @%s tcp dport 443", dohBlockV6Set), "drop", audit.ReasonDoH)
 			}
 		}
 	}
 	portDeny, portAllow := p.PortScopedRules()
 	// Port-scoped deny before every allow; port-scoped allow after the
 	// plain deny set, before the dynamic/plain allow sets.
-	writePortScopedRules(&b, portDeny, "drop")
-	fmt.Fprintf(&b, "add rule inet %s %s ip daddr @%s drop\n", tableName, chainName, denyV4Set)
-	fmt.Fprintf(&b, "add rule inet %s %s ip6 daddr @%s drop\n", tableName, chainName, denyV6Set)
-	writePortScopedRules(&b, portAllow, "accept")
-	fmt.Fprintf(&b, "add rule inet %s %s ip daddr @%s accept\n", tableName, chainName, dynAllowV4Set)
-	fmt.Fprintf(&b, "add rule inet %s %s ip6 daddr @%s accept\n", tableName, chainName, dynAllowV6Set)
-	fmt.Fprintf(&b, "add rule inet %s %s ip daddr @%s accept\n", tableName, chainName, allowV4Set)
-	fmt.Fprintf(&b, "add rule inet %s %s ip6 daddr @%s accept\n", tableName, chainName, allowV6Set)
+	writePortScopedRules(&b, opts, portDeny, "drop")
+	writeVerdict(&b, opts, fmt.Sprintf("ip daddr @%s", denyV4Set), "drop", audit.ReasonIPRule)
+	writeVerdict(&b, opts, fmt.Sprintf("ip6 daddr @%s", denyV6Set), "drop", audit.ReasonIPRule)
+	writePortScopedRules(&b, opts, portAllow, "accept")
+	writeVerdict(&b, opts, fmt.Sprintf("ip daddr @%s", dynAllowV4Set), "accept", audit.ReasonDNSLease)
+	writeVerdict(&b, opts, fmt.Sprintf("ip6 daddr @%s", dynAllowV6Set), "accept", audit.ReasonDNSLease)
+	writeVerdict(&b, opts, fmt.Sprintf("ip daddr @%s", allowV4Set), "accept", audit.ReasonIPRule)
+	writeVerdict(&b, opts, fmt.Sprintf("ip6 daddr @%s", allowV6Set), "accept", audit.ReasonIPRule)
 	if chainPolicy == "drop" {
-		fmt.Fprintf(&b, "add rule inet %s %s drop\n", tableName, chainName)
+		writeVerdict(&b, opts, "", "drop", audit.ReasonDefault)
+	} else if opts.AuditLogGroup > 0 {
+		// The chain policy accepts what falls off the end; log it first.
+		writeAuditLog(&b, opts, "", audit.DecisionAllow, audit.ReasonDefault)
 	}
 
 	return b.String(), nil
@@ -548,7 +558,7 @@ func writeElements(b *strings.Builder, setName string, elems []string) {
 // declaration order. A rule with no Target applies to all destinations
 // (bare "tcp dport { ... }" covers both address families); the dport set
 // mixes ports and lo-hi intervals. TCP only.
-func writePortScopedRules(b *strings.Builder, rules []policy.PortScopedRule, verb string) {
+func writePortScopedRules(b *strings.Builder, opts Options, rules []policy.PortScopedRule, verb string) {
 	for _, r := range rules {
 		members := make([]string, 0, len(r.Ports)+len(r.Ranges))
 		for _, port := range r.Ports {
@@ -559,14 +569,14 @@ func writePortScopedRules(b *strings.Builder, rules []policy.PortScopedRule, ver
 		}
 		portsClause := strings.Join(members, ", ")
 		if r.Target == "" {
-			fmt.Fprintf(b, "add rule inet %s %s tcp dport { %s } %s\n", tableName, chainName, portsClause, verb)
+			writeVerdict(b, opts, fmt.Sprintf("tcp dport { %s }", portsClause), verb, audit.ReasonPortRule)
 			continue
 		}
 		daddr := "ip daddr"
 		if r.IsV6 {
 			daddr = "ip6 daddr"
 		}
-		fmt.Fprintf(b, "add rule inet %s %s %s %s tcp dport { %s } %s\n", tableName, chainName, daddr, r.Target, portsClause, verb)
+		writeVerdict(b, opts, fmt.Sprintf("%s %s tcp dport { %s }", daddr, r.Target, portsClause), verb, audit.ReasonPortRule)
 	}
 }
 

@@ -28,6 +28,7 @@ import (
 
 	"github.com/miekg/dns"
 
+	"github.com/alibaba/opensandbox/egress/pkg/audit"
 	"github.com/alibaba/opensandbox/egress/pkg/constants"
 	"github.com/alibaba/opensandbox/egress/pkg/events"
 	"github.com/alibaba/opensandbox/egress/pkg/log"
@@ -66,6 +67,8 @@ type Proxy struct {
 	infraDomains map[string]func(domain string, ips []nftables.ResolvedIP)
 	// Optional: async fan-out for denied lookups (e.g. webhook).
 	blockedBroadcaster *events.Broadcaster
+	// Optional: per-query audit events (OPENSANDBOX_EGRESS_AUDIT).
+	audit *audit.Collector
 
 	// queryPolicySelector, when set, resolves the per-query policy (and
 	// per-query resolved-IP callback) from the client's source address. This
@@ -308,6 +311,7 @@ func (p *Proxy) forwardAndReply(w dns.ResponseWriter, r *dns.Msg, domain, host s
 // back to a REDIRECTed flow); until the error was reported, such windows were
 // indistinguishable from "query never handled" (issue #1704).
 func (p *Proxy) writeReply(w dns.ResponseWriter, r *dns.Msg, resp *dns.Msg, stage string) {
+	p.recordAudit(r, resp, stage)
 	if err := w.WriteMsg(resp); err != nil {
 		telemetry.RecordDNSReplyFailed(stage)
 		qname := "."

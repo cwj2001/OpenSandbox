@@ -70,6 +70,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("invalid upstream proxy configuration: %v", err)
 	}
+	auditLevel := resolveAuditLevel(profile)
 
 	// Fast Sandbox profile: multi-sandbox control plane driven by the
 	// Sandbox Actions Handler protocol. Sidecar stays the default; the two
@@ -131,16 +132,21 @@ func main() {
 	mode := parseMode()
 	log.Infof("enforcement mode: %s", mode)
 
-	// upstreamSpec was already validated at startup; it scopes the infra nft
-	// exception and lets DNS exempt the proxy hostname from sandbox policy
-	// without feeding the allow sets.
-	nftMgr, err := createNftManager(mode, upstreamSpec)
-	if err != nil {
-		log.Fatalf("nftables options: %v", err)
-	}
 	proxy, err := dnsproxy.New(initialRules, "", alwaysDeny, alwaysAllow)
 	if err != nil {
 		log.Fatalf("failed to init dns proxy: %v", err)
+	}
+	// Audit binds its NFLOG listener before the nft manager exists, so the
+	// first applied ruleset already carries its log rules and has a reader.
+	auditGroup, stopAudit := startAudit(ctx, auditLevel, mode, proxy)
+	defer stopAudit()
+
+	// upstreamSpec was already validated at startup; it scopes the infra nft
+	// exception and lets DNS exempt the proxy hostname from sandbox policy
+	// without feeding the allow sets.
+	nftMgr, err := createNftManager(mode, upstreamSpec, auditGroup)
+	if err != nil {
+		log.Fatalf("nftables options: %v", err)
 	}
 	if upstreamSpec != nil {
 		if _, err := netip.ParseAddr(upstreamSpec.Host); err != nil {
