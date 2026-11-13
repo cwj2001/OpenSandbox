@@ -15,7 +15,8 @@
 // Package audit records which destinations a sandbox reached or was denied,
 // at the DNS layer and (dns+nft) per new L4 connection. It observes verdicts
 // already taken by the DNS proxy and the nftables chain; it never decides one,
-// and it never sees payloads beyond IP/transport headers.
+// and it decodes only IP/transport headers. The fixed NFLOG packet prefix may
+// contain payload bytes, but they are never included in audit events.
 package audit
 
 import (

@@ -15,6 +15,7 @@
 package audit
 
 import (
+	"context"
 	"net/netip"
 	"strconv"
 	"strings"
@@ -78,6 +79,13 @@ type Collector struct {
 	// overrunPending is set by a receive-buffer overrun and cleared by the
 	// next delivered copy, whose sequence number counts the loss.
 	overrunPending atomic.Bool
+	l4Backlog      atomic.Bool
+	l4Active       atomic.Bool
+
+	// Set by StartL4 before producers start; Close joins the reader before
+	// publishing final totals. Neither startup nor Close may run concurrently.
+	l4Cancel context.CancelFunc
+	l4Done   <-chan struct{}
 
 	// NFLOG reader goroutine only.
 	flows   map[flow]time.Time
@@ -207,9 +215,26 @@ func (c *Collector) lifecycle(e Event) {
 func (c *Collector) Close(timeout time.Duration) {
 	c.closeOnce.Do(func() {
 		deadline := time.Now().Add(timeout)
+		if c.l4Cancel != nil {
+			c.l4Cancel()
+		}
 		close(c.stop)
 		if c.done != nil {
 			<-c.done
+		}
+		if c.l4Done != nil {
+			timer := time.NewTimer(time.Until(deadline))
+			defer timer.Stop()
+			select {
+			case <-c.l4Done:
+			case <-timer.C:
+				// Do not claim final totals while a producer can still write.
+				// A missing stopped event declares the incomplete shutdown.
+				if c.sink != nil {
+					c.sink.Close(deadline)
+				}
+				return
+			}
 		}
 		emit := c.out.TryEmit
 		if c.sink != nil {
@@ -243,8 +268,16 @@ func (c *Collector) snapshot() *Stats {
 
 // emit writes e on its own while the budget and the queue allow, and folds it
 // into the current aggregate window otherwise.
-func (c *Collector) emit(e Event) {
+func (c *Collector) emit(e Event, answers []netip.Addr) {
 	if c.budget.allow(e.ObservedAt) {
+		// Aggregates omit answers. Do not format them on the DNS reply path
+		// unless this event has been admitted for detailed output.
+		if n := min(len(answers), maxEventAnswerIPs); n > 0 {
+			e.ResolvedIPs = make([]string, n)
+			for i, addr := range answers[:n] {
+				e.ResolvedIPs[i] = addr.String()
+			}
+		}
 		c.attributeRule(&e)
 		if c.out.TryEmit(e) {
 			c.detailed.Add(1)
@@ -269,10 +302,10 @@ type DNSRecord struct {
 	TTL     time.Duration
 }
 
-// RecordDNS emits the DNS event and remembers which name each answered
-// address came from, for the L4 events of the connections that follow.
+// RecordDNS emits the DNS event and, while L4 collection is active, remembers
+// the answered addresses for attribution of the connections that follow.
 func (c *Collector) RecordDNS(r DNSRecord) {
-	if r.Decision == DecisionAllow {
+	if r.Decision == DecisionAllow && c.l4Active.Load() {
 		c.domains.observe(r.Domain, r.Answers, r.TTL)
 	}
 	e := Event{
@@ -284,19 +317,16 @@ func (c *Collector) RecordDNS(r DNSRecord) {
 		QueryType:    r.QueryType,
 		ResponseCode: r.ResponseCode,
 	}
-	for i, addr := range r.Answers {
-		if i == maxEventAnswerIPs {
-			break
-		}
-		e.ResolvedIPs = append(e.ResolvedIPs, addr.String())
-	}
-	c.emit(e)
+	c.emit(e, r.Answers)
 }
 
 // uncountedLoss explains an overrun no later copy has counted yet: the
 // kernel numbers copies, but loss after the last delivered one only shows
 // once the next one arrives.
 func (c *Collector) uncountedLoss() string {
+	if c.l4Backlog.Load() {
+		return "nflog stopped with unread copies: final totals exclude the remaining receive backlog and any trailing loss"
+	}
 	if c.overrunPending.Load() {
 		return "nflog overrun after the last delivered copy: lost_kernel excludes it until the next connection"
 	}
@@ -349,7 +379,7 @@ func (c *Collector) handleNFLog(prefix string, payload []byte) {
 		DestinationPort: f.dport,
 	}
 	e.Domain, e.DNSSeen = c.domains.lookup(f.dst)
-	c.emit(e)
+	c.emit(e, nil)
 }
 
 func (c *Collector) duplicate(f flow, now time.Time) bool {
@@ -376,6 +406,9 @@ func (c *Collector) duplicate(f flow, now time.Time) bool {
 // and this lookup can leave the rule empty or name the newer rule.
 func (c *Collector) attributeRule(e *Event) {
 	if c.policy == nil || e.Layer != LayerL4 || !e.DestinationIP.IsValid() {
+		return
+	}
+	if e.Reason != ReasonIPRule && (e.Reason != ReasonPortRule || e.Protocol != "tcp") {
 		return
 	}
 	p, platformRules := c.policy.EffectivePolicy()

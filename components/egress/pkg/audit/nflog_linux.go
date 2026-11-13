@@ -17,11 +17,11 @@
 package audit
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -52,18 +52,15 @@ const (
 )
 
 const (
-	// nflogCopyRange covers an IPv6 header, bounded extension headers and the
-	// transport ports; nothing past the ports is ever copied to userspace.
+	// The fixed packet prefix covers IP headers and transport ports. Shorter
+	// headers can leave payload bytes in the copy; decodeFlow ignores them.
 	nflogCopyRange = 128
-	// Deliver in small batches: one receive per copy costs the sidecar a
-	// syscall per new connection, which under a connection flood competes
-	// with the DNS proxy for CPU. A batch is flushed at 64 copies or after
-	// 10ms, so observed_at trails the verdict by at most ~10ms (the kernel
-	// default flush timeout of 1s would skew it far more).
+	// Small batches reduce receive syscalls. The kernel flushes at 64 copies
+	// or after 10ms; the reader's processing backlog adds further delay.
 	nflogQThreshold   = 64
 	nflogFlushTimeout = 1 // 1/100 s
-	// The buffer only absorbs bursts under the processing cap below; kept
-	// small so a backlog cannot delay observed_at by more than about a second.
+	// The bounded buffer absorbs bursts; the processing budget can delay
+	// their observation across multiple windows.
 	nflogRecvBuffer  = 512 << 10
 	nflogRecvTimeout = 500_000 // µs; bounds how long the reader ignores ctx
 )
@@ -78,10 +75,26 @@ func (c *Collector) StartL4(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	ctx, c.l4Cancel = context.WithCancel(ctx)
+	done := make(chan struct{})
+	c.l4Done = done
+	c.l4Active.Store(true)
 	telemetry.SetAuditL4Active(true)
 	safego.Go(func() {
+		defer close(done)
+		defer c.l4Cancel()
 		defer unix.Close(sock.fd)
 		defer telemetry.SetAuditL4Active(false)
+		defer c.l4Active.Store(false)
+		defer func() {
+			// Shutdown is bounded, not an unbounded drain. If queued copies
+			// remain, declare that final totals cannot account for them.
+			var peek [1]byte
+			n, _, err := unix.Recvfrom(sock.fd, peek[:], unix.MSG_PEEK|unix.MSG_DONTWAIT)
+			if n > 0 || errors.Is(err, unix.ENOBUFS) {
+				c.l4Backlog.Store(true)
+			}
+		}()
 		if err := sock.read(ctx, c.observeSeq, c.markOverrun, c.handleNFLog); err != nil {
 			log.Warnf("[audit] nflog receive failed; L4 audit stopped: %v", err)
 			c.Degraded([]string{LayerDNS}, "nflog receive failed: "+err.Error())
@@ -123,8 +136,8 @@ func openNFLog(group uint16, recvBuffer int) (*nflogSocket, error) {
 	mode[4] = nfulnlCopyPacket
 	cfg := append(nlAttr(nfulaCfgMode, mode), nlAttr(nfulaCfgQThresh, be32(nflogQThreshold))...)
 	cfg = append(cfg, nlAttr(nfulaCfgTimeout, be32(nflogFlushTimeout))...)
-	// Per-instance sequence numbers make every receive-buffer overrun an
-	// exact, reported loss count instead of a silent one.
+	// Per-instance sequence numbers count missing copies when a later copy
+	// is delivered; trailing loss can remain uncounted.
 	cfg = append(cfg, nlAttr(nfulaCfgFlags, binary.BigEndian.AppendUint16(nil, nfulnlCfgFSeq))...)
 	if err := s.configure(group, cfg); err != nil {
 		unix.Close(fd)
@@ -171,14 +184,10 @@ func (s *nflogSocket) configure(group uint16, attrs []byte) error {
 	}
 }
 
-// The reader processes at most maxCopiesPerSecond copies, in windows of
-// copyWindow. Past a window's share it stops reading until the window ends:
-// the socket buffer fills, the kernel drops further copies, and the sequence
-// check counts each one as lost_kernel. During a connection flood this caps
-// the CPU audit takes from the DNS proxy sharing the sidecar's quota: with a
-// 0.25-core sidecar, 2000/s still doubled DNS p99 under a flood, while 500/s
-// left it at the unaudited level. Bursts above the rate wait in the socket
-// buffer instead of being dropped.
+// The reader budgets copies in copyWindow intervals to limit CPU competition
+// with the DNS proxy. Each datagram is processed whole, so a window can exceed
+// its share by a batch. When the buffer fills, the kernel drops further copies;
+// the sequence check counts that loss when the next delivered copy arrives.
 const (
 	maxCopiesPerSecond = 500
 	copyWindow         = 100 * time.Millisecond
@@ -232,7 +241,7 @@ func forEachNFLogPacket(b []byte, observeSeq func(uint32), handle func(prefix st
 		forEachAttr(data[nfgenMsgLen:], func(typ uint16, value []byte) {
 			switch typ {
 			case nfulaPrefix:
-				prefix = strings.TrimRight(string(value), "\x00")
+				prefix = canonicalNFLogPrefix(value)
 			case nfulaPayload:
 				payload = value
 			case nfulaSeq:
@@ -247,6 +256,27 @@ func forEachNFLogPacket(b []byte, observeSeq func(uint32), handle func(prefix st
 		}
 	})
 	return packets
+}
+
+var auditNFLogPrefixes = [...]string{
+	"osb-audit:a:dot", "osb-audit:d:dot",
+	"osb-audit:a:doh", "osb-audit:d:doh",
+	"osb-audit:a:port_rule", "osb-audit:d:port_rule",
+	"osb-audit:a:ip_rule", "osb-audit:d:ip_rule",
+	"osb-audit:a:dns_lease", "osb-audit:d:dns_lease",
+	"osb-audit:a:default", "osb-audit:d:default",
+}
+
+// Return an owned, static prefix, not a string allocated for every copy or a
+// reference to the reusable receive buffer. Unknown prefixes remain ignored.
+func canonicalNFLogPrefix(value []byte) string {
+	value = bytes.TrimRight(value, "\x00")
+	for _, prefix := range auditNFLogPrefixes {
+		if string(value) == prefix {
+			return prefix
+		}
+	}
+	return ""
 }
 
 func forEachNetlinkMessage(b []byte, fn func(typ uint16, seq uint32, data []byte)) {

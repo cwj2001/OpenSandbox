@@ -52,7 +52,9 @@ func newTestCollector(t *testing.T, view PolicyView) (*Collector, *eventRecorder
 	t.Helper()
 	sink := &eventRecorder{}
 	clock := &fakeClock{t: time.Unix(1_700_000_000, 0)}
-	return newCollector(sink, view, clock.now), sink, clock
+	c := newCollector(sink, view, clock.now)
+	c.l4Active.Store(true) // tests feed the L4 reader directly
+	return c, sink, clock
 }
 
 func platformView(t *testing.T) staticView {

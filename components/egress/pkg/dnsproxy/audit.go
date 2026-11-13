@@ -15,6 +15,7 @@
 package dnsproxy
 
 import (
+	"net/netip"
 	"strconv"
 
 	"github.com/miekg/dns"
@@ -63,11 +64,18 @@ func (p *Proxy) recordAudit(r, resp *dns.Msg, stage string) {
 		rec.Decision = audit.DecisionDeny
 		rec.Reason = audit.ReasonUnknownSource
 	case telemetry.DNSReplyStageAnswer:
-		for i, ip := range extractResolvedIPs(resp) {
-			rec.Answers = append(rec.Answers, ip.Addr)
-			if i == 0 || ip.TTL < rec.TTL {
+		for _, rr := range resp.Answer {
+			ip, ok := resolvedIP(rr)
+			if !ok {
+				continue
+			}
+			if rec.Answers == nil {
+				rec.Answers = make([]netip.Addr, 0, len(resp.Answer))
+			}
+			if len(rec.Answers) == 0 || ip.TTL < rec.TTL {
 				rec.TTL = ip.TTL
 			}
+			rec.Answers = append(rec.Answers, ip.Addr)
 		}
 	}
 	p.audit.RecordDNS(rec)
