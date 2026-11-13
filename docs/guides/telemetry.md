@@ -228,6 +228,9 @@ Meter: `opensandbox/egress` · Service name: `opensandbox-egress-<version>`.
 | `egress.nftables.rules.count` | Observable Gauge | `{element}` | Approximate policy size after last successful static apply (fast-sandbox profile: summed across every installed subject's policy, 0 while deny-first). |
 | `egress.nftables.updates.count` | Counter | - | Number of successful nftables updates (static apply + dynamic IP add). |
 | `egress.nftables.updates.failed_total` | Counter | - | nftables updates that failed, by `operation`. |
+| `egress.audit.lost_total` | Counter | - | [Outbound audit](/architecture/network/egress#outbound-audit) observations lost without an event, by `reason`: `kernel` (exact count of NFLOG copies the kernel could not deliver) or `undecodable`. Each loss is also reported in-stream by a `gap` event; verdicts are unaffected. |
+| `egress.audit.aggregated_total` | Counter | - | Queries and connections over the detailed-event budget, recorded in aggregated audit events: counted, without per-attempt detail. |
+| `egress.audit.l4.active` | Observable Gauge | - | `1` while per-connection audit collection runs, else `0` (audit off or `dns`, `dns` enforcement mode, or the kernel rejected the audit rule / NFLOG bind). |
 | `egress.system.memory.usage_bytes` | Observable Gauge | `By` | **Node** memory used bytes (Linux: gopsutil; non-Linux build: `0`). |
 | `egress.system.cpu.utilization` | Observable Gauge | `1` | **Node** CPU busy ratio in `[0,1]` (Linux: gopsutil; non-Linux build: `0`). |
 | `egress.process.memory.usage_bytes` | Observable Gauge | `By` | Memory charged to the sidecar's own cgroup. Only present when cgroupfs is readable. |
@@ -324,6 +327,7 @@ Egress structured logs are emitted by zap (typically to stdout). OTLP log export
 
 - Common fields: `sandbox_id` (when `OPENSANDBOX_EGRESS_SANDBOX_ID` is set), key/value pairs from `OPENSANDBOX_EGRESS_METRICS_EXTRA_ATTRS` merged into the root logger, and `opensandbox.event` identifying the event family.
 - `opensandbox.event=egress.outbound` — emitted on allow-path DNS handling (success or forward error) with `target.host`, `target.ips`, `peer`, and `error`.
+- `opensandbox.event=egress.audit.dns`, `egress.audit.connection`, `egress.audit.stream` — opt-in outbound audit events (`OPENSANDBOX_EGRESS_AUDIT`): one per DNS decision and, under `dns+nft`, one per new TCP/UDP connection, allowed or denied. Written on a dedicated `info` logger that `OPENSANDBOX_EGRESS_LOG_LEVEL` does not silence. Fields and limits: [outbound audit](/architecture/network/egress#outbound-audit).
 - Policy lifecycle: `opensandbox.event=egress.loaded` (initial effective policy loaded), `egress.updated` (policy update applied), `egress.update_failed` (policy update failed), with `egress.default` (`allow`/`deny`), `rules`, and `error` fields.
 
 ## Ingress gateway

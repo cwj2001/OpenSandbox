@@ -70,6 +70,10 @@ type Config struct {
 	OutputPaths      []string      // default: stdout
 	ErrorOutputPaths []string      // default: OutputPaths
 	Rotate           *RotateConfig // nil means no rotation on file outputs
+	// DisableSampling keeps every entry. By default, past the first 100
+	// entries with the same message in a second only every 100th is kept;
+	// streams that must not lose entries (audit records) turn that off.
+	DisableSampling bool
 }
 
 // New creates a zap-backed Logger with the provided config.
@@ -142,12 +146,13 @@ func newWithRotate(cfg Config, extra ...zapcore.Core) (Logger, error) {
 		errSinks = append(errSinks, rotateWriter(path, cfg.Rotate))
 	}
 
-	base := zap.New(core,
-		zap.ErrorOutput(zapcore.NewMultiWriteSyncer(errSinks...)),
-		zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+	opts := []zap.Option{zap.ErrorOutput(zapcore.NewMultiWriteSyncer(errSinks...))}
+	if !cfg.DisableSampling {
+		opts = append(opts, zap.WrapCore(func(c zapcore.Core) zapcore.Core {
 			return zapcore.NewSamplerWithOptions(c, time.Second, 100, 100)
-		}),
-	)
+		}))
+	}
+	base := zap.New(core, opts...)
 	return &zapLogger{base: base, sugar: base.Sugar()}, nil
 }
 

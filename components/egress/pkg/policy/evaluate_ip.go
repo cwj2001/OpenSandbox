@@ -61,6 +61,64 @@ func (p *NetworkPolicy) EvaluateIP(addr netip.Addr) string {
 	return p.DefaultAction
 }
 
+// MatchIPRule returns the index of the first portless IP/CIDR rule with the
+// given action that contains addr: the rule behind a hit on the nftables
+// static allow/deny sets.
+func (p *NetworkPolicy) MatchIPRule(action string, addr netip.Addr) (int, bool) {
+	if p == nil || !addr.IsValid() {
+		return -1, false
+	}
+	addr = addr.Unmap()
+	for i := range p.Egress {
+		r := &p.Egress[i]
+		if r.Action != action || len(r.Ports) > 0 || len(r.PortRanges) > 0 {
+			continue
+		}
+		if r.matchesAddr(addr) {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+// MatchPortRule returns the index of the first port-scoped rule with the given
+// action whose target contains addr and whose ports include the TCP port: the
+// rule behind a hit on the nftables "tcp dport" rules, which keep declaration
+// order.
+func (p *NetworkPolicy) MatchPortRule(action string, addr netip.Addr, port int) (int, bool) {
+	if p == nil || !addr.IsValid() {
+		return -1, false
+	}
+	addr = addr.Unmap()
+	for i := range p.Egress {
+		r := &p.Egress[i]
+		if r.Action != action || (len(r.Ports) == 0 && len(r.PortRanges) == 0) {
+			continue
+		}
+		if r.targetKind != targetPortOnly && !r.matchesAddr(addr) {
+			continue
+		}
+		if r.matchesPort(port) {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+func (r *EgressRule) matchesPort(port int) bool {
+	for _, p := range r.Ports {
+		if p == port {
+			return true
+		}
+	}
+	for _, rg := range r.PortRanges {
+		if rg.Contains(port) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *EgressRule) matchesAddr(addr netip.Addr) bool {
 	switch r.targetKind {
 	case targetIP:
