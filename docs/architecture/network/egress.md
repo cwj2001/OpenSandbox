@@ -20,6 +20,7 @@ Egress is how a sandbox gets a network policy instead of open internet access. I
 | Credential Vault | Secrets stay in the sidecar; credentials are injected into matching outbound requests |
 | Transparent TLS interception (L7) | See, control, and authenticate outbound HTTPS — production-usable mechanism, experimental configuration surface |
 | Fail-closed startup | If enforcement cannot be installed, the sidecar exits — it never runs as a no-op |
+| [Outbound audit](#outbound-audit) | Opt-in DNS allow/deny events |
 
 ## How interception works
 
@@ -131,6 +132,22 @@ On shutdown, the sidecar keeps DNS and network rules working while in-flight del
 ## Observability (OpenTelemetry)
 
 When the platform configures an OTLP endpoint, the sidecar exports per-sandbox metrics: denied request counts, DNS query outcomes (denied-by-policy and resolver-failure are deliberately separate counters — alerting on the wrong one inverts the diagnosis), nftables update failures, and process resource usage. Cardinality is bounded: no queried domain or destination ever becomes a label. See [telemetry](/guides/telemetry#egress-sidecar) for the metric list and export configuration.
+
+## Outbound audit
+
+Outbound audit observes allowed and denied DNS decisions without changing enforcement. It is off by default and operator-controlled. Set `OPENSANDBOX_EGRESS_AUDIT=dns` to enable it; only `off` and `dns` are supported. Fast Sandbox and the experimental revision runtime keep audit disabled and warn. This increment does not collect connection verdicts.
+
+Audit JSON uses `opensandbox.event=egress.audit.dns` and `egress.audit.stream`. The dedicated unsampled `info` logger remains active when the ordinary log level is `warn`. DNS records contain `decision`, `reason` (`policy` or `unknown_source`), `domain`, `dns_query_type`, `dns_response_code` and up to 32 `resolved_ips`. Infrastructure names and the proxy's upstream traffic are excluded; `log_skip.always` never suppresses sandbox audit.
+
+`observed_at` is the decision time; the outer log timestamp is the eventual write time. One writer assigns contiguous `seq` values per `boot_id`, and clears reusable typed-field scratch after each event. The writer shares physical destination acquisition, rotation and lifetime with ordinary logging, without sharing their admission budgets.
+
+### Service isolation
+
+DNS never waits for output. Detailed events are budgeted at 1000 per second with a 2000 burst. A refused or over-budget event becomes an aggregate, retaining its count and first/last observation times. Aggregation holds 1024 domain keys before coarsening to layer, decision and reason. Pending aggregates and lifecycle records are retried. Audit has a 4096-event queue; ordinary logging has independent bounded operation and encoded-byte admission, whole-record refusal, error reporting and bounded Sync.
+
+### Completeness
+
+Stream records are `started` with DNS `coverage`, a minute `heartbeat`, and final `stopped`. The latter two carry cumulative `detailed` and `aggregated`; their sum accounts for observed queries. Shutdown allows two seconds for final aggregates and output. Failure to finish leaves `stopped` absent rather than claiming complete delivery. A crash or blocked output can lose queued events; downstream must monitor missing heartbeats/stopped and sequence gaps. Aggregated counts do not imply complete per-domain detail.
 
 ## Experimental strict Vault v2 writes
 

@@ -44,6 +44,7 @@ var (
 	tlsRegistryBudget       metric.Int64Histogram
 	credentialResolutions   metric.Int64Counter
 	credentialResolutionDur metric.Float64Histogram
+	auditAggregated         metric.Int64Counter
 
 	lastNftRuleCount atomic.Int64
 )
@@ -233,6 +234,19 @@ func registerEgressMetrics() error {
 		return err
 	}
 
+	auditAggregated, err = meter.Int64Counter(
+		"egress.audit.aggregated_total",
+		metric.WithDescription("Queries over the detailed-event budget, recorded inside "+
+			"aggregated audit events (counted, but without per-attempt detail)."),
+	)
+	if err != nil {
+		return err
+	}
+
+	if err != nil {
+		return err
+	}
+
 	_, err = meter.Int64ObservableGauge(
 		"egress.nftables.rules.count",
 		metric.WithDescription("Approximate policy size after last static apply"),
@@ -390,6 +404,13 @@ func RecordNftablesUpdateFailed(operation string) {
 		return
 	}
 	nftUpdateFailed.Add(context.Background(), 1, egressMetricOptWith(attribute.String("operation", operation)))
+}
+
+func RecordAuditAggregated() {
+	if auditAggregated == nil {
+		return
+	}
+	auditAggregated.Add(context.Background(), 1, egressMetricOpt())
 }
 
 // Closed-set credential resolution outcomes (OSEP-0025 R10); tenant-provided
