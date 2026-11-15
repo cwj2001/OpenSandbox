@@ -551,8 +551,8 @@ func TestOutputActorAuditOnlySequenceAndCloseLifetimes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := NewCollector(q)
-	c.Started()
+	c := NewCollector(q, nil)
+	c.Started([]string{LayerDNS}, "")
 	for i := range 100 {
 		l.Warnf("ordinary %d", i)
 		c.RecordDNS(DNSRecord{Domain: "a.example", Decision: DecisionAllow, Reason: ReasonPolicy})

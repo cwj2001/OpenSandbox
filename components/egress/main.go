@@ -151,14 +151,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to init dns proxy: %v", err)
 	}
-	// DNS audit observes proxy decisions without changing enforcement.
-	stopAudit := startAudit(auditLevel, proxy, auditSink)
+	// Audit binds its NFLOG listener before the nft manager exists, so the
+	// first applied ruleset already carries its log rules and has a reader.
+	auditGroup, stopAudit := startAudit(ctx, auditLevel, mode, proxy, auditSink)
 	defer stopAudit()
 
 	// upstreamSpec was already validated at startup; it scopes the infra nft
 	// exception and lets DNS exempt the proxy hostname from sandbox policy
 	// without feeding the allow sets.
-	nftMgr, err := createNftManager(mode, upstreamSpec)
+	nftMgr, err := createNftManager(mode, upstreamSpec, auditGroup)
 	if err != nil {
 		log.Fatalf("nftables options: %v", err)
 	}

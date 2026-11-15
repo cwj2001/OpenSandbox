@@ -21,12 +21,21 @@ import (
 	"github.com/miekg/dns"
 
 	"github.com/alibaba/opensandbox/egress/pkg/audit"
+	"github.com/alibaba/opensandbox/egress/pkg/policy"
 	"github.com/alibaba/opensandbox/egress/pkg/telemetry"
 )
 
 // SetAudit wires the optional audit collector. Register before Start.
 func (p *Proxy) SetAudit(c *audit.Collector) {
 	p.audit = c
+}
+
+// EffectivePolicy returns the merged sidecar policy and how many of its
+// leading rules come from the always overlay (always-deny, then always-allow).
+func (p *Proxy) EffectivePolicy() (*policy.NetworkPolicy, int) {
+	p.policyMu.RLock()
+	defer p.policyMu.RUnlock()
+	return p.effectivePolicy, len(p.alwaysDeny) + len(p.alwaysAllow)
 }
 
 // recordAudit reports a decided query. Unlike the egress.outbound line it
@@ -63,6 +72,9 @@ func (p *Proxy) recordAudit(r, resp *dns.Msg, stage string) {
 			if rec.Answers == nil {
 				rec.Answers = make([]netip.Addr, 0, len(resp.Answer))
 			}
+			if len(rec.Answers) == 0 || ip.TTL < rec.TTL {
+				rec.TTL = ip.TTL
+			}
 			rec.Answers = append(rec.Answers, ip.Addr)
 		}
 	}
@@ -75,3 +87,5 @@ func rcodeString(rcode int) string {
 	}
 	return "RCODE" + strconv.Itoa(rcode)
 }
+
+var _ audit.PolicyView = (*Proxy)(nil)

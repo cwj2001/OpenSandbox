@@ -15,6 +15,7 @@
 package audit
 
 import (
+	"net/netip"
 	"sync"
 	"time"
 )
@@ -25,7 +26,10 @@ const maxAggregateKeys = 1024
 
 type aggregateKey struct {
 	layer, decision, reason string
-	domain                  string
+	domain, protocol        string
+	dst                     netip.Addr
+	port                    uint16
+	dnsSeen                 bool
 }
 
 type aggregateValue struct {
@@ -45,7 +49,8 @@ func newAggregator() *aggregator {
 func keyOf(e Event) aggregateKey {
 	return aggregateKey{
 		layer: e.Layer, decision: e.Decision, reason: e.Reason,
-		domain: e.Domain,
+		domain: e.Domain, protocol: e.Protocol,
+		dst: e.DestinationIP, port: e.DestinationPort, dnsSeen: e.DNSSeen,
 	}
 }
 
@@ -86,7 +91,8 @@ func (a *aggregator) drain() map[aggregateKey]*aggregateValue {
 func (k aggregateKey) event(v *aggregateValue) Event {
 	return Event{
 		Layer: k.layer, Decision: k.decision, Reason: k.reason,
-		Domain:     k.domain,
+		Domain: k.domain, Protocol: k.protocol,
+		DestinationIP: k.dst, DestinationPort: k.port, DNSSeen: k.dnsSeen,
 		ObservedAt: v.first, Count: v.count, WindowStart: v.first, WindowEnd: v.last,
 	}
 }

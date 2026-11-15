@@ -65,8 +65,8 @@ func TestAuditLoggerFilesCloseOnlyAfterBothLanesDrain(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, physicalFD)
-	collector := audit.NewCollector(stream)
-	collector.RecordDNS(audit.DNSRecord{Domain: strings.Repeat("a", 700<<10), Decision: audit.DecisionAllow, Reason: audit.ReasonPolicy})
+	collector := audit.NewCollector(stream, nil)
+	collector.Started([]string{audit.LayerDNS}, strings.Repeat("a", 700<<10))
 	require.Error(t, stream.Close(time.Now().Add(100*time.Millisecond)))
 	collector.Close(0)
 	_, err = os.Stat(physicalFD)

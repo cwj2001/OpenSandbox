@@ -16,6 +16,7 @@ package audit
 
 import (
 	"io"
+	"net/netip"
 	"testing"
 	"time"
 )
@@ -33,6 +34,12 @@ func BenchmarkLogSink(b *testing.B) {
 			BootID: "synthetic-boot", Seq: 9007199254740993, ObservedAt: at,
 			Domain: "allowed.example", QueryType: "A", ResponseCode: "NOERROR",
 			ResolvedIPs: []string{"192.0.2.1", "2001:db8::1"},
+		}},
+		{"L4Deny", Event{
+			Layer: LayerL4, Decision: DecisionDeny, Reason: ReasonPortRule,
+			BootID: "synthetic-boot", Seq: 9007199254740993, ObservedAt: at,
+			Protocol: "tcp", DestinationIP: netip.MustParseAddr("192.0.2.5"), DestinationPort: 443,
+			Rule: "tcp:443", RuleSource: "platform",
 		}},
 	}
 	for _, tc := range cases {

@@ -27,7 +27,7 @@ cgroup-v2 parent with cpu already enabled is needed for --cpu-quota; this driver
 never enables controllers on a shared parent. Services/clients stay outside the
 sidecar's own cgroup. Results describe process/cgroup resources, NOT total host
 networking overhead. Longer --duration runs are the soak mode. --output-pause
-pauses stdout consumption during DNS load.
+pauses stdout consumption during load; conn must actually block a pipe writer.
 Only synthetic audit metadata (never packet payloads) is saved.
 """
 from __future__ import annotations
@@ -57,8 +57,9 @@ import uuid
 SCRIPT = Path(__file__).resolve()
 DNS_IP, ALLOW_IP, DENY_IP = "192.0.2.1", "192.0.2.2", "192.0.2.3"
 ECHO_PORT = 18081
+SENTINEL_PORT = ECHO_PORT + 1
 SENTINEL = "sentinel.allow.audit.test"
-STATS = ("detailed", "aggregated")
+STATS = ("detailed", "aggregated", "deduplicated", "lost_kernel", "lost_undecodable")
 
 
 def save(path: Path, value: object) -> None:
@@ -77,8 +78,11 @@ class AuditStream:
         self.started = False
         self.stopped = None
         self.detailed = self.aggregated = 0
+        self.loss = collections.Counter()
         self.verdicts = collections.Counter()
         self.sentinel = threading.Event()
+        self.dns_sentinel = self.l4_sentinel = False
+        self.destinations = collections.Counter()
         self.functional_seen = set()
         self.functional = threading.Event()
 
@@ -118,39 +122,59 @@ class AuditStream:
             self.errors.append("first record is not started")
         if name == "egress.audit.stream":
             if reason == "started":
+                expected = {"dns", "l4"} if self.mode == "conn" else {"dns"}
                 coverage = event.get("coverage")
                 if (self.started or not isinstance(coverage, list)
                         or any(not isinstance(item, str) for item in coverage)
-                        or set(coverage) != {"dns"}):
+                        or set(coverage) != expected):
                     self.errors.append("invalid started coverage")
                 self.started = True
+            elif reason == "degraded":
+                self.errors.append("audit coverage degraded")
+            elif reason == "gap":
+                for key in ("lost_kernel", "lost_undecodable"):
+                    self.loss[key] += event.get(key, 0)
             elif reason == "stopped":
                 self.stopped = event
-            elif reason != "heartbeat":
-                self.errors.append("unknown stream reason " + str(reason))
-        elif name == "egress.audit.dns":
+        elif name in ("egress.audit.dns", "egress.audit.connection"):
             count = event.get("count", 0)
             if count:
                 self.aggregated += count
             else:
                 self.detailed += 1
+            self.verdicts[name + ":" + str(event.get("decision"))] += count or 1
+            if name == "egress.audit.connection":
+                key = ("destination_bearing" if event.get("dst_ip") and event.get("dst_port")
+                       else "destination_free_aggregated" if count else "destination_free_detailed")
+                self.destinations[key] += count or 1
             decision = event.get("decision")
-            self.verdicts[name + ":" + str(decision)] += count or 1
-            if (decision in ("allow", "deny")
-                    and event.get("domain") == f"functional.{decision}.audit.test"):
-                self.functional_seen.add(decision)
-            if self.functional_seen == {"allow", "deny"}:
+            if name == "egress.audit.dns" and event.get("domain") == f"functional.{decision}.audit.test":
+                self.functional_seen.add(("dns", decision))
+            if (name == "egress.audit.connection" and event.get("proto") in ("tcp", "udp")
+                    and event.get("dst_ip") == (ALLOW_IP if decision == "allow" else DENY_IP)
+                    and event.get("dst_port") == ECHO_PORT):
+                self.functional_seen.add((event["proto"], decision))
+            layers = ("dns", "tcp", "udp") if self.mode == "conn" else ("dns",)
+            if all((layer, verdict) in self.functional_seen
+                   for layer in layers for verdict in ("allow", "deny")):
                 self.functional.set()
-            if event.get("domain") == SENTINEL and decision == "allow":
+            if (name == "egress.audit.dns" and event.get("domain") == SENTINEL
+                    and event.get("decision") == "allow"):
+                self.dns_sentinel = True
+            if (name == "egress.audit.connection" and event.get("proto") == "udp"
+                    and event.get("dst_ip") == ALLOW_IP and event.get("dst_port") == SENTINEL_PORT
+                    and event.get("decision") == "allow"):
+                self.l4_sentinel = True
+            if self.dns_sentinel and (self.mode != "conn" or self.l4_sentinel):
                 self.sentinel.set()
-        elif name == "egress.audit.connection":
-            self.errors.append("dns emitted connection event")
+            if self.mode == "dns" and name == "egress.audit.connection":
+                self.errors.append("dns emitted connection event")
         else:
             self.errors.append("unknown audit event " + name)
         return True
 
     def wait_sentinel(self, timeout: float) -> bool:
-        """Wait for an emitted allowed DNS sentinel, not only its client reply."""
+        """Wait for emitted DNS and (conn mode) unique-port L4 sentinels."""
         return self.sentinel.wait(timeout)
 
     def finish(self) -> dict:
@@ -166,10 +190,15 @@ class AuditStream:
         stats = {key: self.stopped.get(key, 0) for key in STATS}
         if (stats["detailed"], stats["aggregated"]) != (self.detailed, self.aggregated):
             raise ValueError("stream detail/aggregate totals disagree with stopped")
+        if any(self.loss[key] != stats[key] for key in ("lost_kernel", "lost_undecodable")):
+            raise ValueError("loss totals disagree with gap reports")
         return {"records": self.records, "boot_id": self.boot, "stats": stats,
                 "observed_accounted": sum(stats.values()),
                 "verdict_counts": dict(self.verdicts),
-                "dns_sentinel_emitted": self.sentinel.is_set(),
+                "l4_destination_observations": dict(self.destinations),
+                "dns_sentinel_emitted": self.dns_sentinel,
+                "l4_sentinel_emitted": self.l4_sentinel,
+                "uncounted_loss_detail": self.stopped.get("detail", ""),
                 "destination_complete": False}
 
 
@@ -260,7 +289,8 @@ def client(action: str, config: dict) -> dict:
         return {"echo_assertions": 4, "dns_assertions": 2 if action == "functional" else 0}
     if action == "sentinel":
         dns_query(SENTINEL, True)
-        return {"dns_assertions": 1}
+        echo(ALLOW_IP, "udp", True, SENTINEL_PORT)
+        return {"dns_assertions": 1, "udp_echo_assertions": 1}
     counters = collections.Counter()
     latency = DNSLatency()
     errors = []
@@ -458,6 +488,7 @@ def phase(mode: str, config: dict, directory: Path) -> dict:
                 (socketserver.UDPServer, (DNS_IP, 53), DNSHandler),
                 (socketserver.UDPServer, (ALLOW_IP, ECHO_PORT), UDPHandler),
                 (socketserver.UDPServer, (DENY_IP, ECHO_PORT), UDPHandler),
+                (socketserver.UDPServer, (ALLOW_IP, SENTINEL_PORT), UDPHandler),
                 (TCPServer, ("0.0.0.0", ECHO_PORT), TCPHandler)):
             server = server_type(address, handler)
             services.callback(server.server_close)
@@ -519,12 +550,13 @@ def phase(mode: str, config: dict, directory: Path) -> dict:
             time.sleep(0.1)
         result["functional"] = invoke("functional")
         if mode != "off" and not stream.functional.wait(5):
-            raise RuntimeError("functional client passed but DNS allow/deny audit events were not emitted")
+            raise RuntimeError("functional client passed but expected DNS/TCP/UDP audit verdicts were not emitted")
         before = process_resources(binary.pid)
         result["cgroup_before_load"] = group.snapshot()
         load = subprocess.Popen([*prefix, sys.executable, str(SCRIPT), "_client", "load",
                                  json.dumps(config)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 text=True)
+        blocked = False
         peak_rss = before["rss_bytes"]
         load_start = time.monotonic()
         if config["output_pause"]:
@@ -534,6 +566,10 @@ def phase(mode: str, config: dict, directory: Path) -> dict:
                 elapsed = time.monotonic() - load_start
                 if elapsed >= config["output_pause"]:
                     gate.set()
+                elif mode == "conn":
+                    for file in Path(f"/proc/{binary.pid}/task").glob("*/wchan"):
+                        with contextlib.suppress(OSError):
+                            blocked |= "pipe_write" in file.read_text()
                 peak_rss = max(peak_rss, process_resources(binary.pid)["rss_bytes"])
                 if elapsed > config["duration"] + 10:
                     raise RuntimeError("load exceeded duration deadline")
@@ -556,18 +592,23 @@ def phase(mode: str, config: dict, directory: Path) -> dict:
             result["cgroup_load_cpu_delta"] = {
                 key: value - result["cgroup_before_load"]["cpu.stat"][key]
                 for key, value in result["cgroup_after_load"]["cpu.stat"].items()}
-        # A full aggregate window can coarsen the first sentinel's domain.
-        # Retry DNS queries within one deadline until that domain is emitted.
+        result["stdout_pipe_writer_observed_blocked"] = blocked
+        if mode == "conn" and config["output_pause"] and not blocked:
+            raise RuntimeError("requested blocked-stdout scenario did not block a pipe writer; increase pause/DNS rate")
+        # Later actually emitted L4 copies expose trailing NFLOG sequence loss.
+        # Retry with fresh UDP source tuples: the first sentinel can itself be
+        # dropped or coarsened while backlog drains. Replies alone are not proof.
         deadline = time.monotonic() + 20
-        result["sentinel_client"] = {"attempts": 0, "dns_assertions": 0}
+        result["sentinel_client"] = {"attempts": 0, "dns_assertions": 0, "udp_echo_assertions": 0}
         while True:
             attempt = invoke("sentinel")
             result["sentinel_client"]["attempts"] += 1
-            result["sentinel_client"]["dns_assertions"] += attempt["dns_assertions"]
+            for key, value in attempt.items():
+                result["sentinel_client"][key] += value
             if mode == "off" or stream.wait_sentinel(0.25):
                 break
             if time.monotonic() >= deadline:
-                raise RuntimeError("sentinel replies passed but the DNS audit sentinel was not emitted")
+                raise RuntimeError("sentinel replies passed but required DNS/L4 audit sentinels were not emitted")
         stop(binary)
         reader.join(timeout=5)
         if reader.is_alive() or errors:
@@ -609,15 +650,15 @@ def inside(config: dict) -> dict:
     run("mount", "--bind", resolver, Path("/etc/resolv.conf").resolve())
     run("ip", "link", "set", "lo", "up")
     results = []
-    for mode in ("off", "dns"):
+    for mode in ("off", "dns", "conn"):
         results.append(phase(mode, config, Path(config["artifacts"]) / mode))
-    off, dns = results[0], results[1]
+    off, conn = results[0], results[2]
     cpu = lambda result: sum(result["sidecar_process_load"][key]
                              for key in ("user_seconds", "system_seconds"))
     return {"status": "passed", "runs": results,
-            "comparison": {"modes": ["off", "dns"],
+            "comparison": {"modes": ["off", "conn"],
                            "same_requested_quota_and_rates": True,
-                           "sidecar_process_cpu_seconds_delta": cpu(dns) - cpu(off),
+                           "sidecar_process_cpu_seconds_delta": cpu(conn) - cpu(off),
                            "scope": "process CPU / optional cgroup charge; not total host overhead",
                            "note": "single sequential samples, achieved counts reported; not a statistical benchmark"}}
 
@@ -632,7 +673,7 @@ def main() -> int:
     parser.add_argument("--dns-rate", type=float, default=100, help="requested queries/sec, alternating allow/deny")
     parser.add_argument("--cpu-quota", type=float, help="sidecar CPU cores (e.g. 0.5), REQUIRED if requested; never fallback")
     parser.add_argument("--cgroup-parent", default="/sys/fs/cgroup", help="writable delegated cgroup-v2 parent; no controllers enabled here")
-    parser.add_argument("--output-pause", type=float, default=0, help="pause stdout reader seconds during load")
+    parser.add_argument("--output-pause", type=float, default=0, help="pause stdout reader seconds during load; conn must demonstrably block")
     args = parser.parse_args()
     for name in ("duration", "denied_udp_rate", "dns_rate", "output_pause", "cpu_quota"):
         value = getattr(args, name)
