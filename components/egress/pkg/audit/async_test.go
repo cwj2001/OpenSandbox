@@ -71,7 +71,7 @@ func TestAsyncSinkStampsContiguousSequence(t *testing.T) {
 	close(inner.release)
 	sink := NewAsyncSink(inner, 64)
 	for i := 0; i < 50; i++ {
-		require.True(t, sink.TryEmit(Event{Layer: LayerDNS}))
+		require.True(t, sink.TryEmit(Event{Layer: LayerL4}))
 	}
 	sink.Close(time.Now().Add(2 * time.Second))
 	events := inner.snapshot()

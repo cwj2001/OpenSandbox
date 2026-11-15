@@ -179,20 +179,43 @@ sandbox = await Sandbox.create(
 
 ## Outbound audit
 
-Set `OPENSANDBOX_EGRESS_AUDIT=dns` in an operator-owned egress image to record DNS allow/deny outcomes. The default is `off`, retaining synchronous ordinary logging. `conn` is unsupported and warns with audit disabled. Fast Sandbox and the experimental revision runtime also disable audit. Workloads cannot override this operator flag through the creation-request environment allowlist.
+Outbound audit is an operator-controlled, best-effort record of allowed and denied destinations. It does not change policy decisions. `OPENSANDBOX_EGRESS_AUDIT` is not on the per-request environment allowlist, so sandbox workloads cannot disable it through a creation request.
 
-Audit uses unsampled JSON at `info` independently of ordinary log level. Restrict log access and retention: domain metadata is sensitive. Monitor `started`, `heartbeat`, `stopped`, `boot_id` and contiguous `seq`; see [accounting and limits](/architecture/network/egress#outbound-audit). No connection capture is provided.
+| `OPENSANDBOX_EGRESS_AUDIT` | Coverage |
+|---|---|
+| `off` (default) | No audit events or additional nftables rules. |
+| `dns` | DNS decisions, including denied names. |
+| `conn` | DNS decisions and new TCP/UDP connection verdicts under `dns+nft`. Without nftables/NFLOG support it reports DNS-only coverage. |
+
+Set the value in an operator-owned egress image and configure the server's existing `[egress] image` setting to use it:
+
+```dockerfile
+FROM opensandbox/egress:latest
+ENV OPENSANDBOX_EGRESS_AUDIT=conn
+```
+
+Use `mode = "dns+nft"` for connection coverage. Fast Sandbox and the experimental revision runtime do not support audit and keep it disabled. Audit JSON uses a dedicated unsampled logger at `info`; lowering `OPENSANDBOX_EGRESS_LOG_LEVEL` does not silence it. Restrict access and retention in your log pipeline because domain and destination metadata can be sensitive.
+
+Monitor `started` coverage, `degraded`, `gap`, `heartbeat` and final `stopped` events. Contiguous `seq` values alone do not prove complete capture: receive losses cannot reconstruct destinations, and aggregate-key exhaustion can omit destinations. See [event fields, accounting and resource limits](/architecture/network/egress#outbound-audit).
 
 ### Reproduce with synthetic traffic
 
-The checked-in `components/egress/scripts/test_outbound_audit.py` runs the actual separately built binary in private network and mount namespaces with synthetic DNS/TCP/UDP services and no Internet route. This increment runs only `off` and `dns`. It checks DNS allow/deny, unchanged enforcement, emitted accounting, and a written DNS sentinel. Linux, Python 3.9+, iproute2, nftables, iptables, util-linux and namespace privileges are required.
+The [checked-in driver](https://github.com/opensandbox-group/OpenSandbox/blob/main/components/egress/scripts/test_outbound_audit.py) runs the actual binary in fresh private network and mount namespaces, with synthetic DNS/TCP/UDP services and no Internet route. It checks real allowed and denied client outcomes in `off`, `dns` and `conn`, validates emitted stream accounting, and waits for a written sentinel rather than assuming a fixed drain delay.
+
+On Linux, install Go 1.25.9, Python 3.9+, nftables, iptables, iproute2 and util-linux. Root privileges are required for namespaces and netfilter. A quota comparison additionally requires a cgroup-v2 parent whose CPU controller is already enabled; the driver fails rather than enabling shared controllers or silently dropping the requested quota.
 
 ```bash
-(cd components/egress && GOTOOLCHAIN=go1.25.9 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /tmp/egress-dns-audit .)
-sudo python3 components/egress/scripts/test_outbound_audit.py --binary /tmp/egress-dns-audit --artifacts /tmp/dns-audit-new --duration 10 --dns-rate 200 --output-pause 2
+# From the repository root; keep binaries and evidence outside the checkout.
+(cd components/egress && GOTOOLCHAIN=go1.25.9 CGO_ENABLED=0 \
+  go build -trimpath -buildvcs=false -ldflags='-buildid= -B none' \
+  -o /tmp/egress-audit .)
+
+sudo /usr/bin/python3 components/egress/scripts/test_outbound_audit.py \
+  --binary /tmp/egress-audit --artifacts /tmp/audit-synthetic-new \
+  --duration 30 --denied-udp-rate 5000 --dns-rate 20 --cpu-quota 0.25
 ```
 
-Use a fresh artifacts directory. `--output-pause` pauses consumption; it does not itself prove a blocked writer. If specifying `--cpu-quota`, provide an already delegated cgroup-v2 CPU parent; missing quota support fails closed, never changes shared controllers.
+Use a new artifacts directory for each run. Increase `--duration` for a soak. To exercise blocked stdout, add `--output-pause 30` with a duration greater than 30 seconds; the driver requires an observed blocked pipe writer in `conn`, not merely a requested pause. Results include the binary hash, configuration, client outcomes and resource measurements. Cgroup CPU is not total host/netfilter overhead, and reconciled counts are not proof of per-destination completeness or arbitrary-rate lossless capture.
 
 ### Diagnostic output under audit
 

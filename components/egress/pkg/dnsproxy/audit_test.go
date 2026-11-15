@@ -76,7 +76,7 @@ func auditedProxy(t *testing.T) (*Proxy, *auditRecorder) {
 	proxy.refreshEffectivePolicy()
 	sink := &auditRecorder{}
 	output := audit.NewAsyncSink(sink, audit.DefaultQueueSize)
-	sink.collector = audit.NewCollector(output)
+	sink.collector = audit.NewCollector(output, proxy)
 	t.Cleanup(func() { sink.collector.Close(time.Second); _ = output.Close(time.Now().Add(time.Second)) })
 	proxy.SetAudit(sink.collector)
 	return proxy, sink
@@ -150,4 +150,12 @@ func TestAuditOffByDefault(t *testing.T) {
 	proxy, _ := auditedProxy(t)
 	proxy.audit = nil
 	require.NotPanics(t, func() { query(t, proxy, "pypi.org.", dns.TypeA) })
+}
+
+func TestEffectivePolicyCountsOverlay(t *testing.T) {
+	proxy, _ := auditedProxy(t)
+	p, platform := proxy.EffectivePolicy()
+	require.Equal(t, 1, platform)
+	require.Equal(t, "10.96.0.0/12", p.Egress[0].Target)
+	require.Equal(t, "pypi.org", p.Egress[1].Target)
 }

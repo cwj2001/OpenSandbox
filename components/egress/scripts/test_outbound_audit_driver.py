@@ -22,7 +22,7 @@ import threading
 import unittest
 
 from test_outbound_audit import (
-    AuditStream, Cgroup, DNSLatency, echo,
+    ALLOW_IP, DENY_IP, ECHO_PORT, SENTINEL_PORT, AuditStream, Cgroup, DNSLatency, echo,
 )
 
 
@@ -31,26 +31,33 @@ def event(seq: int, kind: str = "stream", **fields: object) -> str:
                        "boot_id": "synthetic-boot", "seq": seq, **fields})
 
 
-def started() -> str:
-    return event(1, reason="started", coverage=["dns"])
+def started(mode: str = "conn") -> str:
+    return event(1, reason="started", coverage=["dns", "l4"] if mode == "conn" else ["dns"])
 
 
 class AuditStreamTests(unittest.TestCase):
-    def test_reconciles_dns_details_and_aggregates(self) -> None:
-        stream = AuditStream("dns")
+    def test_reconciles_details_aggregates_and_explicit_loss(self) -> None:
+        stream = AuditStream("conn")
         for line in [started(), event(2, "dns", domain="sentinel.allow.audit.test",
                                      decision="allow"),
-                     event(3, "dns", count=7),
-                     event(4, reason="stopped", detailed=1, aggregated=7)]:
+                     event(3, "connection", proto="udp", dst_ip=ALLOW_IP,
+                           dst_port=SENTINEL_PORT, decision="allow"),
+                     event(4, "connection", count=7),
+                     event(5, reason="gap", lost_kernel=3, lost_undecodable=2),
+                     event(6, reason="stopped", detailed=2, aggregated=7,
+                           deduplicated=4, lost_kernel=3, lost_undecodable=2)]:
             stream.feed(line)
         result = stream.finish()
-        self.assertEqual(result["records"], 4)
-        self.assertEqual(result["observed_accounted"], 8)
+        self.assertEqual(result["records"], 6)
+        self.assertEqual(result["observed_accounted"], 18)
         self.assertEqual(result["destination_complete"], False)
+        self.assertEqual(result["stats"]["lost_kernel"], 3)
+        self.assertEqual(result["l4_destination_observations"],
+                         {"destination_bearing": 1, "destination_free_aggregated": 7})
 
     def test_sentinel_wait_requires_emitted_allowed_dns_not_client_success(self) -> None:
         stream = AuditStream("dns")
-        stream.feed(started())
+        stream.feed(started("dns"))
         self.assertFalse(stream.wait_sentinel(0.001))
         stream.feed(event(2, "dns", domain="sentinel.allow.audit.test", decision="deny"))
         self.assertFalse(stream.wait_sentinel(0.001))
@@ -73,7 +80,7 @@ class AuditStreamTests(unittest.TestCase):
             stream.finish()
 
     def test_rejects_downstream_sequence_gap(self) -> None:
-        stream = AuditStream("dns")
+        stream = AuditStream("conn")
         stream.feed(started())
         stream.feed(event(3, reason="stopped"))
         with self.assertRaisesRegex(ValueError, "sequence"):
@@ -81,38 +88,42 @@ class AuditStreamTests(unittest.TestCase):
 
     def test_rejects_boot_change(self) -> None:
         stream = AuditStream("dns")
-        stream.feed(started())
+        stream.feed(started("dns"))
         stream.feed(event(2, boot_id="other", reason="stopped"))
         with self.assertRaisesRegex(ValueError, "boot"):
             stream.finish()
 
     def test_requires_stopped_after_sentinel(self) -> None:
         stream = AuditStream("dns")
-        stream.feed(started())
+        stream.feed(started("dns"))
         stream.feed(event(2, "dns", domain="sentinel.allow.audit.test", decision="allow"))
         with self.assertRaisesRegex(ValueError, "stopped"):
             stream.finish()
 
     def test_rejects_unreconciled_aggregate_totals(self) -> None:
         stream = AuditStream("dns")
-        stream.feed(started())
+        stream.feed(started("dns"))
         stream.feed(event(2, "dns", domain="sentinel.allow.audit.test", decision="allow"))
         stream.feed(event(3, reason="stopped", detailed=1, aggregated=1))
         with self.assertRaisesRegex(ValueError, "totals"):
             stream.finish()
 
-    def test_rejects_trailing_records(self) -> None:
-        stream = AuditStream("dns")
-        stream.feed(started())
-        stream.feed(event(2, "dns", domain="sentinel.allow.audit.test", decision="allow"))
-        stream.feed(event(3, reason="stopped", detailed=1))
-        stream.feed(event(4, "dns"))
-        with self.assertRaises(ValueError):
-            stream.finish()
+    def test_rejects_unreported_loss_and_trailing_records(self) -> None:
+        for trailing in (False, True):
+            with self.subTest(trailing=trailing):
+                stream = AuditStream("dns")
+                stream.feed(started("dns"))
+                stream.feed(event(2, "dns", domain="sentinel.allow.audit.test", decision="allow"))
+                stream.feed(event(3, reason="stopped", detailed=1,
+                                  lost_kernel=0 if trailing else 4))
+                if trailing:
+                    stream.feed(event(4, "dns"))
+                with self.assertRaises(ValueError):
+                    stream.finish()
 
-    def test_rejects_incorrect_dns_coverage(self) -> None:
-        stream = AuditStream("dns")
-        stream.feed(event(1, reason="started", coverage=[]))
+    def test_rejects_degraded_conn_coverage(self) -> None:
+        stream = AuditStream("conn")
+        stream.feed(started("dns"))
         with self.assertRaisesRegex(ValueError, "coverage"):
             stream.finish()
 
@@ -121,54 +132,46 @@ class AuditStreamTests(unittest.TestCase):
                      event(2, "dns", count=-1)):
             with self.subTest(line=line):
                 stream = AuditStream("dns")
-                stream.feed(started())
+                stream.feed(started("dns"))
                 stream.feed(line)
                 with self.assertRaises(ValueError):
                     stream.finish()
 
     def test_functional_barrier_requires_each_actual_verdict(self) -> None:
-        stream = AuditStream("dns")
+        stream = AuditStream("conn")
         stream.feed(started())
-        stream.feed(event(2, "dns", domain="functional.allow.audit.test", decision="allow"))
-        self.assertFalse(stream.functional.is_set())
-        stream.feed(event(3, "dns", domain="functional.deny.audit.test", decision="deny"))
+        seq = 1
+        for verdict in ("allow", "deny"):
+            seq += 1
+            stream.feed(event(seq, "dns", domain=f"functional.{verdict}.audit.test",
+                              decision=verdict))
+            for protocol in ("tcp", "udp"):
+                self.assertFalse(stream.functional.is_set())
+                seq += 1
+                stream.feed(event(seq, "connection", proto=protocol, decision=verdict,
+                                  dst_port=ECHO_PORT,
+                                  dst_ip=ALLOW_IP if verdict == "allow" else DENY_IP))
         self.assertTrue(stream.functional.is_set())
 
     def test_rejects_null_coverage_without_crashing_consumer(self) -> None:
-        stream = AuditStream("dns")
+        stream = AuditStream("conn")
         stream.feed(event(1, reason="started", coverage=None))
         with self.assertRaisesRegex(ValueError, "coverage"):
             stream.finish()
 
-    def test_rejects_connection_event_in_dns_stream(self) -> None:
-        stream = AuditStream("dns")
+    def test_conn_sentinel_requires_both_emitted_layers_and_unique_port(self) -> None:
+        stream = AuditStream("conn")
         stream.feed(started())
-        stream.feed(event(2, "connection", decision="allow"))
-        with self.assertRaisesRegex(ValueError, "dns emitted connection event"):
-            stream.finish()
-        self.assertFalse(stream.wait_sentinel(0))
-        self.assertFalse(stream.functional.is_set())
-
-    def test_rejects_unknown_stream_reason(self) -> None:
-        stream = AuditStream("dns")
-        stream.feed(started())
-        stream.feed(event(2, reason="unexpected"))
-        with self.assertRaisesRegex(ValueError, "unknown stream reason"):
-            stream.finish()
-
-    def test_coarsened_first_sentinel_requires_eventual_emitted_domain(self) -> None:
-        stream = AuditStream("dns")
-        stream.feed(started())
-        stream.feed(event(2, "dns", decision="allow", reason="policy", count=1))
-        self.assertFalse(stream.wait_sentinel(0))
-        stream.feed(event(3, "dns", domain="sentinel.allow.audit.test",
-                          decision="allow", reason="policy"))
-        self.assertTrue(stream.wait_sentinel(0))
-        stream.feed(event(4, reason="stopped", detailed=1, aggregated=1))
-        result = stream.finish()
-        self.assertEqual(result["observed_accounted"], 2)
-        self.assertTrue(result["dns_sentinel_emitted"])
-
+        stream.feed(event(2, "dns", domain="sentinel.allow.audit.test", decision="allow"))
+        self.assertFalse(stream.wait_sentinel(0.001))
+        stream.feed(event(3, "connection", proto="udp", dst_ip=ALLOW_IP,
+                          dst_port=ECHO_PORT, decision="allow"))
+        self.assertFalse(stream.wait_sentinel(0.001))
+        stream.feed(event(4, "connection", count=100, decision="allow"))
+        self.assertFalse(stream.wait_sentinel(0.001))
+        stream.feed(event(5, "connection", proto="udp", dst_ip=ALLOW_IP,
+                          dst_port=SENTINEL_PORT, decision="allow"))
+        self.assertTrue(stream.wait_sentinel(0.001))
 
 
 class DNSLatencyTests(unittest.TestCase):

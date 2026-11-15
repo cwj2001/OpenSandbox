@@ -96,7 +96,12 @@ jobs:
             TestNftQuiescenceAfterCommittedStaticError \
             TestNftStartFailurePreservesKernelAndRetry \
             TestNftRealMissingTableFallback \
-            TestNftEstablishedDropKernelRuleOrder
+            TestNftEstablishedDropKernelRuleOrder \
+            TestNftAuditKernelVerdictsAndEvents \
+            TestNftAuditKernelAccountsForEveryConnection \
+            TestNftAuditProbeKernel
+          bash scripts/ci-nft-go-test.sh ./pkg/audit \
+            TestNFLogKernelSequenceGapsCountLoss
           bash scripts/ci-nft-go-test.sh ./pkg/fastsandboxnft \
             TestResolvedIPRenewalExtendsKernelExpiry
           bash scripts/ci-nft-go-test.sh ./pkg/iptables \

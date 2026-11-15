@@ -20,7 +20,7 @@ Egress is how a sandbox gets a network policy instead of open internet access. I
 | Credential Vault | Secrets stay in the sidecar; credentials are injected into matching outbound requests |
 | Transparent TLS interception (L7) | See, control, and authenticate outbound HTTPS — production-usable mechanism, experimental configuration surface |
 | Fail-closed startup | If enforcement cannot be installed, the sidecar exits — it never runs as a no-op |
-| [Outbound audit](#outbound-audit) | Opt-in DNS allow/deny events |
+| [Outbound audit](#outbound-audit) | Opt-in per-DNS-query and per-connection allow/deny events, including literal-IP dials |
 
 ## How interception works
 
@@ -135,19 +135,56 @@ When the platform configures an OTLP endpoint, the sidecar exports per-sandbox m
 
 ## Outbound audit
 
-Outbound audit observes allowed and denied DNS decisions without changing enforcement. It is off by default and operator-controlled. Set `OPENSANDBOX_EGRESS_AUDIT=dns` to enable it; only `off` and `dns` are supported. Fast Sandbox and the experimental revision runtime keep audit disabled and warn. This increment does not collect connection verdicts.
+Outbound audit observes DNS decisions and, under `dns+nft`, new TCP/UDP connection verdicts, including literal-IP dials. It is off by default, operator-controlled, and best effort within bounded resources. See [enabling outbound audit](/guides/network-isolation#outbound-audit) for configuration.
 
-Audit JSON uses `opensandbox.event=egress.audit.dns` and `egress.audit.stream`. The dedicated unsampled `info` logger remains active when the ordinary log level is `warn`. DNS records contain `decision`, `reason` (`policy` or `unknown_source`), `domain`, `dns_query_type`, `dns_response_code` and up to 32 `resolved_ips`. Infrastructure names and the proxy's upstream traffic are excluded; `log_skip.always` never suppresses sandbox audit.
+Like the other egress logs, the stream is JSON on stdout, one `opensandbox.event` name per kind: `egress.audit.dns`, `egress.audit.connection`, and `egress.audit.stream` for events about the stream itself. Egress produces it; shipping, retention and access control belong to your log pipeline. It is written on its own logger at `info`, so lowering `OPENSANDBOX_EGRESS_LOG_LEVEL` never silences it.
 
-`observed_at` is the decision time; the outer log timestamp is the eventual write time. One writer assigns contiguous `seq` values per `boot_id`, and clears reusable typed-field scratch after each event. The writer shares physical destination acquisition, rotation and lifetime with ordinary logging, without sharing their admission budgets.
+The audit sink writes typed fields directly through its long-lived structured logger. Its single writer owns and reuses the field buffer; it does not create a derived logger or retain a second serialized field context for each event. This preserves the flat JSON schema and output ordering without another queue, lock or sampling layer.
+
+```json
+{"ts":"2026-11-12T04:28:20.401Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.stream","reason":"started","boot_id":"9f2c…","seq":1,"observed_at":"2026-11-12T04:28:20.400Z","coverage":["dns","l4"]}
+{"ts":"2026-11-12T04:28:20.466Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.dns","reason":"policy","boot_id":"9f2c…","seq":2,"observed_at":"2026-11-12T04:28:20.465Z","decision":"allow","domain":"pypi.org","dns_query_type":"A","dns_response_code":"NOERROR","resolved_ips":["151.101.0.223"]}
+{"ts":"2026-11-12T04:28:21.132Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.connection","reason":"dns_lease","boot_id":"9f2c…","seq":3,"observed_at":"2026-11-12T04:28:21.131Z","decision":"allow","domain":"pypi.org","proto":"tcp","dst_ip":"151.101.0.223","dst_port":443,"dns_seen":true}
+{"ts":"2026-11-12T04:28:21.140Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.connection","reason":"ip_rule","boot_id":"9f2c…","seq":4,"observed_at":"2026-11-12T04:28:21.139Z","decision":"deny","proto":"tcp","dst_ip":"10.96.0.10","dst_port":5432,"dns_seen":false,"rule":"10.96.0.0/12","rule_source":"platform"}
+{"ts":"2026-11-12T04:28:23.001Z","sandbox_id":"sbx-abc","opensandbox.event":"egress.audit.connection","reason":"default","boot_id":"9f2c…","seq":5,"observed_at":"2026-11-12T04:28:22.010Z","decision":"deny","proto":"udp","dst_ip":"203.0.113.9","dst_port":9999,"dns_seen":false,"count":4210,"window_start":"2026-11-12T04:28:22.010Z","window_end":"2026-11-12T04:28:22.998Z"}
+```
+
+| Field | Meaning |
+|---|---|
+| `opensandbox.event` | `egress.audit.dns`, `egress.audit.connection`, or `egress.audit.stream`. A `dns` allow means the name was allowed to resolve, not that a connection followed. |
+| `decision` | `allow` or `deny` — the verdict already taken by the DNS proxy or the nftables chain. |
+| `reason` | `dns`: `policy` or `unknown_source`. `connection`: the rule family that decided — `dns_lease` (address learned from an allowed DNS answer), `ip_rule` (IP/CIDR rule), `port_rule` (port-scoped rule, including `reachable.ports.cap`), `dot`, `doh`, or `default` (`defaultAction`). `stream`: see [Completeness](#completeness). |
+| `observed_at` | When the sidecar saw the query or connection. `ts` is when the line was written and can trail it under load. |
+| `rule`, `rule_source` | For `ip_rule`/`port_rule`: the matching rule (`10.96.0.0/12`, `ports 25`, `reachable.ports.cap`) and whether it came from the platform overlay (`platform`) or the sandbox policy (`user`). Read from the policy when the event is emitted, so a policy changed in between can leave it empty. |
+| `domain`, `dns_seen` | For connections: the name this address was last answered for by the sidecar's DNS proxy (kept for 30 minutes or the TTL, whichever is longer). `dns_seen: false` marks a literal-IP dial or a name resolved some other way. |
+| `proto`, `dst_ip`, `dst_port` | The connection's destination, named as in execd's eBPF `connect` events so the two can be joined per sandbox: egress says what the policy decided, execd which process dialed. |
+| `dns_query_type`, `dns_response_code`, `resolved_ips` | For DNS events: the query type, the code returned to the client, and up to 32 answered addresses. |
+| `count`, `window_start`, `window_end` | An aggregated event: `count` queries or connections with these fields, first and last seen in the window (see [Completeness](#completeness)). |
+| `boot_id`, `seq` | `seq` counts 1, 2, 3, … per `boot_id` (one per sidecar run) in output order. |
+
+**How connection events are produced.** Each new-connection verdict rule in the chain is preceded by a twin rule with the same match and no verdict, which sends an NFLOG copy of up to the first 128 bytes of conntrack-`new` TCP/UDP packets with the decision and reason in its log prefix. That fixed prefix can include payload bytes after shorter headers; the decoder reads only IP addresses, protocol and ports, and no packet payload is included in audit events. Evaluation always falls through to the original verdict rule, so verdicts and their order are unchanged; infrastructure accepts and the established-connection path are never logged. The sidecar binds the NFLOG group before the first ruleset is installed. Repeated copies of the same five-tuple and verdict/reason are folded into one event for 30 seconds; a changed verdict or reason starts a new observation even within that window.
 
 ### Service isolation
 
-DNS never waits for output. Detailed events are budgeted at 1000 per second with a 2000 burst. A refused or over-budget event becomes an aggregate, retaining its count and first/last observation times. Aggregation holds 1024 domain keys before coarsening to layer, decision and reason. Pending aggregates and lifecycle records are retried. Audit has a 4096-event queue; ordinary logging has independent bounded operation and encoded-byte admission, whole-record refusal, error reporting and bounded Sync.
+Policy enforcement and DNS availability take priority over audit completeness. Audit does not change a verdict or make request handling wait for the log sink. Collection and buffering are bounded: when audit cannot keep up, it must aggregate or declare collection loss rather than apply backpressure to sandbox requests. Within that resource budget, destination-bearing detail is preferred to destination-free totals. This is not a zero-overhead guarantee: NFLOG copies, collection and log output share sidecar CPU and memory, so operators must size and validate audit with their workload and CPU quota. Complete capture at arbitrary traffic rates cannot be guaranteed without risking the service.
 
 ### Completeness
 
-Stream records are `started` with DNS `coverage`, a minute `heartbeat`, and final `stopped`. The latter two carry cumulative `detailed` and `aggregated`; their sum accounts for observed queries. Shutdown allows two seconds for final aggregates and output. Failure to finish leaves `stopped` absent rather than claiming complete delivery. A crash or blocked output can lose queued events; downstream must monitor missing heartbeats/stopped and sequence gaps. Aggregated counts do not imply complete per-domain detail.
+An audit trail with silent holes is not one, so the stream accounts for every query and connection the sidecar observes, and reports every gap in-stream:
+
+- **The writer never drops.** Individual events are budgeted at 1000 per second (burst 2000). Over budget — or when the writer falls behind its 4096-event queue — events are folded into per-second aggregates keyed by event, decision, reason, domain and destination, so volume costs per-attempt detail, never a count. A window holds 1024 keys; beyond that, keys fold into one aggregate per event, decision and reason without a destination. Every event is written: the audit logger does not sample.
+- **The reader is budgeted, and receive losses are reported.** The kernel rules carry no rate limit (a kernel limiter would drop copies silently); instead the sidecar budgets connection processing at 500 copies per second in 100 ms windows, to limit CPU competition with the DNS proxy. Each received datagram is processed as a unit, so a window can exceed its budget by a batch. Bursts wait in the bounded receive buffer; `observed_at` can lag the verdict by seconds while that backlog drains, and is not a kernel verdict timestamp. Under a sustained flood the buffer fills and the kernel drops further copies. NFLOG per-instance sequence numbers count those losses in `lost_kernel` when a subsequent copy arrives — this preserves a loss count, not the destinations, verdicts or per-destination counts of missing copies. A TCP SYN retransmit is a copy of its own, so `lost_kernel` bounds the lost connections from above. Loss after the last delivered copy remains uncounted until another copy arrives; heartbeat and stopped events report that uncertainty in `detail`.
+- **Gaps are events.** `egress.audit.stream` events describe the stream: `started` (with `coverage`, and a `detail` when L4 is unavailable), `degraded` (a layer stopped while running), `gap` (`lost_kernel`/`lost_undecodable` over `window_start`–`window_end`), `heartbeat` (every minute, cumulative `detailed`/`aggregated`/`deduplicated`/`lost_*` totals) and `stopped` (final totals, after the last aggregates are flushed). Per run, `detailed + aggregated + deduplicated + lost_kernel + lost_undecodable` accounts for observed queries and sequence-accounted L4 copies; `deduplicated` counts repeated copies with the same five-tuple and unchanged decision/reason within 30 seconds. A new attempt reusing that tuple and decision/reason can still be folded. An owned envelope with a valid sequence but missing payload counts as undecodable. Truncated envelopes without a trustworthy sequence have no independently exact loss count; a later valid sequence can reveal missing copies.
+- **Shutdown stays bounded.** One 2-second budget covers the flush worker, NFLOG reader and writer. Final totals are published only after the producers stop and every pending lifecycle, aggregate and gap record is accepted for output. A blocked policy lookup cannot hold up shutdown; if a worker cannot finish, a flush fails, or the budget expires, no final `stopped` event is claimed. Unread kernel backlog is declared in the stopped event's `detail`, not drained without limit.
+- **Downstream can detect the rest.** A crash, or a writer slower than the shutdown budget, loses queued events without a record; so does anything lost after stdout. Both show up as a `seq` gap, a missing `stopped` event for a `boot_id`, or heartbeats that stop: alert on those, on `egress.audit.lost_total`, and on `egress.audit.l4.active = 0` where `conn` is expected.
+
+### Limits
+
+- Audit never takes the sidecar down or changes a verdict. Before installing audit rules the sidecar checks, in a hookless scratch table, that the kernel accepts the log statement (`nft_log`); if that check or the NFLOG bind fails (missing module, no `CAP_NET_ADMIN`), it audits DNS only, records why in the `started` event, and reports `egress.audit.l4.active = 0`.
+- Established-flow teardown drops (`dropEstablished`) are not logged.
+- With transparent MITM, the workload's own dial to an intercepted port is redirected to the local listener and accepted as infrastructure, so it is not logged; the connection mitmproxy then opens upstream passes the chain and is logged like any other. With a chained upstream proxy that connection is itself an infrastructure accept, so intercepted flows are not logged at L4.
+- The DNS proxy's own upstream queries and infrastructure names (such as an upstream-proxy hostname) are not sandbox activity and are not logged. `log_skip.always` quiets only the `egress.outbound` line, never audit events.
+- Not supported with the fast-sandbox profile or the experimental revision runtime; there, as with an unknown value, the sidecar logs a warning and runs without audit.
 
 ## Experimental strict Vault v2 writes
 

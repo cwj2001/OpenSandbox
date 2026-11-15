@@ -16,12 +16,83 @@ package audit
 
 import (
 	"context"
+	"net/netip"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/alibaba/opensandbox/egress/pkg/policy"
 	"github.com/stretchr/testify/require"
 )
+
+type gatedPolicyView struct {
+	entered chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (v *gatedPolicyView) EffectivePolicy() (*policy.NetworkPolicy, int) {
+	v.once.Do(func() { close(v.entered) })
+	<-v.release
+	return &policy.NetworkPolicy{}, 0
+}
+
+func TestCloseBudgetIncludesBlockedFlushAndFinalAttribution(t *testing.T) {
+	for _, duringTick := range []bool{true, false} {
+		name := "final_attribution"
+		if duringTick {
+			name = "flush_join"
+		}
+		t.Run(name, func(t *testing.T) {
+			view := &gatedPolicyView{entered: make(chan struct{}), release: make(chan struct{})}
+			inner := &blockingSink{release: make(chan struct{})}
+			close(inner.release)
+			output := NewAsyncSink(inner, DefaultQueueSize)
+			defer output.Close(time.Now().Add(2 * time.Second))
+			c := NewCollector(output, view)
+			// Stage one aggregate without reading the policy on a producer.
+			c.agg.add(Event{Layer: LayerL4, Decision: DecisionAllow, Reason: ReasonIPRule,
+				DestinationIP: netip.MustParseAddr("198.51.100.7"), ObservedAt: time.Now()})
+			if duringTick {
+				select {
+				case <-view.entered:
+				case <-time.After(2 * time.Second):
+					t.Fatal("flush never reached policy attribution")
+				}
+			}
+			returned := make(chan struct{})
+			go func() { c.Close(30 * time.Millisecond); close(returned) }()
+			if !duringTick {
+				select {
+				case <-view.entered:
+				case <-time.After(time.Second):
+					t.Fatal("final flush never reached policy attribution")
+				}
+			}
+			bounded := true
+			select {
+			case <-returned:
+			case <-time.After(300 * time.Millisecond):
+				bounded = false
+			}
+			// Release only after measuring Close; then join everything before inspecting output.
+			close(view.release)
+			select {
+			case <-returned:
+			case <-time.After(time.Second):
+				t.Fatal("Close failed to finish after policy release")
+			}
+			select {
+			case <-c.done:
+			case <-time.After(time.Second):
+				t.Fatal("flush worker failed to finish")
+			}
+			c.sink.Close(time.Now().Add(time.Second))
+			require.True(t, bounded, "blocked policy work exceeded the shared Close budget")
+			require.Nil(t, lastOf(inner.snapshot(), ReasonStopped), "unfinished/expired shutdown must not claim stopped")
+		})
+	}
+}
 
 type selectiveRecorder struct {
 	mu     sync.Mutex
@@ -46,17 +117,19 @@ func (r *selectiveRecorder) snapshot() []Event {
 }
 
 func TestCloseRefusedFinalOutputNeverClaimsStopped(t *testing.T) {
-	for _, kind := range []string{"aggregate", "lifecycle"} {
+	for _, kind := range []string{"aggregate", "lifecycle", "gap"} {
 		t.Run(kind, func(t *testing.T) {
 			out := &selectiveRecorder{refuse: func(e Event) bool {
-				return kind == "aggregate" && e.Count > 0 || kind == "lifecycle" && e.Reason == ReasonStarted
+				return kind == "aggregate" && e.Count > 0 || kind == "lifecycle" && e.Reason == ReasonStarted || kind == "gap" && e.Reason == ReasonGap
 			}}
-			c := newCollector(out, time.Now)
+			c := newCollector(out, nil, time.Now)
 			switch kind {
 			case "aggregate":
 				c.agg.add(Event{Layer: LayerDNS, Decision: DecisionAllow, Reason: ReasonPolicy, ObservedAt: time.Now()})
 			case "lifecycle":
-				c.Started()
+				c.Started([]string{LayerDNS}, "")
+			case "gap":
+				c.observeSeq(1)
 			}
 			finishTestCollector(c, time.Second)
 			require.Nil(t, lastOf(out.snapshot(), ReasonStopped), "refused final output must leave shutdown incomplete")
@@ -186,8 +259,8 @@ func TestAsyncSinkClosedRejectsFurtherAdmission(t *testing.T) {
 func TestCollectorCloseWithActuallyFullOutputLeavesStoppedAbsent(t *testing.T) {
 	inner := &blockingSink{release: make(chan struct{})}
 	output := NewAsyncSink(inner, 1)
-	c := NewCollector(output)
-	c.Started()
+	c := NewCollector(output, nil)
+	c.Started([]string{LayerDNS}, "")
 	// Saturation is independent of whether the writer has dequeued started.
 	for i := 0; i < 4; i++ {
 		c.RecordDNS(DNSRecord{Domain: "queued.example", Decision: DecisionAllow, Reason: ReasonPolicy})

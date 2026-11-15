@@ -17,19 +17,25 @@ package audit
 import (
 	"context"
 	"net/netip"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/alibaba/opensandbox/egress/pkg/policy"
 	"github.com/alibaba/opensandbox/egress/pkg/telemetry"
 	"github.com/alibaba/opensandbox/internal/safego"
 )
 
-const maxEventAnswerIPs = 32
-
 const (
+	// flowDedupWindow folds TCP SYN retransmits and the repeated packets of a
+	// denied UDP flow (each is conntrack-new, so each is logged) into one event.
+	flowDedupWindow = 30 * time.Second
+	maxTrackedFlows = 16384
+
 	// Individual events are budgeted; over budget, events are aggregated
-	// rather than dropped, so every query is still counted.
+	// rather than dropped, so every query and connection is still counted.
 	detailedPerSecond = 1000
 	detailedBurst     = 2000
 
@@ -37,22 +43,59 @@ const (
 	heartbeatInterval = time.Minute
 )
 
+// PolicyView exposes the effective sidecar policy for rule attribution.
+type PolicyView interface {
+	// EffectivePolicy returns the merged policy and how many of its leading
+	// rules come from the platform overlay (always-deny, then always-allow).
+	EffectivePolicy() (*policy.NetworkPolicy, int)
+}
+
 type emitter interface {
 	TryEmit(Event) bool
 }
 
+// Collector turns DNS decisions and NFLOG verdict copies into audit events.
+//
+// Accounting invariant: every query and L4 copy it observes ends up in
+// exactly one of Stats.Detailed, Aggregated, Deduplicated or
+// LostUndecodable, and every L4 copy the kernel failed to deliver in
+// Stats.LostKernel; losses are reported in-stream by gap events. Only a crash, or a writer slower than the shutdown deadline, loses
+// events without a record — downstream sees that as a Seq gap or a missing
+// stopped event for the BootID.
 type Collector struct {
-	out    emitter
-	sink   *AsyncSink
-	now    func() time.Time
-	budget tokenBucket
-	agg    *aggregator
+	out     emitter
+	sink    *AsyncSink
+	policy  PolicyView
+	domains *domainCache
+	now     func() time.Time
+	budget  tokenBucket
+	agg     *aggregator
 
-	detailed   atomic.Uint64
-	aggregated atomic.Uint64
+	detailed        atomic.Uint64
+	aggregated      atomic.Uint64
+	deduplicated    atomic.Uint64
+	lostKernel      atomic.Uint64
+	lostUndecodable atomic.Uint64
+	// overrunPending is set by a receive-buffer overrun and cleared by the
+	// next delivered copy, whose sequence number counts the loss.
+	overrunPending atomic.Bool
+	l4Backlog      atomic.Bool
+	l4Active       atomic.Bool
+
+	// Set by StartL4 before producers start; Close joins the reader before
+	// publishing final totals. Neither startup nor Close may run concurrently.
+	l4Cancel context.CancelFunc
+	l4Done   <-chan struct{}
+
+	// NFLOG reader goroutine only. Each tuple retains only its latest verdict.
+	flows   map[flow]flowObservation
+	nextSeq uint32
+
 	// Guarded by mu: the flush goroutine, lifecycle calls and Close.
 	mu            sync.Mutex
 	pending       []Event
+	reported      Stats
+	reportedAt    time.Time
 	lastHeartbeat time.Time
 
 	stop      chan context.Context
@@ -60,23 +103,32 @@ type Collector struct {
 	closeOnce sync.Once
 }
 
+type flowObservation struct {
+	until  time.Time
+	prefix string
+}
+
 // NewCollector claims the audit lane and starts its flush loop. Close drains
 // only that lane; ordinary diagnostics retain their independent lifetime.
-func NewCollector(sink *AsyncSink) *Collector {
-	c := newCollector(sink, time.Now)
+func NewCollector(sink *AsyncSink, view PolicyView) *Collector {
+	c := newCollector(sink, view, time.Now)
 	c.sink = sink
 	c.done = make(chan struct{})
 	safego.Go(c.run)
 	return c
 }
 
-func newCollector(out emitter, now func() time.Time) *Collector {
+func newCollector(out emitter, view PolicyView, now func() time.Time) *Collector {
 	start := now()
 	return &Collector{
 		out:           out,
+		policy:        view,
+		domains:       newDomainCache(now),
 		now:           now,
 		budget:        tokenBucket{rate: detailedPerSecond, burst: detailedBurst},
 		agg:           newAggregator(),
+		flows:         make(map[flow]flowObservation),
+		reportedAt:    start,
 		lastHeartbeat: start,
 		stop:          make(chan context.Context, 1),
 	}
@@ -97,22 +149,22 @@ func (c *Collector) run() {
 	}
 }
 
-// tick writes aggregates and sends the heartbeat. Events
+// tick writes aggregates, reports new losses and sends the heartbeat. Events
 // the queue refuses stay pending (aggregates are merged back) for the next
 // tick.
 func (c *Collector) tick() {
 	now := c.now()
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.flushLocked(c.out.TryEmit)
+	c.flushLocked(now, c.out.TryEmit)
 	if now.Sub(c.lastHeartbeat) >= heartbeatInterval {
-		if c.out.TryEmit(Event{Layer: LayerAudit, Reason: ReasonHeartbeat, ObservedAt: now, Stats: c.snapshot()}) {
+		if c.out.TryEmit(Event{Layer: LayerAudit, Reason: ReasonHeartbeat, ObservedAt: now, Stats: c.snapshot(), Detail: c.uncountedLoss()}) {
 			c.lastHeartbeat = now
 		}
 	}
 }
 
-func (c *Collector) flushLocked(emit func(Event) bool) bool {
+func (c *Collector) flushLocked(now time.Time, emit func(Event) bool) bool {
 	accepted := true
 	kept := c.pending[:0]
 	for _, e := range c.pending {
@@ -125,18 +177,40 @@ func (c *Collector) flushLocked(emit func(Event) bool) bool {
 
 	for k, v := range c.agg.drain() {
 		e := k.event(v)
+		c.attributeRule(&e)
 		if !emit(e) {
 			accepted = false
 			c.agg.merge(k, *v)
 		}
 	}
 
+	cur := c.snapshot()
+	delta := Stats{
+		LostKernel:      cur.LostKernel - c.reported.LostKernel,
+		LostUndecodable: cur.LostUndecodable - c.reported.LostUndecodable,
+	}
+	if delta.LostKernel == 0 && delta.LostUndecodable == 0 {
+		c.reportedAt = now
+		return accepted
+	}
+	gap := Event{Layer: LayerAudit, Reason: ReasonGap, ObservedAt: now, WindowStart: c.reportedAt, WindowEnd: now, Stats: &delta}
+	if emit(gap) {
+		c.reported, c.reportedAt = *cur, now
+	} else {
+		accepted = false
+	}
 	return accepted
 }
 
-// Started records DNS coverage.
-func (c *Collector) Started() {
-	c.lifecycle(Event{Layer: LayerAudit, Reason: ReasonStarted, ObservedAt: c.now(), Coverage: []string{LayerDNS}})
+// Started records the audit coverage; detail explains a layer that is
+// missing.
+func (c *Collector) Started(coverage []string, detail string) {
+	c.lifecycle(Event{Layer: LayerAudit, Reason: ReasonStarted, ObservedAt: c.now(), Coverage: coverage, Detail: detail})
+}
+
+// Degraded records that a layer stopped while running.
+func (c *Collector) Degraded(coverage []string, detail string) {
+	c.lifecycle(Event{Layer: LayerAudit, Reason: ReasonDegraded, ObservedAt: c.now(), Coverage: coverage, Detail: detail})
 }
 
 func (c *Collector) lifecycle(e Event) {
@@ -147,14 +221,17 @@ func (c *Collector) lifecycle(e Event) {
 	}
 }
 
-// Close writes pending aggregates and a stopped event
-// with the final Stats. One deadline covers producers and
+// Close writes pending aggregates, the last gap report and a stopped event
+// with the final Stats. One deadline covers producers, policy attribution and
 // the writer. An unfinished worker or refused output leaves stopped absent.
 func (c *Collector) Close(timeout time.Duration) {
 	c.closeOnce.Do(func() {
 		deadline := time.Now().Add(timeout)
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
+		if c.l4Cancel != nil {
+			c.l4Cancel()
+		}
 		c.stop <- ctx
 		select {
 		case <-c.done:
@@ -164,7 +241,17 @@ func (c *Collector) Close(timeout time.Duration) {
 	})
 }
 
+// finish runs on the flush worker, never the caller of Close. PolicyView has
+// no cancellation contract: a blocked lookup can outlive Close, but cannot
+// publish stopped after the deadline.
 func (c *Collector) finish(ctx context.Context, output func(Event) bool) {
+	if c.l4Done != nil {
+		select {
+		case <-c.l4Done:
+		case <-ctx.Done():
+			return
+		}
+	}
 	emit := func(e Event) bool {
 		if !beforeDeadline(ctx) {
 			return false
@@ -177,8 +264,8 @@ func (c *Collector) finish(ctx context.Context, output func(Event) bool) {
 		return
 	}
 	now := c.now()
-	if c.flushLocked(emit) {
-		emit(Event{Layer: LayerAudit, Reason: ReasonStopped, ObservedAt: now, Stats: c.snapshot()})
+	if c.flushLocked(now, emit) {
+		emit(Event{Layer: LayerAudit, Reason: ReasonStopped, ObservedAt: now, Stats: c.snapshot(), Detail: c.uncountedLoss()})
 	}
 }
 
@@ -189,8 +276,11 @@ func (c *Collector) Stats() Stats {
 
 func (c *Collector) snapshot() *Stats {
 	return &Stats{
-		Detailed:   c.detailed.Load(),
-		Aggregated: c.aggregated.Load(),
+		Detailed:        c.detailed.Load(),
+		Aggregated:      c.aggregated.Load(),
+		Deduplicated:    c.deduplicated.Load(),
+		LostKernel:      c.lostKernel.Load(),
+		LostUndecodable: c.lostUndecodable.Load(),
 	}
 }
 
@@ -206,6 +296,7 @@ func (c *Collector) emit(e Event, answers []netip.Addr) {
 				e.ResolvedIPs[i] = addr.String()
 			}
 		}
+		c.attributeRule(&e)
 		if c.out.TryEmit(e) {
 			c.detailed.Add(1)
 			return
@@ -223,11 +314,18 @@ type DNSRecord struct {
 	Reason       string
 	QueryType    string
 	ResponseCode string
-	// Answers are the A/AAAA addresses returned to the client.
+	// Answers are the A/AAAA addresses returned to the client; TTL is their
+	// smallest TTL.
 	Answers []netip.Addr
+	TTL     time.Duration
 }
 
+// RecordDNS emits the DNS event and, while L4 collection is active, remembers
+// the answered addresses for attribution of the connections that follow.
 func (c *Collector) RecordDNS(r DNSRecord) {
+	if r.Decision == DecisionAllow && c.l4Active.Load() {
+		c.domains.observe(r.Domain, r.Answers, r.TTL)
+	}
 	e := Event{
 		Layer:        LayerDNS,
 		Decision:     r.Decision,
@@ -238,6 +336,146 @@ func (c *Collector) RecordDNS(r DNSRecord) {
 		ResponseCode: r.ResponseCode,
 	}
 	c.emit(e, r.Answers)
+}
+
+// uncountedLoss explains an overrun no later copy has counted yet: the
+// kernel numbers copies, but loss after the last delivered one only shows
+// once the next one arrives.
+func (c *Collector) uncountedLoss() string {
+	if c.l4Backlog.Load() {
+		return "nflog stopped with unread copies: final totals exclude the remaining receive backlog and any trailing loss"
+	}
+	if c.overrunPending.Load() {
+		return "nflog overrun after the last delivered copy: lost_kernel excludes it until the next connection"
+	}
+	return ""
+}
+
+func (c *Collector) markOverrun() {
+	c.overrunPending.Store(true)
+}
+
+// observeSeq accounts for copies the kernel numbered but could not deliver
+// (receive-buffer overruns). Sequence numbers start at 0 per NFLOG instance
+// and increase by one per copy, so any jump is an exact loss count.
+func (c *Collector) observeSeq(seq uint32) {
+	// Unsigned wraparound keeps the arithmetic right across 2^32; a "gap"
+	// in the upper half would be a reordering, which netlink does not do.
+	if gap := seq - c.nextSeq; gap != 0 && gap < 1<<31 {
+		c.lostKernel.Add(uint64(gap))
+		telemetry.RecordAuditLost(telemetry.AuditLostKernel, int64(gap))
+	}
+	c.nextSeq = seq + 1
+	c.overrunPending.Store(false)
+}
+
+// handleNFLog processes one packet copied by an audit rule. Packets that do
+// not carry an audit prefix belong to some other NFLOG user and are ignored.
+func (c *Collector) handleNFLog(prefix string, payload []byte) {
+	decision, reason, ok := parseNFLogPrefix(prefix)
+	if !ok {
+		return
+	}
+	f, ok := decodeFlow(payload)
+	if !ok {
+		c.lostUndecodable.Add(1)
+		telemetry.RecordAuditLost(telemetry.AuditLostUndecodable, 1)
+		return
+	}
+	now := c.now()
+	if c.duplicate(f, prefix, now) {
+		c.deduplicated.Add(1)
+		return
+	}
+	e := Event{
+		Layer:           LayerL4,
+		Decision:        decision,
+		Reason:          reason,
+		ObservedAt:      now,
+		Protocol:        f.protocol(),
+		DestinationIP:   f.dst,
+		DestinationPort: f.dport,
+	}
+	e.Domain, e.DNSSeen = c.domains.lookup(f.dst)
+	c.emit(e, nil)
+}
+
+func (c *Collector) duplicate(f flow, prefix string, now time.Time) bool {
+	if previous, ok := c.flows[f]; ok {
+		if previous.prefix == prefix && now.Before(previous.until) {
+			return true
+		}
+		// A changed decision or reason replaces the tuple's last observation.
+		c.flows[f] = flowObservation{until: now.Add(flowDedupWindow), prefix: prefix}
+		return false
+	}
+	if len(c.flows) >= maxTrackedFlows {
+		for k, previous := range c.flows {
+			if !now.Before(previous.until) {
+				delete(c.flows, k)
+			}
+		}
+		// Still full: forgetting every window only risks a repeated event.
+		if len(c.flows) >= maxTrackedFlows {
+			clear(c.flows)
+		}
+	}
+	c.flows[f] = flowObservation{until: now.Add(flowDedupWindow), prefix: prefix}
+	return false
+}
+
+// attributeRule names the policy rule behind an ip_rule or port_rule verdict.
+// It reads the policy at event time, so a policy changed between the verdict
+// and this lookup can leave the rule empty or name the newer rule.
+func (c *Collector) attributeRule(e *Event) {
+	if c.policy == nil || e.Layer != LayerL4 || !e.DestinationIP.IsValid() {
+		return
+	}
+	if e.Reason != ReasonIPRule && (e.Reason != ReasonPortRule || e.Protocol != "tcp") {
+		return
+	}
+	p, platformRules := c.policy.EffectivePolicy()
+	action := policy.ActionAllow
+	if e.Decision == DecisionDeny {
+		action = policy.ActionDeny
+	}
+	var idx int
+	var ok bool
+	switch e.Reason {
+	case ReasonIPRule:
+		idx, ok = p.MatchIPRule(action, e.DestinationIP)
+	case ReasonPortRule:
+		if e.Protocol == "tcp" {
+			idx, ok = p.MatchPortRule(action, e.DestinationIP, int(e.DestinationPort))
+		}
+	}
+	if !ok {
+		return
+	}
+	e.Rule = describeRule(p.Egress[idx])
+	e.RuleSource = "user"
+	if idx < platformRules {
+		e.RuleSource = "platform"
+	}
+}
+
+func describeRule(r policy.EgressRule) string {
+	// PortRanges is set only by the platform reachable-ports floor, whose
+	// complement would be an unreadable port list.
+	if len(r.PortRanges) > 0 {
+		return "reachable.ports.cap"
+	}
+	if len(r.Ports) == 0 {
+		return r.Target
+	}
+	ports := make([]string, len(r.Ports))
+	for i, p := range r.Ports {
+		ports[i] = strconv.Itoa(p)
+	}
+	if r.Target == "" {
+		return "ports " + strings.Join(ports, ",")
+	}
+	return r.Target + " ports " + strings.Join(ports, ",")
 }
 
 // tokenBucket budgets individual events. Callers pass event times, which can

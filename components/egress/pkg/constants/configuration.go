@@ -134,7 +134,8 @@ const (
 	EnvEgressMetricsExtraAttrs   = "OPENSANDBOX_EGRESS_METRICS_EXTRA_ATTRS"
 	EnvNameserverExempt          = "OPENSANDBOX_EGRESS_NAMESERVER_EXEMPT"
 	EnvCredentialVaultRequireTLS = "OPENSANDBOX_EGRESS_CREDENTIAL_VAULT_REQUIRE_TLS"
-	// EnvEgressAudit selects outbound DNS audit events: off (default) or dns.
+	// EnvEgressAudit selects outbound audit events: off (default), dns, or
+	// conn (dns plus one event per new TCP/UDP connection; dns+nft only).
 	EnvEgressAudit = "OPENSANDBOX_EGRESS_AUDIT"
 
 	// MITM: mitmdump transparent; Linux + CAP_NET_ADMIN, runs as a dedicated user.

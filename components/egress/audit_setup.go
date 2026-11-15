@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -22,12 +23,14 @@ import (
 	"github.com/alibaba/opensandbox/egress/pkg/constants"
 	"github.com/alibaba/opensandbox/egress/pkg/dnsproxy"
 	"github.com/alibaba/opensandbox/egress/pkg/log"
+	"github.com/alibaba/opensandbox/egress/pkg/nftables"
 	"github.com/alibaba/opensandbox/egress/pkg/telemetry"
 	slogger "github.com/alibaba/opensandbox/internal/logger"
 	"go.uber.org/zap"
 )
 
 const (
+	auditProbeTimeout = 5 * time.Second
 	// auditFlushTimeout bounds how long shutdown waits for queued events.
 	auditFlushTimeout = 2 * time.Second
 )
@@ -51,16 +54,47 @@ func resolveAuditLevel(profile, raw string, revisionRuntime bool) (audit.Level, 
 	return level, ""
 }
 
-// startAudit records DNS decisions without changing enforcement.
-func startAudit(level audit.Level, proxy *dnsproxy.Proxy, sink *audit.AsyncSink) func() {
+// startAudit wires the audit collector into the DNS proxy and, at conn level
+// under dns+nft, binds the NFLOG listener before any nft rule exists. It
+// returns the NFLOG group for the nft audit rules (0 when L4 audit is not
+// running) and a stop function that flushes the stream. Every L4 failure
+// degrades to DNS-only audit, recorded in the stream's started event; none
+// changes enforcement or startup.
+func startAudit(ctx context.Context, level audit.Level, mode string, proxy *dnsproxy.Proxy, sink *audit.AsyncSink) (uint16, func()) {
 	if level == audit.LevelOff {
-		return func() {}
+		return 0, func() {}
 	}
-	collector := audit.NewCollector(sink)
+	collector := audit.NewCollector(sink, proxy)
 	proxy.SetAudit(collector)
-	collector.Started()
-	log.Infof("egress audit enabled (level=dns)")
-	return func() { collector.Close(auditFlushTimeout) }
+	stop := func() { collector.Close(auditFlushTimeout) }
+	dnsOnly := func(detail string) (uint16, func()) {
+		collector.Started([]string{audit.LayerDNS}, detail)
+		return 0, stop
+	}
+	if level != audit.LevelConn {
+		log.Infof("egress audit enabled (level=dns)")
+		return dnsOnly("")
+	}
+	if !constants.ModeUsesNft(mode) {
+		log.Warnf("egress audit: %s=conn needs dns+nft enforcement (mode=%s); auditing DNS only", constants.EnvEgressAudit, mode)
+		return dnsOnly("l4 unavailable: enforcement mode " + mode + " has no nftables")
+	}
+	probeCtx, cancelProbe := context.WithTimeout(ctx, auditProbeTimeout)
+	err := nftables.ProbeAuditLog(probeCtx, audit.NFLogGroup)
+	cancelProbe()
+	if err != nil {
+		log.Warnf("egress audit: L4 collection unavailable, auditing DNS only (enforcement unaffected): %v", err)
+		return dnsOnly("l4 unavailable: " + err.Error())
+	}
+	// The reader outlives the signal context: DNS and nft keep enforcing
+	// through the shutdown drain, so their audit must keep running too.
+	if err := collector.StartL4(context.WithoutCancel(ctx)); err != nil {
+		log.Warnf("egress audit: L4 collection unavailable, auditing DNS only (enforcement unaffected): %v", err)
+		return dnsOnly("l4 unavailable: " + err.Error())
+	}
+	collector.Started([]string{audit.LayerDNS, audit.LayerL4}, "")
+	log.Infof("egress audit enabled (level=conn, NFLOG group %d)", audit.NFLogGroup)
+	return audit.NFLogGroup, stop
 }
 
 // newLogSink keeps typed audit encoding and physical acquisition separate from

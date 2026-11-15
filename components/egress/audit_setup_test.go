@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -41,10 +42,10 @@ func TestResolveAuditLevel(t *testing.T) {
 	}{
 		{name: "unset", want: audit.LevelOff},
 		{name: "dns", audit: "dns", want: audit.LevelDNS},
-		{name: "conn", audit: "conn", profile: constants.ProfileSidecar, want: audit.LevelOff},
+		{name: "conn", audit: "conn", profile: constants.ProfileSidecar, want: audit.LevelConn},
 		// Audit never fails startup: bad or unsupported settings turn it off.
 		{name: "unknown level", audit: "l7", want: audit.LevelOff},
-		{name: "fast-sandbox", audit: "dns", profile: constants.ProfileFastSandbox, want: audit.LevelOff},
+		{name: "fast-sandbox", audit: "conn", profile: constants.ProfileFastSandbox, want: audit.LevelOff},
 		{name: "revision runtime", audit: "dns", revision: "true", want: audit.LevelOff},
 	}
 	for _, tc := range cases {
@@ -62,6 +63,30 @@ func newAuditTestProxy(t *testing.T) *dnsproxy.Proxy {
 	proxy, err := dnsproxy.New(policy.DefaultDenyPolicy(), "", nil, nil)
 	require.NoError(t, err)
 	return proxy
+}
+
+func startAuditGroup(t *testing.T, level audit.Level, mode string) uint16 {
+	t.Helper()
+	_, pair, err := newOutputLogger(slogger.Config{OutputPaths: []string{filepath.Join(t.TempDir(), "audit.log")}})
+	require.NoError(t, err)
+	defer pair.Close(time.Now().Add(100 * time.Millisecond))
+	group, stop := startAudit(context.Background(), level, mode, newAuditTestProxy(t), pair)
+	stop()
+	return group
+}
+
+func TestStartAuditGroups(t *testing.T) {
+	require.Zero(t, startAuditGroup(t, audit.LevelOff, "dns+nft"))
+	require.Zero(t, startAuditGroup(t, audit.LevelDNS, "dns+nft"), "dns level installs no nft log rules")
+	require.Zero(t, startAuditGroup(t, audit.LevelConn, "dns"), "conn degrades to DNS without nft")
+}
+
+func TestStartAuditDegradesWithoutNFLog(t *testing.T) {
+	if runtime.GOOS == "linux" && os.Geteuid() == 0 {
+		t.Skip("root can bind NFLOG; the degrade path needs an unprivileged run")
+	}
+	require.Zero(t, startAuditGroup(t, audit.LevelConn, "dns+nft"),
+		"an unprivileged probe or NFLOG bind fails, and no log rules are installed")
 }
 
 // Exercise the two real consumers, not two artificial writes to one sink.
@@ -150,30 +175,6 @@ func TestPairedAuditRemainsInfoUnsampledAndMetadataBearing(t *testing.T) {
 	require.Equal(t, 250, strings.Count(string(data), `"sandbox_id":"audit-sandbox"`))
 	require.Equal(t, 250, strings.Count(string(data), `"logger":"opensandbox.egress.audit"`))
 	require.NotContains(t, string(data), "ordinary-filtered")
-}
-
-func TestStartAuditDNSLifecycle(t *testing.T) {
-	for _, level := range []audit.Level{audit.LevelOff, audit.LevelDNS} {
-		t.Run(level.String(), func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "audit.log")
-			_, output, err := newOutputLogger(slogger.Config{OutputPaths: []string{path}})
-			require.NoError(t, err)
-			stop := startAudit(level, newAuditTestProxy(t), output)
-			stop()
-			require.NoError(t, output.Close(time.Now().Add(time.Second)))
-			data, err := os.ReadFile(path)
-			require.NoError(t, err)
-			if level == audit.LevelOff {
-				require.Empty(t, data)
-				return
-			}
-			require.Contains(t, string(data), `"reason":"started"`)
-			require.Contains(t, string(data), `"coverage":["dns"]`)
-			require.Contains(t, string(data), `"reason":"stopped"`)
-			require.Contains(t, string(data), `"detailed":0,"aggregated":0`)
-			require.NotContains(t, string(data), "deduplicated")
-		})
-	}
 }
 
 func TestNormalizedEmptyLogOutputsPreserveLegacyFallback(t *testing.T) {

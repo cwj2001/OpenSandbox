@@ -15,7 +15,7 @@
 package audit
 
 import (
-	"fmt"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -49,12 +49,13 @@ func lastOf(events []Event, reason string) *Event {
 
 // Over the detailed budget, connections are aggregated, never dropped: the
 // stream accounts for every one of them.
-func TestOverBudgetDNSAreAggregatedNotLost(t *testing.T) {
-	c, sink, clock := newTestCollector(t)
-	dsts := []string{"a.example", "b.example", "c.example"}
+func TestOverBudgetConnectionsAreAggregatedNotLost(t *testing.T) {
+	c, sink, clock := newTestCollector(t, platformView(t))
+	dsts := []string{"203.0.113.5", "203.0.113.6", "198.51.100.7"}
 	const total = 5000
 	for i := 0; i < total; i++ {
-		c.RecordDNS(DNSRecord{Domain: dsts[i%len(dsts)], Decision: DecisionAllow, Reason: ReasonPolicy})
+		c.handleNFLog(NFLogPrefix(DecisionAllow, ReasonIPRule),
+			ipv4Packet(protoTCP, "192.0.2.2", dsts[i%len(dsts)], uint16(1024+i), 443))
 	}
 	stats := c.snapshot()
 	require.Equal(t, uint64(detailedBurst), stats.Detailed)
@@ -71,13 +72,17 @@ func TestOverBudgetDNSAreAggregatedNotLost(t *testing.T) {
 	require.Len(t, aggregates, len(dsts), "one aggregate per destination")
 	for _, e := range aggregates {
 		require.False(t, e.WindowStart.IsZero())
-
+		if netip.MustParsePrefix("203.0.113.0/24").Contains(e.DestinationIP) {
+			require.Equal(t, "203.0.113.0/24", e.Rule, "aggregates are attributed too")
+		} else {
+			require.Empty(t, e.Rule)
+		}
 	}
-	require.Equal(t, uint64(total), counted(sink.events, LayerDNS))
+	require.Equal(t, uint64(total), counted(sink.events, LayerL4))
 }
 
 func TestBudgetRefills(t *testing.T) {
-	c, sink, clock := newTestCollector(t)
+	c, sink, clock := newTestCollector(t, nil)
 	for i := 0; i < detailedBurst+10; i++ {
 		c.RecordDNS(DNSRecord{Domain: "a.example", Decision: DecisionDeny, Reason: ReasonPolicy})
 	}
@@ -92,11 +97,11 @@ func TestBudgetRefills(t *testing.T) {
 // A full queue folds events into aggregates, and aggregates the queue cannot
 // take yet wait for the next flush.
 func TestRefusedEventsWaitForRoom(t *testing.T) {
-	c, sink, clock := newTestCollector(t)
+	c, sink, clock := newTestCollector(t, nil)
 	sink.refuse = true
 	c.RecordDNS(DNSRecord{Domain: "a.example", Decision: DecisionAllow, Reason: ReasonPolicy})
 	c.RecordDNS(DNSRecord{Domain: "a.example", Decision: DecisionAllow, Reason: ReasonPolicy})
-	c.Started()
+	c.Started([]string{LayerDNS}, "")
 	clock.t = clock.t.Add(flushInterval)
 	c.tick()
 	require.Empty(t, sink.events)
@@ -109,29 +114,79 @@ func TestRefusedEventsWaitForRoom(t *testing.T) {
 }
 
 func TestAggregateOverflowKeepsCounts(t *testing.T) {
-	c, sink, clock := newTestCollector(t)
+	c, sink, clock := newTestCollector(t, nil)
 	sink.refuse = true
 	const total = maxAggregateKeys + 500
 	for i := 0; i < total; i++ {
-		c.RecordDNS(DNSRecord{Domain: fmt.Sprintf("host%d.example", i), Decision: DecisionDeny, Reason: ReasonPolicy})
+		c.handleNFLog(NFLogPrefix(DecisionDeny, ReasonDefault),
+			ipv4Packet(protoUDP, "192.0.2.2", netip.AddrFrom4([4]byte{198, 18, byte(i >> 8), byte(i)}).String(), 5000, 53))
 	}
 	sink.refuse = false
 	clock.t = clock.t.Add(flushInterval)
 	c.tick()
-	require.Equal(t, uint64(total), counted(sink.events, LayerDNS))
+	require.Equal(t, uint64(total), counted(sink.events, LayerL4))
 	var coarse *Event
 	for i := range sink.events {
-		if sink.events[i].Domain == "" {
+		if !sink.events[i].DestinationIP.IsValid() {
 			coarse = &sink.events[i]
 		}
 	}
 	require.NotNil(t, coarse, "keys past the window bound fold into one coarse aggregate")
 	require.Equal(t, uint64(500), coarse.Count)
-	require.NotContains(t, logSinkRecord(t, *coarse), "domain")
+	require.NotContains(t, logSinkRecord(t, *coarse), "dst_ip")
+}
+
+func TestSequenceGapsAreExactAndReportedOnce(t *testing.T) {
+	c, sink, clock := newTestCollector(t, nil)
+	start := clock.t
+	for _, seq := range []uint32{0, 1, 5, 6} { // 2, 3, 4 lost
+		c.observeSeq(seq)
+	}
+	c.handleNFLog(NFLogPrefix(DecisionDeny, ReasonDefault), []byte{0x45})
+	clock.t = clock.t.Add(flushInterval)
+	c.tick()
+	gap := lastOf(sink.events, ReasonGap)
+	require.NotNil(t, gap)
+	require.Equal(t, Stats{LostKernel: 3, LostUndecodable: 1}, *gap.Stats)
+	require.Equal(t, start, gap.WindowStart)
+	require.Equal(t, clock.t, gap.WindowEnd)
+
+	clock.t = clock.t.Add(flushInterval)
+	c.tick()
+	require.Same(t, gap, lastOf(sink.events, ReasonGap), "no new loss, no new gap event")
+}
+
+func TestSequenceGapAcrossWraparound(t *testing.T) {
+	c, _, _ := newTestCollector(t, nil)
+	c.nextSeq = 0xfffffffe
+	c.observeSeq(0xfffffffe)
+	c.observeSeq(0)
+	require.Equal(t, uint64(1), c.snapshot().LostKernel, "0xffffffff was lost")
+}
+
+func TestFirstCopiesLostBeforeTheFirstReadAreCounted(t *testing.T) {
+	c, _, _ := newTestCollector(t, nil)
+	c.observeSeq(4)
+	require.Equal(t, uint64(4), c.snapshot().LostKernel)
+}
+
+func TestGapReportRetriedUntilWritten(t *testing.T) {
+	c, sink, clock := newTestCollector(t, nil)
+	c.observeSeq(2)
+	sink.refuse = true
+	clock.t = clock.t.Add(flushInterval)
+	c.tick()
+	sink.refuse = false
+	c.observeSeq(5)
+	clock.t = clock.t.Add(flushInterval)
+	c.tick()
+	gap := lastOf(sink.events, ReasonGap)
+	require.NotNil(t, gap)
+	require.Equal(t, uint64(4), gap.Stats.LostKernel, "the refused report is folded into the next")
 }
 
 func TestHeartbeatCarriesCumulativeStats(t *testing.T) {
-	c, sink, clock := newTestCollector(t)
+	c, sink, clock := newTestCollector(t, nil)
 	c.RecordDNS(DNSRecord{Domain: "a.example", Decision: DecisionAllow, Reason: ReasonPolicy})
 	clock.t = clock.t.Add(heartbeatInterval - time.Second)
 	c.tick()
@@ -144,16 +199,36 @@ func TestHeartbeatCarriesCumulativeStats(t *testing.T) {
 }
 
 func TestCloseFlushesAndReportsFinalStats(t *testing.T) {
-	c, sink, _ := newTestCollector(t)
+	c, sink, _ := newTestCollector(t, nil)
 	for i := 0; i < detailedBurst+7; i++ {
 		c.RecordDNS(DNSRecord{Domain: "a.example", Decision: DecisionAllow, Reason: ReasonPolicy})
 	}
+	c.observeSeq(3)
 	finishTestCollector(c, time.Second)
 	finishTestCollector(c, time.Second) // idempotent
 
 	stopped := lastOf(sink.events, ReasonStopped)
 	require.NotNil(t, stopped)
-	require.Equal(t, Stats{Detailed: detailedBurst, Aggregated: 7}, *stopped.Stats)
+	require.Equal(t, Stats{Detailed: detailedBurst, Aggregated: 7, LostKernel: 3}, *stopped.Stats)
 	require.Equal(t, uint64(detailedBurst+7), counted(sink.events, LayerDNS), "aggregates are flushed before stopped")
+	require.NotNil(t, lastOf(sink.events, ReasonGap))
 	require.Equal(t, ReasonStopped, sink.events[len(sink.events)-1].Reason, "stopped is the last event")
+}
+
+func TestOverrunWithoutLaterCopyIsDeclared(t *testing.T) {
+	c, sink, _ := newTestCollector(t, nil)
+	c.observeSeq(0)
+	c.markOverrun()
+	finishTestCollector(c, time.Second)
+	stopped := lastOf(sink.events, ReasonStopped)
+	require.NotNil(t, stopped)
+	require.Contains(t, stopped.Detail, "overrun after the last delivered copy")
+
+	c2, sink2, _ := newTestCollector(t, nil)
+	c2.markOverrun()
+	c2.observeSeq(3) // the next copy counts the loss
+	finishTestCollector(c2, time.Second)
+	stopped = lastOf(sink2.events, ReasonStopped)
+	require.Empty(t, stopped.Detail)
+	require.Equal(t, uint64(3), stopped.Stats.LostKernel)
 }
