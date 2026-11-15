@@ -1,0 +1,78 @@
+components/egress/audit_logger_linux_test.go
+  h_80542e13e8372a 1-288
+components/egress/audit_setup.go
+  h_80542e13e8372a 1-87
+components/egress/audit_setup_test.go
+  h_80542e13e8372a 1-225
+components/egress/main.go
+  h_80542e13e8372a 32,54-71,150-157,277-288
+components/egress/pkg/audit/aggregate.go
+  h_80542e13e8372a 1-92
+components/egress/pkg/audit/async.go
+  h_80542e13e8372a 1-369
+components/egress/pkg/audit/async_test.go
+  h_80542e13e8372a 1-97
+components/egress/pkg/audit/audit.go
+  h_80542e13e8372a 1-202
+components/egress/pkg/audit/audit_test.go
+  h_80542e13e8372a 1-89
+components/egress/pkg/audit/collector.go
+  h_80542e13e8372a 1-267
+components/egress/pkg/audit/collector_bench_test.go
+  h_80542e13e8372a 1-46
+components/egress/pkg/audit/collector_test.go
+  h_80542e13e8372a 1-70
+components/egress/pkg/audit/isolation_test.go
+  h_80542e13e8372a 1-40
+components/egress/pkg/audit/log_sink_bench_test.go
+  h_80542e13e8372a 1-49
+components/egress/pkg/audit/log_sink_test.go
+  h_80542e13e8372a 1-120
+components/egress/pkg/audit/ordinary_test.go
+  h_80542e13e8372a 1-654
+components/egress/pkg/audit/shutdown_regression_test.go
+  h_80542e13e8372a 1-204
+components/egress/pkg/audit/stream_test.go
+  h_80542e13e8372a 1-159
+components/egress/pkg/constants/configuration.go
+  h_80542e13e8372a 137-138
+components/egress/pkg/dnsproxy/audit.go
+  h_80542e13e8372a 1-77
+components/egress/pkg/dnsproxy/audit_test.go
+  h_80542e13e8372a 1-153
+components/egress/pkg/dnsproxy/log_isolation_linux_test.go
+  h_80542e13e8372a 1-85
+components/egress/pkg/dnsproxy/proxy.go
+  h_80542e13e8372a 31,70-71,314,594-595,601-619
+components/egress/pkg/dnsproxy/resolved_ip_test.go
+  h_80542e13e8372a 1-50
+components/egress/pkg/telemetry/metrics.go
+  h_80542e13e8372a 47,237-249,409-415
+components/egress/scripts/test_outbound_audit.py
+  h_80542e13e8372a 1-712
+components/egress/scripts/test_outbound_audit_driver.py
+  h_80542e13e8372a 1-230
+components/internal/logger/audit.go
+  h_80542e13e8372a 1-201
+components/internal/logger/zap.go
+  h_80542e13e8372a 120,141-154,179,183-187
+components/internal/logger/zap_test.go
+  h_80542e13e8372a 1-105
+docs/architecture/network/egress.md
+  h_80542e13e8372a 23,136-151
+docs/guides/network-isolation.md
+  h_80542e13e8372a 180-208
+docs/guides/telemetry.md
+  h_80542e13e8372a 231,328
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2790fcb35efb808ff0bd02d0583aa7fe704588cd",
+  "prompts": {},
+  "humans": {
+    "h_80542e13e8372a": {
+      "author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
