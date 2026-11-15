@@ -28,6 +28,7 @@ import (
 
 	"github.com/miekg/dns"
 
+	"github.com/alibaba/opensandbox/egress/pkg/audit"
 	"github.com/alibaba/opensandbox/egress/pkg/constants"
 	"github.com/alibaba/opensandbox/egress/pkg/events"
 	"github.com/alibaba/opensandbox/egress/pkg/log"
@@ -66,6 +67,8 @@ type Proxy struct {
 	infraDomains map[string]func(domain string, ips []nftables.ResolvedIP)
 	// Optional: async fan-out for denied lookups (e.g. webhook).
 	blockedBroadcaster *events.Broadcaster
+	// Optional: per-query audit events (OPENSANDBOX_EGRESS_AUDIT).
+	audit *audit.Collector
 
 	// queryPolicySelector, when set, resolves the per-query policy (and
 	// per-query resolved-IP callback) from the client's source address. This
@@ -308,6 +311,7 @@ func (p *Proxy) forwardAndReply(w dns.ResponseWriter, r *dns.Msg, domain, host s
 // back to a REDIRECTed flow); until the error was reported, such windows were
 // indistinguishable from "query never handled" (issue #1704).
 func (p *Proxy) writeReply(w dns.ResponseWriter, r *dns.Msg, resp *dns.Msg, stage string) {
+	p.recordAudit(r, resp, stage)
 	if err := w.WriteMsg(resp); err != nil {
 		telemetry.RecordDNSReplyFailed(stage)
 		qname := "."
@@ -587,28 +591,30 @@ func extractResolvedIPs(resp *dns.Msg) []nftables.ResolvedIP {
 
 	var out []nftables.ResolvedIP
 	for _, rr := range resp.Answer {
-		switch v := rr.(type) {
-		case *dns.A:
-			if v.A == nil {
-				continue
-			}
-			addr, err := netip.ParseAddr(v.A.String())
-			if err != nil {
-				continue
-			}
-			out = append(out, nftables.ResolvedIP{Addr: addr, TTL: time.Duration(v.Hdr.Ttl) * time.Second})
-		case *dns.AAAA:
-			if v.AAAA == nil {
-				continue
-			}
-			addr, err := netip.ParseAddr(v.AAAA.String())
-			if err != nil {
-				continue
-			}
-			out = append(out, nftables.ResolvedIP{Addr: addr, TTL: time.Duration(v.Hdr.Ttl) * time.Second})
+		if ip, ok := resolvedIP(rr); ok {
+			out = append(out, ip)
 		}
 	}
 	return out
+}
+
+// resolvedIP avoids converting DNS addresses to text and parsing them back on
+// the reply path. Unmap preserves net.IP.String's handling of mapped IPv4.
+func resolvedIP(rr dns.RR) (nftables.ResolvedIP, bool) {
+	var raw net.IP
+	switch v := rr.(type) {
+	case *dns.A:
+		raw = v.A
+	case *dns.AAAA:
+		raw = v.AAAA
+	default:
+		return nftables.ResolvedIP{}, false
+	}
+	addr, ok := netip.AddrFromSlice(raw)
+	if !ok {
+		return nftables.ResolvedIP{}, false
+	}
+	return nftables.ResolvedIP{Addr: addr.Unmap(), TTL: time.Duration(rr.Header().Ttl) * time.Second}, true
 }
 
 const fallbackUpstream = "8.8.8.8:53"

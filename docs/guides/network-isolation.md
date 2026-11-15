@@ -177,6 +177,35 @@ sandbox = await Sandbox.create(
 | Cluster CIDR exposure | Not exposed to users | Must be exposed to users |
 | Use case | Platform-wide default isolation, recommended | Whitelist mode, fine-grained control |
 
+## Outbound audit
+
+Set `OPENSANDBOX_EGRESS_AUDIT=dns` in an operator-owned egress image to record DNS allow/deny outcomes. The default is `off`, retaining synchronous ordinary logging. `conn` is unsupported and warns with audit disabled. Fast Sandbox and the experimental revision runtime also disable audit. Workloads cannot override this operator flag through the creation-request environment allowlist.
+
+Audit uses unsampled JSON at `info` independently of ordinary log level. Restrict log access and retention: domain metadata is sensitive. Monitor `started`, `heartbeat`, `stopped`, `boot_id` and contiguous `seq`; see [accounting and limits](/architecture/network/egress#outbound-audit). No connection capture is provided.
+
+### Reproduce with synthetic traffic
+
+The checked-in `components/egress/scripts/test_outbound_audit.py` runs the actual separately built binary in private network and mount namespaces with synthetic DNS/TCP/UDP services and no Internet route. This increment runs only `off` and `dns`. It checks DNS allow/deny, unchanged enforcement, emitted accounting, and a written DNS sentinel. Linux, Python 3.9+, iproute2, nftables, iptables, util-linux and namespace privileges are required.
+
+```bash
+(cd components/egress && GOTOOLCHAIN=go1.25.9 CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /tmp/egress-dns-audit .)
+sudo python3 components/egress/scripts/test_outbound_audit.py --binary /tmp/egress-dns-audit --artifacts /tmp/dns-audit-new --duration 10 --dns-rate 200 --output-pause 2
+```
+
+Use a fresh artifacts directory. `--output-pause` pauses consumption; it does not itself prove a blocked writer. If specifying `--cpu-quota`, provide an already delegated cgroup-v2 CPU parent; missing quota support fails closed, never changes shared controllers.
+
+### Diagnostic output under audit
+
+When supported audit is enabled, ordinary sidecar diagnostic logs also use nonblocking output: they share stdout with audit, so leaving them synchronous could block a DNS denial before its reply when audit fills the pipe. Audit-off and unsupported profiles keep their existing logging behavior.
+
+Ordinary diagnostics have a separate queue bounded to 256 operations and 1 MiB of encoded bytes, plus at most one 1 MiB in-flight record. Over-budget or oversized JSON records are dropped whole, not truncated. After output recovers, an unsampled `warn` record with `logger: "opensandbox.logger"` and `msg: "ordinary_log_gap"` reports `dropped` since the last report and cumulative `dropped_total`. A crash or permanently stalled output can prevent that recovery report. Ordinary diagnostic losses are not audit losses and do not enter the audit stream's `lost_*` counters.
+
+Ordinary-log `Sync` waits at most 100 ms for the records accepted before that call; later audit traffic does not extend its target. The collector's 2-second audit shutdown ends and drains audit admission while diagnostics may continue through telemetry shutdown. Final output `Close` ends both lanes with one 100 ms wait budget. Neither producer performs destination I/O.
+
+One output worker services both independently bounded lanes and owns one physical destination per configured path, including file rotation state. Ordinary records do not consume audit capacity or advance audit sequence numbers. Named regular files rotate; pipes and kernel-openable descriptor aliases without a resolvable filename remain nonrotating streams. Physical destinations close only after the worker actually drains both lanes and exits, not when a caller's wait times out.
+
+Background diagnostic write failures produce `logger: "opensandbox.logger"`, `msg: "ordinary_log_output_error"` and an `error` string from the writer to the configured error destination, without recursively reporting a failure of that error destination. If both destinations fail or the process exits before recovery, a final diagnostic cannot be guaranteed.
+
 ## Runtime Compatibility
 
 Both Approach 1 (`deny.always` via egress sidecar) and Approach 2 (per-sandbox `network_policy`) depend on the egress sidecar, which uses an iptables `nat` table REDIRECT rule for DNS interception. This works with `runc` (default) and all Kata Containers variants (`kata-qemu`, `kata-clh`, `kata-fc`), but **not with gVisor** — gVisor's netstack does not implement the `nat` table.

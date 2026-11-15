@@ -29,6 +29,7 @@ import (
 	_ "github.com/alibaba/opensandbox/internal/safego"
 	_ "go.uber.org/automaxprocs/maxprocs"
 
+	"github.com/alibaba/opensandbox/egress/pkg/audit"
 	"github.com/alibaba/opensandbox/egress/pkg/constants"
 	"github.com/alibaba/opensandbox/egress/pkg/dnsproxy"
 	"github.com/alibaba/opensandbox/egress/pkg/events"
@@ -50,14 +51,29 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	ctx = withLogger(ctx)
-	defer log.Logger.Sync()
+	profile := strings.TrimSpace(os.Getenv(constants.EnvEgressProfile))
+	auditLevel, auditWarning := resolveAuditLevel(profile, os.Getenv(constants.EnvEgressAudit),
+		constants.IsTruthy(os.Getenv(constants.EnvExperimentalRevisionRuntime)))
+	base, pair, err := newSidecarLoggers(auditLevel)
+	if err != nil {
+		panic(err) // Match the default logger's fail-fast output validation.
+	}
+	ctx = installLogger(ctx, base)
+	closeLogger := log.Logger.Sync
+	var auditSink *audit.AsyncSink
+	if pair != nil {
+		auditSink = pair
+		closeLogger = func() error { return pair.Close(time.Now().Add(100 * time.Millisecond)) }
+	}
+	defer func() { _ = closeLogger() }()
+	if auditWarning != "" {
+		log.Warnf("%s", auditWarning)
+	}
 
 	// Validate the chained upstream proxy env before profile dispatch: a
 	// configured proxy without transparent mitmproxy (and, outside
 	// fast-sandbox, without dns+nft enforcement) fails startup instead of
 	// being silently ignored.
-	profile := strings.TrimSpace(os.Getenv(constants.EnvEgressProfile))
 	if err := validateRevisionRuntimeStartup(profile); err != nil {
 		log.Fatalf("invalid live revision runtime configuration: %v", err)
 	}
@@ -131,16 +147,20 @@ func main() {
 	mode := parseMode()
 	log.Infof("enforcement mode: %s", mode)
 
+	proxy, err := dnsproxy.New(initialRules, "", alwaysDeny, alwaysAllow)
+	if err != nil {
+		log.Fatalf("failed to init dns proxy: %v", err)
+	}
+	// DNS audit observes proxy decisions without changing enforcement.
+	stopAudit := startAudit(auditLevel, proxy, auditSink)
+	defer stopAudit()
+
 	// upstreamSpec was already validated at startup; it scopes the infra nft
 	// exception and lets DNS exempt the proxy hostname from sandbox policy
 	// without feeding the allow sets.
 	nftMgr, err := createNftManager(mode, upstreamSpec)
 	if err != nil {
 		log.Fatalf("nftables options: %v", err)
-	}
-	proxy, err := dnsproxy.New(initialRules, "", alwaysDeny, alwaysAllow)
-	if err != nil {
-		log.Fatalf("failed to init dns proxy: %v", err)
 	}
 	if upstreamSpec != nil {
 		if _, err := netip.ParseAddr(upstreamSpec.Host); err != nil {
@@ -254,10 +274,18 @@ func validateRevisionRuntimeStartup(profile string) error {
 	return nil
 }
 
-func withLogger(ctx context.Context) context.Context {
-	level := envOrDefault(constants.EnvEgressLogLevel, "info")
-	cfg := slogger.Config{Level: level}
-	base := slogger.MustNew(cfg)
+// Off and unsupported audit modes keep the legacy synchronous logger, without
+// starting a queue. Supported audit gets one locally owned output actor.
+func newSidecarLoggers(level audit.Level) (slogger.Logger, *audit.AsyncSink, error) {
+	cfg := slogger.Config{Level: envOrDefault(constants.EnvEgressLogLevel, "info")}
+	if level == audit.LevelOff {
+		base, err := slogger.New(cfg)
+		return base, nil, err
+	}
+	return newOutputLogger(cfg)
+}
+
+func installLogger(ctx context.Context, base slogger.Logger) context.Context {
 	// Baseline log fields (e.g. sandbox_id, OPENSANDBOX_EGRESS_METRICS_EXTRA_ATTRS) for every line.
 	if extra := telemetry.EgressLogFields(); len(extra) > 0 {
 		base = base.With(extra...)
