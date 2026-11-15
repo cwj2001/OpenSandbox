@@ -1,0 +1,96 @@
+.github/workflows/egress-test.yml
+  h_80542e13e8372a 99-104
+components/egress/audit_logger_linux_test.go
+  h_80542e13e8372a 68-69
+components/egress/audit_setup.go
+  h_80542e13e8372a 18,26,33,57-63,65,67,69-97
+components/egress/audit_setup_test.go
+  h_80542e13e8372a 24,45,48,68-91
+components/egress/main.go
+  h_80542e13e8372a 154-156,162
+components/egress/nft.go
+  h_80542e13e8372a 36-37,45
+components/egress/pkg/audit/aggregate.go
+  h_80542e13e8372a 18,29-32,52-53,94-95
+components/egress/pkg/audit/async_test.go
+  h_80542e13e8372a 74
+components/egress/pkg/audit/audit.go
+  h_80542e13e8372a 15-19,24,38-39,42,49-50,52,60-61,69,71,84-91,94-95,100-139,145,148-149,152-164,170,179-181,190,192,196-205,209-210,218-220,228-229,265-278,300-302,307-309
+components/egress/pkg/audit/audit_test.go
+  h_80542e13e8372a 21,31,36,40-54,102-138,141
+components/egress/pkg/audit/collector.go
+  h_80542e13e8372a 20-21,26,32-36,38,46-52,57-64,66-93,97-98,106-110,113-114,121,125-126,130-131,152,159,161,167,180,187-201,205-213,224-225,232-234,244-246,248-254,267-268,279-283,299,317-318,320,323-324,326-328,341-480
+components/egress/pkg/audit/collector_bench_test.go
+  h_80542e13e8372a 30,33-37,39-40,42
+components/egress/pkg/audit/collector_test.go
+  h_80542e13e8372a 23,41-47,52,56-57,61-202,204,209,211-259
+components/egress/pkg/audit/domains.go
+  h_80542e13e8372a 1-93
+components/egress/pkg/audit/isolation_test.go
+  h_80542e13e8372a 18,21,23,27-37,46-48,56-115
+components/egress/pkg/audit/log_sink_bench_test.go
+  h_80542e13e8372a 19,38-43
+components/egress/pkg/audit/log_sink_test.go
+  h_80542e13e8372a 20,38-45,49,51-54,57,61-65,68-75,87-88,90-96,98-99,103,125,128,141
+components/egress/pkg/audit/nflog_hotpath_linux_test.go
+  h_80542e13e8372a 1-94
+components/egress/pkg/audit/nflog_linux.go
+  h_80542e13e8372a 1-330
+components/egress/pkg/audit/nflog_linux_test.go
+  h_80542e13e8372a 1-253
+components/egress/pkg/audit/nflog_other.go
+  h_80542e13e8372a 1-27
+components/egress/pkg/audit/ordinary_test.go
+  h_80542e13e8372a 554-555
+components/egress/pkg/audit/packet.go
+  h_80542e13e8372a 1-114
+components/egress/pkg/audit/packet_test.go
+  h_80542e13e8372a 1-118
+components/egress/pkg/audit/shutdown_regression_test.go
+  h_80542e13e8372a 19,24,28-96,120,123,125,130-132,262-263
+components/egress/pkg/audit/stream_test.go
+  h_80542e13e8372a 18,52-54,57-58,75-79,81,85,100,104,117,121-122,127,130,136-185,189,202,206,212,214,217-234
+components/egress/pkg/constants/configuration.go
+  h_80542e13e8372a 137-138
+components/egress/pkg/dnsproxy/audit.go
+  h_80542e13e8372a 24,33-40,75-77,90-91
+components/egress/pkg/dnsproxy/audit_test.go
+  h_80542e13e8372a 79,154-161
+components/egress/pkg/nftables/audit.go
+  h_80542e13e8372a 1-83
+components/egress/pkg/nftables/audit_linux_test.go
+  h_80542e13e8372a 1-358
+components/egress/pkg/nftables/audit_test.go
+  h_80542e13e8372a 1-176
+components/egress/pkg/nftables/manager.go
+  h_80542e13e8372a 29,74-77,439-440,442-443,448,451,454,461-468,470-473,561,572,579
+components/egress/pkg/policy/evaluate_ip.go
+  h_80542e13e8372a 64-121
+components/egress/pkg/policy/evaluate_ip_test.go
+  h_80542e13e8372a 44-102
+components/egress/pkg/telemetry/metrics.go
+  h_80542e13e8372a 47,51,74-81,247-254,257,263-275,439-447,455-458
+components/egress/revision_nft_options_test.go
+  h_80542e13e8372a 36,53
+components/egress/scripts/test_outbound_audit.py
+  h_80542e13e8372a 30,60,62,81,84-85,125,129,132-136,139,145-149,151-159,161-168,170-171,177,193-194,198-201,292-293,491,553,559,569-572,595-600,602,606-607,611,653,655,659,661,676
+components/egress/scripts/test_outbound_audit_driver.py
+  h_80542e13e8372a 25,34-35,39-40,43-48,51-52,54-56,60,83,91,98,105,111-122,124-126,135,141,143-153,157,162-163,165-174
+docs/architecture/network/egress.md
+  h_80542e13e8372a 23,138,140,142-165,169,173-187
+docs/guides/network-isolation.md
+  h_80542e13e8372a 182,184-199,203-205,208-215,218
+docs/guides/telemetry.md
+  h_80542e13e8372a 231-233,330
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9344aed11402e8ea8f107a2debbf4696e4fbe7e9",
+  "prompts": {},
+  "humans": {
+    "h_80542e13e8372a": {
+      "author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
