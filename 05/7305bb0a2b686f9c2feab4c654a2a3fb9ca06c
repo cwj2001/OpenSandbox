@@ -1,0 +1,36 @@
+components/egress/pkg/fastsandboxnft/fastsandboxnft_linux_test.go
+  s_f4e5dfc1915caf::t_f5386a011719ec 20,23-24,28-29,33,37,103-261
+  s_697abf75fcf4af::t_3e30e13a05023c 262
+docs/architecture/fast-sandbox/networking.md
+  s_f4e5dfc1915caf::t_fb6d44c4af0dc7 126
+components/egress/pkg/fastsandboxnft/fastsandboxnft.go
+  s_697abf75fcf4af::t_3ee88786423bc8 646-647,653,664,675
+components/egress/pkg/fastsandboxnft/fastsandboxnft_test.go
+  s_697abf75fcf4af::t_d9c084943417eb 820,891-892
+components/egress/pkg/fastsandboxnft/upstream.go
+  s_697abf75fcf4af::t_5fa8285aa50f3f 100-101,104,106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "057305bb0a2b686f9c2feab4c654a2a3fb9ca06c",
+  "prompts": {},
+  "sessions": {
+    "s_697abf75fcf4af": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e376-b48e-7363-b925-560cafac44b5",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_f4e5dfc1915caf": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e3ea-dbb7-7129-b19a-397335c1e911",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
