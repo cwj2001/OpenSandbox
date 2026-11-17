@@ -285,7 +285,6 @@ func TestPolicyRelayInvalidPortRulesKeepLastGood(t *testing.T) {
 		`{"action":"deny","ports":[0]}`,
 		`{"action":"deny","ports":[65536]}`,
 		`{"action":"deny","ports":[25,25]}`,
-		`{"action":"allow","target":"example.com","ports":[443]}`,
 		`{"action":"deny","target":"","ports":[]}`,
 		`{"action":"deny","ports":["25"]}`,
 	}
@@ -607,4 +606,20 @@ func TestPolicyRelayRebindResetsRecord(t *testing.T) {
 	// The old incarnation cannot write into the successor.
 	rec = doPolicy(t, srv, http.MethodPut, policyTestUID, policyPutDoc(policyAllow(), 1, false, true), testFenceR)
 	require.Equal(t, http.StatusPreconditionFailed, rec.Code)
+}
+
+func TestPolicyRelayDomainPortsSupportedWithDNSOnlyClassicMode(t *testing.T) {
+	t.Setenv(constants.EnvEgressMode, constants.PolicyDnsOnly)
+	t.Setenv(constants.EnvUpstreamProxy, "")
+	h := newPolicyPersistHarness(t)
+	good := `{"defaultAction":"deny","egress":[{"action":"allow","target":"api.example.com","ports":[443]}]}`
+	subj := setBindingAndReady(t, h.srv, h.reg, policyTestUID, vaultTestIP, strPtr(good))
+	require.True(t, h.reg.UserPolicy(subj).HasDomainPorts())
+	replacement := `{"defaultAction":"deny","egress":[{"action":"allow","target":"other.example.com","ports":[8443]}]}`
+	rec := doPolicy(t, h.srv, http.MethodPut, policyTestUID, policyPutDoc(replacement, 1, false, true), "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	pf, body := decodePolicyFile(t, h.fileFor(policyTestUID))
+	require.Equal(t, int64(2), pf.Revision)
+	assertPolicyPortBody(t, body, replacement)
+	require.Equal(t, []int{8443}, h.reg.UserPolicy(subj).DomainPermissions("other.example.com").AllowPorts)
 }

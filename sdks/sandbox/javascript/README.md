@@ -461,7 +461,7 @@ const sandbox = await Sandbox.create({
 });
 ```
 
-TCP `ports` (1–65535, at most 256 per rule, no duplicates) may replace `target` or combine with IP/CIDR targets. Classic `dns+nft` also supports domain/wildcard targets with DNS-learned endpoint leases; Fast Sandbox domain-plus-port support is a separate delivery and is explicitly rejected here. Targetless allows do not independently admit DNS under default deny. See [port-scoped rules](../../../docs/architecture/network/egress.md#port-scoped-rules) for profile, proxy and shared-IP limits.
+TCP `ports` (1–65535, at most 256 per rule, no duplicates) may replace `target` or combine with IP, CIDR, domain or wildcard targets in classic `dns+nft` and Fast Sandbox. Domain scopes use DNS-learned endpoint leases and require supporting server/images; classic DNS-only and chained upstream deployments reject them. Targetless allows do not independently admit DNS under default deny. See [port-scoped rules](../../../docs/architecture/network/egress.md#port-scoped-rules) for profile, proxy and shared-IP limits.
 
 ```ts
 const sandbox = await Sandbox.create({

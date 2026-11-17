@@ -446,7 +446,7 @@ func (s *fastSandboxPolicyServer) parseBindingPolicy(env *actionhandler.Envelope
 	if err != nil {
 		return nil, fmt.Errorf("invalid binding input policy: %v", err)
 	}
-	if err := validateFastSandboxDomainPortPolicy(pol); err != nil {
+	if err := validateDomainPortPolicy(pol, constants.PolicyDnsNft, s.nft != nil); err != nil {
 		return nil, err
 	}
 	return pol, nil

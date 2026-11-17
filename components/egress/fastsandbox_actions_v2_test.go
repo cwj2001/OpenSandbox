@@ -329,15 +329,20 @@ func TestActionsV2OwnerPersistenceAndRetirementFailuresRemainClosed(t *testing.T
 }
 
 func TestActionsV2DomainPortsRejectBeforeOwnerPersistence(t *testing.T) {
-	for _, target := range []string{"api.example.com", "*.example.com"} {
-		t.Run(target, func(t *testing.T) {
+	for _, profile := range []string{"chained", "missing_nft"} {
+		t.Run(profile, func(t *testing.T) {
+			t.Setenv(constants.EnvUpstreamProxy, "")
 			srv, reg, nft := fastSandboxTestServer(t)
 			srv.SetActionsAPIVersion(actionhandler.APIVersionV2)
+			if profile == "chained" {
+				t.Setenv(constants.EnvUpstreamProxy, "http://proxy.example:3128")
+			} else {
+				srv.nft = nil
+			}
 			owner := actionsV2Owner("a", "runtime-a", "attachment-a", 1)
-			input := fmt.Sprintf(`{"egress":[{"action":"allow","target":%q,"ports":[443]}]}`, target)
+			input := `{"defaultAction":"deny","egress":[{"action":"allow","target":"api.example.com","ports":[443]}]}`
 			rec := doActionsV2(t, srv, actionsV2Body(t, actionhandler.OperationSetBinding, owner, &input))
 			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-			require.Contains(t, rec.Body.String(), "not yet supported by Fast Sandbox")
 			subj := subject.FromSandboxUID("a")
 			record, err := srv.readOwnerRecord(subj)
 			require.NoError(t, err)

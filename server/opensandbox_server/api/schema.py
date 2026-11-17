@@ -200,8 +200,8 @@ class NetworkRule(BaseModel):
         description=(
             "Restricts this rule to specific TCP destination ports (1-65535). Omitted target with "
             "ports set applies to all destinations; domain targets scope DNS-derived IPs to these "
-            "TCP ports, not UDP or strict hostname identity. Requires classic dns+nft without "
-            "an upstream proxy; Fast Sandbox temporarily rejects domain+ports. Max 256 ports per rule."
+            "TCP ports, not UDP or strict hostname identity. Requires classic dns+nft or Fast "
+            "Sandbox shared-Fastlet nft enforcement, without an upstream proxy. Max 256 ports per rule."
         ),
     )
 

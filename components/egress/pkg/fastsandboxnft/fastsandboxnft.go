@@ -55,6 +55,7 @@ package fastsandboxnft
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 	"os/exec"
@@ -163,8 +164,9 @@ type Options struct {
 // it is the source for table rebuilds (subject removal) and the idempotency
 // guard for deny-first installs.
 type installedSubject struct {
-	att actionhandler.NetworkAttachment
-	pol *policy.NetworkPolicy // nil while denying
+	att        actionhandler.NetworkAttachment
+	pol        *policy.NetworkPolicy // nil while denying
+	generation uint64
 }
 
 // Applier applies per-subject rules to table TableName. All methods are safe
@@ -175,15 +177,23 @@ type Applier struct {
 	opts       Options
 	tableReady bool
 	subjects   map[subject.Subject]installedSubject
+	generation uint64 // never reset: even identical attachments are new incarnations
 
 	// Per-subject dynamic-lease mirror used by the connection refresh loop
 	// (refresh.go): which IPs each subject's dyn sets currently authorize and
-	// when they expire. Kept in sync by AddResolvedIPs and cleared on
+	// when they expire. Kept in sync by AddResolvedDomain and cleared on
 	// deny-first resets and unloads.
-	states     map[subject.Subject]*refreshState
-	conntrack  func(context.Context) ([]conntrackEntry, error) // injectable for tests
-	now        func() time.Time                                // injectable for tests
-	sandboxMir func(context.Context, subject.Subject, []nftables.ResolvedIP) error
+	states map[subject.Subject]*refreshState
+	// A failed lease apply may have committed. Never base another delta on
+	// that uncertain mirror: first flush/reseed this subject's dynamic sets.
+	dirtyLeases map[subject.Subject]bool
+	conntrack   func(context.Context) ([]conntrackEntry, error) // injectable for tests
+	now         func() time.Time                                // injectable for tests
+	sandboxMir  func(context.Context, subject.Subject, []nftables.ResolvedIP) error
+
+	// Unknown static outcomes require normal lifecycle recovery. A DNS
+	// callback must not restore old static policy or trust its lease mirror.
+	staticUncertain map[subject.Subject]bool
 
 	// upstreamIPs mirrors the DNS-learned upstream-proxy drop-set elements
 	// and counts successful refreshes missing each address. Elements are
@@ -238,12 +248,15 @@ func (a *Applier) ApplyReset(ctx context.Context) error {
 		return err
 	}
 	if err := a.applyWithMissingTableFallback(ctx, b.String()); err != nil {
+		a.markStaticUncertain(err)
 		telemetry.RecordNftablesUpdateFailed(telemetry.NftOpReset)
 		return err
 	}
 	a.tableReady = true
 	a.subjects = make(map[subject.Subject]installedSubject)
 	a.states = make(map[subject.Subject]*refreshState)
+	a.dirtyLeases = nil
+	a.staticUncertain = nil
 	a.recordRuleCountLocked()
 	telemetry.RecordNftablesUpdate()
 	return nil
@@ -265,8 +278,8 @@ func (a *Applier) recordRuleCountLocked() {
 
 // applyWithMissingTableFallback runs the script; if the batch fails because
 // `delete table` targets a missing table (e.g. first boot, or a prior reset
-// already removed it), retry without the delete line, with the same helpers
-// as the sidecar manager's fallback.
+// already removed it), retry without the delete line. Mirrors the sidecar
+// manager's fallback.
 func (a *Applier) applyWithMissingTableFallback(ctx context.Context, script string) error {
 	if _, err := a.run(ctx, script); err == nil {
 		return nil
@@ -274,6 +287,8 @@ func (a *Applier) applyWithMissingTableFallback(ctx context.Context, script stri
 		if fallback := nftables.RemoveDeleteTableLine(script, TableName); fallback != script {
 			if _, retryErr := a.run(ctx, fallback); retryErr == nil {
 				return nil
+			} else {
+				return errors.Join(err, retryErr)
 			}
 		}
 		return err
@@ -301,7 +316,7 @@ func (a *Applier) ApplyDenyFirst(ctx context.Context, s subject.Subject, att act
 		if err := a.writeTableHeader(&b); err != nil {
 			return err
 		}
-		a.tableReady = true
+		// Publish tableReady only after the transaction succeeds.
 	}
 	if _, ok := a.subjects[s]; ok {
 		if err := writeSubjectResetFragment(&b, s, att, a.opts.MitmRedirectPort); err != nil {
@@ -313,21 +328,25 @@ func (a *Applier) ApplyDenyFirst(ctx context.Context, s subject.Subject, att act
 		}
 	}
 	if err := a.applyWithMissingTableFallback(ctx, b.String()); err != nil {
-		// The batch is atomic: on failure nothing was installed, so keep the
-		// flag consistent (the controller retries).
+		// Retain lifecycle intent for retry, but fence DNS/refresh work if
+		// the process may have committed before reporting an error.
+		a.markStaticUncertain(err, s)
 		telemetry.RecordNftablesUpdateFailed(telemetry.NftOpDenyFirst)
 		return err
 	}
-	a.subjects[s] = installedSubject{att: att}
+	a.tableReady = true
+	a.generation++
+	a.subjects[s] = installedSubject{att: att, generation: a.generation}
 	delete(a.states, s) // deny-first: no policy, no leases (nft dyn sets were flushed)
+	delete(a.dirtyLeases, s)
+	delete(a.staticUncertain, s)
 	a.recordRuleCountLocked()
 	telemetry.RecordNftablesUpdate()
 	return nil
 }
 
-// ApplyPolicy swaps a subject's static sets and chain content atomically in
-// one transaction; dynamic DNS-learned sets are untouched. Deny-first
-// subjects move to active only via this call.
+// ApplyPolicy atomically reclassifies retained DNS observations and swaps all
+// subject rules and sets. Failure retains intent; unknown outcomes fence leases.
 func (a *Applier) ApplyPolicy(ctx context.Context, s subject.Subject, pol *policy.NetworkPolicy) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -342,74 +361,24 @@ func (a *Applier) ApplyPolicy(ctx context.Context, s subject.Subject, pol *polic
 	if err := writeSubjectPolicySwapFragment(&b, s, pol, a.opts.MitmRedirectPort); err != nil {
 		return err
 	}
+	next := a.states[s].clone()
+	next.renewalEndpoints = nil
+	next.classify(pol, a.now())
+	writeDynamicFlush(&b, s)
+	writeRemainingLeasesFragment(&b, s, next, a.now())
 	if _, err := a.run(ctx, b.String()); err != nil {
+		a.markStaticUncertain(err, s)
 		telemetry.RecordNftablesUpdateFailed(telemetry.NftOpStaticApply)
 		return err
 	}
 	inst.pol = pol
 	a.subjects[s] = inst
+	a.states[s] = next
+	delete(a.dirtyLeases, s)
+	delete(a.staticUncertain, s)
 	a.recordRuleCountLocked()
 	telemetry.RecordNftablesUpdate()
 	return nil
-}
-
-// AddResolvedIPs adds DNS-learned IPs to a subject's dynamic allow sets with
-// a bounded timeout (mirrors the sidecar profile's lease behavior). The
-// domain is re-authorized against the installed policy under the same lock
-// the always-rule reload rebuilds under, so an answer that was in flight
-// while the overlay tightened cannot re-authorize a revoked domain's IP.
-// Returns ErrLeaseRejected (expected race outcome, not an nft failure — the
-// answer still reaches the client) or ErrUnknownSubject.
-func (a *Applier) AddResolvedIPs(ctx context.Context, s subject.Subject, domain string, ips []nftables.ResolvedIP) error {
-	if len(ips) == 0 {
-		return nil
-	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	inst, ok := a.subjects[s]
-	if !ok {
-		return ErrUnknownSubject
-	}
-	// Serialized with ApplyAlwaysRulesReload; inst.pol carries the always
-	// overlay and Evaluate is what the DNS selector used at query time.
-	// Deny-first subjects admit no leases.
-	if inst.pol == nil || inst.pol.Evaluate(domain) == policy.ActionDeny {
-		return ErrLeaseRejected
-	}
-	var b strings.Builder
-	writeResolvedIPsFragment(&b, s, ips)
-	if b.Len() == 0 {
-		return nil
-	}
-	if _, err := a.run(ctx, b.String()); err != nil {
-		telemetry.RecordNftablesUpdateFailed(telemetry.NftOpDynamicAdd)
-		return err
-	}
-	a.trackDynamicIPs(s, ips)
-	telemetry.RecordNftablesUpdate()
-	return nil
-}
-
-// trackDynamicIPs mirrors the just-added leases into the refresh state, so
-// the connection refresh loop knows which IPs each subject's dyn sets carry
-// and when they expire (same clamping as the nft elements written above).
-func (a *Applier) trackDynamicIPs(s subject.Subject, ips []nftables.ResolvedIP) {
-	st := a.states[s]
-	if st == nil {
-		st = &refreshState{}
-		a.states[s] = st
-	}
-	now := a.now()
-	for _, r := range ips {
-		addr := r.Addr.Unmap()
-		if !addr.IsValid() {
-			continue
-		}
-		if st.dyn == nil {
-			st.dyn = make(map[netip.Addr]time.Time)
-		}
-		st.dyn[addr] = now.Add(nftables.ClampTTL(r.TTL))
-	}
 }
 
 // Remove deletes a subject's enforcement. nftables deletes rules only by
@@ -452,11 +421,14 @@ func (a *Applier) Remove(ctx context.Context, s subject.Subject) error {
 		writeRemainingLeasesFragment(&b, subj, a.states[subj], now)
 	}
 	if err := a.applyWithMissingTableFallback(ctx, b.String()); err != nil {
+		a.markStaticUncertain(err)
 		telemetry.RecordNftablesUpdateFailed(telemetry.NftOpRemove)
 		return err
 	}
 	delete(a.subjects, s)
 	delete(a.states, s)
+	a.dirtyLeases = nil // every surviving dynamic set was rebuilt
+	a.staticUncertain = nil
 	a.tableReady = true
 	a.recordRuleCountLocked()
 	telemetry.RecordNftablesUpdate()
@@ -469,13 +441,11 @@ func (a *Applier) Remove(ctx context.Context, s subject.Subject) error {
 // Subjects the applier holds deny-first (inst.pol == nil) stay deny-first
 // even when pols carries a policy for them — a deny-first transition that
 // raced the caller's snapshot must never be resurrected by the rebuild.
-// Every DNS-learned lease is dropped (sidecar parity): a tightened overlay
-// must not keep a revoked domain's IP authorized, and a late DNS answer
-// cannot re-admit one — AddResolvedIPs re-authorizes under this same lock.
-// Active flows keep passing via the established-state accept; a still-
-// allowed domain recovers with the next DNS lookup (the refresh loop renews
-// only mirrored leases, never re-learns). In-memory state mutates only after
-// the transaction commits, so a failed reload stays retryable.
+// Legacy portless reloads still clear DNS leases. If either policy has domain
+// ports, retained observations are reclassified with their remaining deadlines:
+// narrowing cannot leave broad grants or require a new DNS lookup. Late DNS
+// answers are re-authorized under this same lock. State changes only after the
+// transaction commits; ordinary established flows continue to survive.
 func (a *Applier) ApplyAlwaysRulesReload(ctx context.Context, portFloor []policy.PortRange, pols map[subject.Subject]*policy.NetworkPolicy) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -488,6 +458,8 @@ func (a *Applier) ApplyAlwaysRulesReload(ctx context.Context, portFloor []policy
 		a.opts.PortFloorDenyRanges = previousFloor
 		return err
 	}
+	nextStates := make(map[subject.Subject]*refreshState)
+	now := a.now()
 	for subj, inst := range a.subjects {
 		// Kernel truth wins over the caller's snapshot: deny-first stays
 		// deny-first (see the doc comment).
@@ -505,9 +477,17 @@ func (a *Applier) ApplyAlwaysRulesReload(ctx context.Context, portFloor []policy
 			a.opts.PortFloorDenyRanges = previousFloor
 			return err
 		}
+		if pol != nil && (pol.HasDomainPorts() || inst.pol.HasDomainPorts()) {
+			next := a.states[subj].clone()
+			next.renewalEndpoints = nil
+			next.classify(pol, now)
+			writeRemainingLeasesFragment(&b, subj, next, now)
+			nextStates[subj] = next
+		}
 	}
 	if err := a.applyWithMissingTableFallback(ctx, b.String()); err != nil {
 		a.opts.PortFloorDenyRanges = previousFloor
+		a.markStaticUncertain(err)
 		telemetry.RecordNftablesUpdateFailed(telemetry.NftOpStaticApply)
 		return err
 	}
@@ -519,7 +499,9 @@ func (a *Applier) ApplyAlwaysRulesReload(ctx context.Context, portFloor []policy
 		inst.pol = pol
 		a.subjects[subj] = inst
 	}
-	a.states = make(map[subject.Subject]*refreshState) // leases cleared with the table; the refresh mirror renews, never re-learns
+	a.states = nextStates
+	a.dirtyLeases = nil
+	a.staticUncertain = nil
 	a.tableReady = true
 	a.recordRuleCountLocked()
 	telemetry.RecordNftablesUpdate()
@@ -707,7 +689,7 @@ func writeSubjectResetFragment(b *strings.Builder, s subject.Subject, att action
 // and static set elements. The chain and set objects are FLUSHED, not
 // deleted: the master-chain dispatch rule references the chain (and the
 // verdict rules reference the sets), and deleting referenced objects fails
-// with EBUSY. Dynamic DNS-learned sets and the dispatch rules are untouched.
+// with EBUSY. ApplyPolicy reclassifies dynamic DNS sets in the same batch.
 // Regular chains have no policy, so re-adding the rules after the flush is a
 // complete swap; the prerouting mark chain is flushed and rebuilt alongside
 // (a default-action change flips the mark strategy).
@@ -747,6 +729,11 @@ func writeSubjectSets(b *strings.Builder, s subject.Subject, pol *policy.Network
 	}
 	fmt.Fprintf(b, "add set inet %s %s { type ipv4_addr; timeout %ds; }\n", TableName, dynSetName(s, "v4"), dynSetTimeoutS)
 	fmt.Fprintf(b, "add set inet %s %s { type ipv6_addr; timeout %ds; }\n", TableName, dynSetName(s, "v6"), dynSetTimeoutS)
+	for _, allow := range []bool{true, false} {
+		for _, family := range []string{"v4", "v6"} {
+			fmt.Fprintf(b, "add set inet %s %s { type %s . inet_service; timeout %ds; }\n", TableName, tcpSetName(s, family, allow), ipSetType("_"+family), dynSetTimeoutS)
+		}
+	}
 	if pol == nil {
 		return nil
 	}
@@ -810,6 +797,7 @@ func writeSubjectForwardDenyRules(b *strings.Builder, s subject.Subject, pol *po
 	chain := subjectChain(s)
 	deny, _ := pol.PortScopedRules()
 	writeSubjectPortRules(b, chain, deny, false, "drop")
+	writeTCPRules(b, s, chain, false, false, "drop")
 	fmt.Fprintf(b, "add rule inet %s %s ip daddr @%s drop\n", TableName, chain, denySetName(s, "v4"))
 	fmt.Fprintf(b, "add rule inet %s %s ip6 daddr @%s drop\n", TableName, chain, denySetName(s, "v6"))
 	if denyFirst {
@@ -824,6 +812,9 @@ func writeSubjectForwardDenyRules(b *strings.Builder, s subject.Subject, pol *po
 // carry no mark rules at all.
 func writeSubjectMarkRules(b *strings.Builder, s subject.Subject, pol *policy.NetworkPolicy) {
 	chain := markChainName(s)
+	// Denies run in forward, after its established-flow bypass, not here.
+	// Ordinary policy updates must not tear down existing connections.
+	writeTCPRules(b, s, chain, true, false, fmt.Sprintf("meta mark set 0x%x", allowMark))
 	if pol.DefaultAction == policy.ActionAllow {
 		fmt.Fprintf(b, "add rule inet %s %s meta mark set 0x%x\n", TableName, chain, allowMark)
 		return
@@ -849,8 +840,10 @@ func writeSubjectInputVerdictRules(b *strings.Builder, s subject.Subject, pol *p
 	in := subjectChainIn(s)
 	deny, allow := pol.PortScopedRules()
 	writeSubjectPortRules(b, in, deny, true, "drop")
+	writeTCPRules(b, s, in, false, true, "drop")
 	fmt.Fprintf(b, "add rule inet %s %s ct original ip daddr @%s drop\n", TableName, in, denySetName(s, "v4"))
 	fmt.Fprintf(b, "add rule inet %s %s ct original ip6 daddr @%s drop\n", TableName, in, denySetName(s, "v6"))
+	writeTCPRules(b, s, in, true, true, "accept")
 	writeSubjectPortRules(b, in, allow, true, "accept")
 	fmt.Fprintf(b, "add rule inet %s %s ct original ip daddr @%s accept\n", TableName, in, dynSetName(s, "v4"))
 	fmt.Fprintf(b, "add rule inet %s %s ct original ip6 daddr @%s accept\n", TableName, in, dynSetName(s, "v6"))
@@ -939,23 +932,6 @@ func writeDispatchRule(b *strings.Builder, s subject.Subject, att actionhandler.
 	}
 }
 
-// writeResolvedIPsFragment adds or renews DNS-learned IPs in a subject's
-// dynamic sets with clamped TTLs (mirrors pkg/nftables lease behavior).
-func writeResolvedIPsFragment(b *strings.Builder, s subject.Subject, ips []nftables.ResolvedIP) {
-	for _, r := range ips {
-		addr := r.Addr.Unmap()
-		var set string
-		if addr.Is4() {
-			set = dynSetName(s, "v4")
-		} else if addr.Is6() {
-			set = dynSetName(s, "v6")
-		} else {
-			continue
-		}
-		nftables.WriteTimedElement(b, TableName, set, addr, nftables.ClampTTL(r.TTL))
-	}
-}
-
 // writeRemainingLeasesFragment re-adds a subject's unexpired DNS-learned IPs
 // to its freshly rebuilt dynamic sets with the time each lease has left, so
 // rebuilding the table to remove another subject keeps them allowed.
@@ -978,6 +954,21 @@ func writeRemainingLeasesFragment(b *strings.Builder, s subject.Subject, st *ref
 		}
 		seconds := int((left + time.Second - 1) / time.Second)
 		fmt.Fprintf(b, "add element inet %s %s { %s timeout %ds }\n", TableName, set, addr, seconds)
+	}
+	for _, allow := range []bool{true, false} {
+		leases := st.denyTCP
+		if allow {
+			leases = st.allowTCP
+		}
+		for endpoint, expiry := range leases {
+			if left := expiry.Sub(now); left > 0 {
+				family := "v6"
+				if endpoint.Addr.Is4() {
+					family = "v4"
+				}
+				nftables.WriteTimedPortElement(b, TableName, tcpSetName(s, family, allow), endpoint, left)
+			}
+		}
 	}
 }
 
@@ -1019,12 +1010,46 @@ func staticSetNames(s subject.Subject) []string {
 // allSetNames includes the dynamic DNS-learned sets; used by the reset
 // fragment so a rebind also drops the previous sandbox's leases.
 func allSetNames(s subject.Subject) []string {
-	return append(staticSetNames(s), dynSetName(s, "v4"), dynSetName(s, "v6"))
+	return append(staticSetNames(s), dynamicSetNames(s)...)
 }
 
 func allowSetName(s subject.Subject, fam string) string { return subjectChain(s) + "_allow_" + fam }
 func denySetName(s subject.Subject, fam string) string  { return subjectChain(s) + "_deny_" + fam }
 func dynSetName(s subject.Subject, fam string) string   { return subjectChain(s) + "_dyn_" + fam }
+
+func tcpSetName(s subject.Subject, family string, allow bool) string {
+	action := "deny"
+	if allow {
+		action = "allow"
+	}
+	return subjectChain(s) + "_tcp_" + action + "_" + family
+}
+
+func dynamicSetNames(s subject.Subject) []string {
+	return []string{dynSetName(s, "v4"), dynSetName(s, "v6"),
+		tcpSetName(s, "v4", true), tcpSetName(s, "v6", true),
+		tcpSetName(s, "v4", false), tcpSetName(s, "v6", false)}
+}
+
+func writeDynamicFlush(b *strings.Builder, s subject.Subject) {
+	for _, name := range dynamicSetNames(s) {
+		fmt.Fprintf(b, "flush set inet %s %s\n", TableName, name)
+	}
+}
+
+func writeTCPRules(b *strings.Builder, s subject.Subject, chain string, allow, original bool, verdict string) {
+	for _, family := range []string{"v4", "v6"} {
+		protocol := "ip"
+		if family == "v6" {
+			protocol = "ip6"
+		}
+		match := protocol + " daddr . tcp dport"
+		if original {
+			match = "meta l4proto tcp ct original " + protocol + " daddr . ct original proto-dst"
+		}
+		fmt.Fprintf(b, "add rule inet %s %s %s @%s %s\n", TableName, chain, match, tcpSetName(s, family, allow), verdict)
+	}
+}
 
 func ipSetType(name string) string {
 	if strings.HasSuffix(name, "_v6") {

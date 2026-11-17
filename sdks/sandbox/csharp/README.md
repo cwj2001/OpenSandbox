@@ -496,9 +496,9 @@ var sandbox = await Sandbox.CreateAsync(new SandboxCreateOptions
 
 // A rule can scope by TCP destination ports instead of a target — Ports
 // (each 1-65535, at most 256 per rule, no duplicates) may replace Target
-// entirely, or combine with IP/CIDR targets. Classic dns+nft also supports
-// DNS-learned domain-plus-port scopes; Fast Sandbox rejects those until its
-// separate delivery. Targetless allows do not independently admit DNS.
+// entirely, or combine with IP/CIDR/domain/wildcard targets. Domain scopes
+// require supporting classic dns+nft or Fast Sandbox images; DNS-only and
+// chained upstream deployments reject them. Targetless allows do not admit DNS.
 var byPorts = await Sandbox.CreateAsync(new SandboxCreateOptions
 {
     ConnectionConfig = config,

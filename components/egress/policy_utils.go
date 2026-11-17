@@ -47,15 +47,6 @@ func validateDomainPortPolicy(pol *policy.NetworkPolicy, mode string, hasNft boo
 	return nil
 }
 
-// Fast Sandbox keeps legacy static-IP and port-only policies, but its current
-// dataplane cannot enforce DNS-derived TCP endpoints yet.
-func validateFastSandboxDomainPortPolicy(pol *policy.NetworkPolicy) error {
-	if pol != nil && pol.HasDomainPorts() {
-		return fmt.Errorf("domain+ports rules are not yet supported by Fast Sandbox; use classic dns+nft without an upstream proxy")
-	}
-	return nil
-}
-
 func readPolicyRequestBody(r *http.Request) (string, error) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxPolicyBodyBytes))
 	if err != nil {

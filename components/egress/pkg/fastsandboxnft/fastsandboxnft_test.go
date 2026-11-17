@@ -134,8 +134,8 @@ func TestPolicySwapAtomic(t *testing.T) {
 	require.Contains(t, script, "flush set inet opensandbox-fast-sandbox subj_s_u_1_allow_v4")
 	require.Contains(t, script, "add element inet opensandbox-fast-sandbox subj_s_u_1_allow_v4 { 10.0.0.0/24 }")
 	require.Contains(t, script, "add element inet opensandbox-fast-sandbox subj_s_u_1_deny_v4 { 1.2.3.4 }")
-	// dynamic sets survive the swap (never deleted)
-	assert.NotContains(t, script, "flush set inet opensandbox-fast-sandbox subj_s_u_1_dyn")
+	// Dynamic sets are reclassified and repopulated in the same transaction.
+	assert.Contains(t, script, "flush set inet opensandbox-fast-sandbox subj_s_u_1_dyn")
 	require.Equal(t, 1, runner.count(), "policy swap must be a single transaction")
 }
 
@@ -167,10 +167,10 @@ func TestUnknownSubjectRejected(t *testing.T) {
 	pol, err := policy.ParsePolicy(`{"defaultAction":"deny"}`)
 	require.NoError(t, err)
 	require.ErrorIs(t, a.ApplyPolicy(ctx, subject.FromSandboxUID("ghost"), pol), ErrUnknownSubject)
-	require.ErrorIs(t, a.AddResolvedIPs(ctx, subject.FromSandboxUID("ghost"), "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.2.3.4"), TTL: time.Minute}}), ErrUnknownSubject)
+	require.ErrorIs(t, a.AddResolvedDomain(ctx, subject.FromSandboxUID("ghost"), 0, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.2.3.4"), TTL: time.Minute}}), ErrUnknownSubject)
 }
 
-func TestAddResolvedIPsClampsTTL(t *testing.T) {
+func TestAddResolvedDomainClampsTTL(t *testing.T) {
 	runner := &fakeRunner{}
 	a := NewApplier(runner.Run)
 	s := subject.FromSandboxUID("u-1")
@@ -179,7 +179,7 @@ func TestAddResolvedIPsClampsTTL(t *testing.T) {
 	pol, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"example.com"}]}`)
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, s, pol))
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{
 		{Addr: netip.MustParseAddr("1.2.3.4"), TTL: 30 * time.Second},   // clamps up to 90s (min 60 + slack)
 		{Addr: netip.MustParseAddr("2001:db8::1"), TTL: 24 * time.Hour}, // clamps down to 360s
 	}))
@@ -188,16 +188,24 @@ func TestAddResolvedIPsClampsTTL(t *testing.T) {
 	require.Contains(t, script, "2001:db8::1 timeout 360s")
 }
 
-func TestAddResolvedIPsRecreatesElementsToRenewExpiry(t *testing.T) {
+func TestAddResolvedDomainRecreatesElementsToRenewExpiry(t *testing.T) {
 	runner := &fakeRunner{}
 	a := NewApplier(runner.Run)
+	now := time.Unix(1700000000, 0)
+	a.now = func() time.Time { return now }
 	s := subject.FromSandboxUID("u-1")
 	ctx := context.Background()
 	require.NoError(t, a.ApplyDenyFirst(ctx, s, testSlot("u-1", "10.0.0.5")))
 	pol, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"example.com"}]}`)
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, s, pol))
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{
+		{Addr: netip.MustParseAddr("1.2.3.4"), TTL: 300 * time.Second},
+		{Addr: netip.MustParseAddr("2001:db8::1"), TTL: 300 * time.Second},
+	}))
+	// A second observation must replace the live kernel timeout atomically.
+	now = now.Add(time.Second)
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{
 		{Addr: netip.MustParseAddr("1.2.3.4"), TTL: 300 * time.Second},
 		{Addr: netip.MustParseAddr("2001:db8::1"), TTL: 300 * time.Second},
 	}))
@@ -206,16 +214,16 @@ func TestAddResolvedIPsRecreatesElementsToRenewExpiry(t *testing.T) {
 		{dynSetName(s, "v4"), "1.2.3.4"},
 		{dynSetName(s, "v6"), "2001:db8::1"},
 	} {
-		require.Contains(t, script, fmt.Sprintf(
-			"add element inet %[1]s %[2]s { %[3]s }\ndelete element inet %[1]s %[2]s { %[3]s }\nadd element inet %[1]s %[2]s { %[3]s timeout 360s }\n",
-			TableName, tc.set, tc.addr), "a plain add does not renew an existing element's kernel expiry")
+		require.NotContains(t, script, "flush set")
+		require.Contains(t, script, fmt.Sprintf("delete element inet %s %s { %s }\n", TableName, tc.set, tc.addr), "renew only the changed member, not its whole set")
+		require.Contains(t, script, fmt.Sprintf("add element inet %s %s { %s timeout 360s }\n", TableName, tc.set, tc.addr))
 	}
 }
 
-// TestAddResolvedIPsRejectsDomainRevokedByReload: a DNS answer that was in
+// TestAddResolvedDomainRejectsDomainRevokedByReload: a DNS answer that was in
 // flight while an always-rule reload tightened the overlay must not
 // re-authorize the revoked domain's cached IP.
-func TestAddResolvedIPsRejectsDomainRevokedByReload(t *testing.T) {
+func TestAddResolvedDomainRejectsDomainRevokedByReload(t *testing.T) {
 	runner := &fakeRunner{}
 	a := NewApplier(runner.Run)
 	s := subject.FromSandboxUID("u-1")
@@ -225,7 +233,7 @@ func TestAddResolvedIPsRejectsDomainRevokedByReload(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, s, pol))
 	ips := []nftables.ResolvedIP{{Addr: netip.MustParseAddr("192.0.2.1"), TTL: 0}}
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", ips))
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", ips))
 
 	// the overlay tightens: example.com moves to always-deny
 	denyRule, err := policy.ParseValidatedEgressRule("deny", "example.com")
@@ -235,7 +243,7 @@ func TestAddResolvedIPsRejectsDomainRevokedByReload(t *testing.T) {
 
 	// the stale in-flight answer arrives after the reload: refused
 	count := runner.count()
-	require.ErrorIs(t, a.AddResolvedIPs(ctx, s, "example.com", ips), ErrLeaseRejected)
+	require.ErrorIs(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", ips), ErrLeaseRejected)
 	require.Equal(t, count, runner.count(), "a refused lease must not emit an nft transaction")
 	require.NotContains(t, runner.last(), "192.0.2.1")
 	a.mu.Lock()
@@ -244,13 +252,13 @@ func TestAddResolvedIPsRejectsDomainRevokedByReload(t *testing.T) {
 	require.False(t, tracked, "a refused lease must not enter the refresh mirror")
 
 	// a domain the reload still allows keeps working
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "api.example.com", ips))
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "api.example.com", ips))
 	require.Contains(t, runner.last(), "192.0.2.1")
 }
 
-// TestAddResolvedIPsRejectsDenyFirstSubject: a subject that reverted to
+// TestAddResolvedDomainRejectsDenyFirstSubject: a subject that reverted to
 // deny-first while its DNS answer was in flight must not re-acquire a lease.
-func TestAddResolvedIPsRejectsDenyFirstSubject(t *testing.T) {
+func TestAddResolvedDomainRejectsDenyFirstSubject(t *testing.T) {
 	runner := &fakeRunner{}
 	a := NewApplier(runner.Run)
 	s := subject.FromSandboxUID("u-1")
@@ -258,7 +266,7 @@ func TestAddResolvedIPsRejectsDenyFirstSubject(t *testing.T) {
 	require.NoError(t, a.ApplyDenyFirst(ctx, s, testSlot("u-1", "10.0.0.5")))
 
 	count := runner.count()
-	require.ErrorIs(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("192.0.2.1"), TTL: 0}}), ErrLeaseRejected)
+	require.ErrorIs(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("192.0.2.1"), TTL: 0}}), ErrLeaseRejected)
 	require.Equal(t, count, runner.count(), "a refused lease must not emit an nft transaction")
 	a.mu.Lock()
 	_, tracked := a.states[s]
@@ -317,7 +325,7 @@ func TestRemoveKeepsRemainingSubjectsLeases(t *testing.T) {
 	pol, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"api.example.com"}]}`)
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, kept, pol))
-	require.NoError(t, a.AddResolvedIPs(ctx, kept, "api.example.com", []nftables.ResolvedIP{
+	require.NoError(t, a.AddResolvedDomain(ctx, kept, a.subjects[kept].generation, "api.example.com", []nftables.ResolvedIP{
 		{Addr: netip.MustParseAddr("192.0.2.1"), TTL: 0},                   // 60s lease
 		{Addr: netip.MustParseAddr("2001:db8::1"), TTL: 300 * time.Second}, // 360s lease
 		{Addr: netip.MustParseAddr("192.0.2.9"), TTL: 0},                   // expires before the rebuild
@@ -389,7 +397,7 @@ func TestApplyAlwaysRulesReloadRebuildsTable(t *testing.T) {
 	oldPol, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"8.8.8.8"},{"action":"allow","target":"example.com"}]}`)
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, active, oldPol))
-	require.NoError(t, a.AddResolvedIPs(ctx, active, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("192.0.2.1"), TTL: 0}}))
+	require.NoError(t, a.AddResolvedDomain(ctx, active, a.subjects[active].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("192.0.2.1"), TTL: 0}}))
 
 	newDeny, err := policy.ParseValidatedEgressRule("deny", "203.0.113.0/24")
 	require.NoError(t, err)
@@ -512,7 +520,7 @@ func TestDenyFirstResetsOnReRegistration(t *testing.T) {
 	pol, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"8.8.8.8"},{"action":"allow","target":"example.com"}]}`)
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, s, pol))
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
 
 	runner.mu.Lock()
 	runner.scripts = nil
@@ -670,7 +678,7 @@ func TestApplyDenyFirstMissingTableFallback(t *testing.T) {
 	var attempts atomic.Int32
 	runner := &fakeRunner{fail: func(script string) error {
 		if strings.Contains(script, "delete table inet opensandbox-fast-sandbox") && attempts.Add(1) == 1 {
-			return nftMissingObjectError("delete table inet opensandbox-fast-sandbox")
+			return nftMissingObjectError("delete table inet " + TableName)
 		}
 		return nil
 	}}
@@ -1288,7 +1296,7 @@ func TestPortScopedPolicyLifecycle(t *testing.T) {
 			old, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"10.0.0.9","ports":[8443]},{"action":"deny","ports":[25]},{"action":"allow","target":"example.com"}]}`)
 			require.NoError(t, err)
 			require.NoError(t, a.ApplyPolicy(ctx, s, old))
-			require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("10.0.0.20"), TTL: time.Minute}}))
+			require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("10.0.0.20"), TTL: time.Minute}}))
 
 			next, err := policy.ParsePolicy(`{"defaultAction":"allow","egress":[{"action":"deny","target":"10.0.0.9","ports":[443]}]}`)
 			require.NoError(t, err)
@@ -1320,7 +1328,7 @@ func TestPortScopedPolicyLifecycle(t *testing.T) {
 			require.Contains(t, script, "mark_s_u_1 meta mark set 0x2")
 			assert.NotContains(t, script, "8443")
 			assert.NotContains(t, script, "{ 25 }")
-			assert.NotContains(t, script, "flush set inet opensandbox-fast-sandbox subj_s_u_1_dyn")
+			assert.Contains(t, script, "flush set inet opensandbox-fast-sandbox subj_s_u_1_dyn")
 			assert.Contains(t, a.states[s].dyn, netip.MustParseAddr("10.0.0.20"))
 			if mitmPort > 0 {
 				require.Contains(t, script, "flush chain inet opensandbox-fast-sandbox subj_s_u_1_in")

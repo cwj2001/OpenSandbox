@@ -255,35 +255,8 @@ func runFastSandboxProfile(ctx context.Context, upstreamSpec *mitmproxy.Upstream
 			log.Infof("upstream proxy: literal endpoint %s:%d (profile-wide sandbox drop)", upstreamSpec.Host, upstreamSpec.Port)
 		}
 	}
-	proxy.SetQueryPolicySelector(func(remote netip.Addr) (*dnsproxy.QueryPolicy, string) {
-		s, ok := reg.Resolve(subject.SubjectKey{SourceIP: remote})
-		if !ok {
-			// Unknown source: deny (fail closed), never a default policy.
-			return nil, "unknown source"
-		}
-		eff := reg.EffectivePolicy(s)
-		if eff == nil {
-			return nil, "no effective policy for subject " + string(s)
-		}
-		return &dnsproxy.QueryPolicy{
-			Policy: eff,
-			OnResolved: func(domain string, ips []nftables.ResolvedIP) error {
-				addCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-				defer cancel()
-				if err := podNft.AddResolvedIPs(addCtx, s, domain, ips); err != nil {
-					if errors.Is(err, fastsandboxnft.ErrLeaseRejected) || errors.Is(err, fastsandboxnft.ErrUnknownSubject) {
-						// Answer was in flight during a rule change: fail
-						// closed, quietly.
-						log.Infof("[dns] resolved IPs for subject %s domain %q not admitted (policy changed during resolution)", s, domain)
-						return err
-					}
-					log.Warnf("[dns] add resolved IPs to fast-sandbox nft failed for subject %s domain %q: %v", s, domain, err)
-					return err
-				}
-				return nil
-			},
-		}, ""
-	})
+	proxy.SetQueryPolicySelector(fastSandboxQueryPolicySelector(ctx, reg, podNft))
+
 	if err := proxy.Start(ctx); err != nil {
 		log.Fatalf("failed to start dns proxy: %v", err)
 	}
@@ -504,4 +477,35 @@ func unionResolvedIPs(ips []nftables.ResolvedIP) []nftables.ResolvedIP {
 		out = append(out, r)
 	}
 	return out
+}
+
+func fastSandboxQueryPolicySelector(ctx context.Context, reg *subject.MemoryRegistry, podNft *fastsandboxnft.Applier) func(netip.Addr) (*dnsproxy.QueryPolicy, string) {
+	return func(remote netip.Addr) (*dnsproxy.QueryPolicy, string) {
+		s, ok := reg.Resolve(subject.SubjectKey{SourceIP: remote})
+		if !ok {
+			return nil, "unknown source"
+		}
+		if state, ok := reg.Get(s); !ok || state != subject.StateActive {
+			return nil, "inactive subject " + string(s)
+		}
+		// Snapshot installed policy and generation together before forwarding
+		// DNS. A registry policy read followed by a generation read could pair
+		// a retired policy with the next incarnation's authority.
+		eff, generation, ok := podNft.ResolutionPolicy(s, remote)
+		if !ok {
+			return nil, "no active nft generation for subject " + string(s)
+		}
+		return &dnsproxy.QueryPolicy{
+			Policy: eff,
+			OnResolved: func(domain string, ips []nftables.ResolvedIP) error {
+				addCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+				defer cancel()
+				err := podNft.AddResolvedDomain(addCtx, s, generation, domain, ips)
+				if err != nil {
+					log.Warnf("[dns] add resolved domain to fast-sandbox nft failed for subject %s domain %q: %v", s, domain, err)
+				}
+				return err
+			},
+		}, ""
+	}
 }

@@ -2007,16 +2007,16 @@ export interface components {
              *       across all IPv4/IPv6 destinations.
              *     - `target` is an IP or CIDR, `ports` set: the rule applies to that
              *       destination only on these ports.
-             *     - `target` is a domain or wildcard, `ports` set: in classic `dns+nft`,
+             *     - `target` is a domain or wildcard, `ports` set: in classic `dns+nft` and Fast Sandbox,
              *       DNS-derived IP leases are scoped to these TCP destination ports.
              *       Scoped allows permit DNS under default deny; scoped denies win at
              *       L4 without denying an otherwise allowed hostname's DNS lookup.
              *       Portless domain rules retain ordered first-match DNS behavior.
              *       Leases are not strict hostname identity: shared IPs share grants,
              *       and default-allow denies cover only learned addresses while leased.
-             *       DNS-only and chained upstream-proxy deployments reject this shape.
-             *       Fast Sandbox temporarily rejects domain+ports before applying policy;
-             *       its existing static IP/CIDR and port-only rules remain supported.
+             *       Classic DNS-only and chained upstream-proxy deployments reject this shape.
+             *       Fast Sandbox uses shared-Fastlet nft enforcement independently of the
+             *       classic sidecar mode; chained upstream proxies remain unsupported.
              *
              *     TCP only for now; UDP port scoping is not supported.
              *

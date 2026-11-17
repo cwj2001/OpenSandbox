@@ -45,6 +45,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/alibaba/opensandbox/egress/pkg/constants"
 	"github.com/alibaba/opensandbox/egress/pkg/log"
 	"github.com/alibaba/opensandbox/egress/pkg/policy"
 	"github.com/alibaba/opensandbox/egress/pkg/subject"
@@ -453,7 +454,7 @@ func (s *fastSandboxPolicyServer) rehydratePolicyReload(subj subject.Subject, fe
 		s.degradePolicyReloadLocked(subj, fence, fmt.Sprintf("policy file content rejected (%v)", parseErr))
 		return policy.DefaultDenyPolicy(), true
 	}
-	if err := validateFastSandboxDomainPortPolicy(pol); err != nil {
+	if err := validateDomainPortPolicy(pol, constants.PolicyDnsNft, s.nft != nil); err != nil {
 		// This is valid durable policy on an unsupported deployment, not
 		// corrupt input: keep the file for a compatible writer or relay heal.
 		s.degradePolicyReloadLocked(subj, fence, fmt.Sprintf("policy capability rejected (%v)", err))

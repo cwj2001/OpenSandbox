@@ -59,7 +59,7 @@ func TestResolvedIPRenewalExtendsKernelExpiry(t *testing.T) {
 		for _, address := range addresses {
 			ips = append(ips, nftables.ResolvedIP{Addr: address, TTL: ttl})
 		}
-		require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", ips))
+		require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", ips))
 	}
 	resolve(0)                 // clamped to the 60s minimum
 	resolve(300 * time.Second) // clamped to 360s

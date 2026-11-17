@@ -18,6 +18,7 @@ import (
 	"context"
 	"net/netip"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ const connectionRefreshInterval = 30 * time.Second
 type conntrackEntry struct {
 	src   netip.Addr
 	dst   netip.Addr
+	port  uint16 // first/original dport, never the reply tuple
 	state string // TCP state name (e.g. ESTABLISHED)
 }
 
@@ -45,9 +47,16 @@ type conntrackEntry struct {
 // active set (used for the end-of-activity final refresh) and a pending
 // set of IPs whose redelivery to the sandbox layer is still owed.
 type refreshState struct {
-	dyn     map[netip.Addr]time.Time
-	prev    map[netip.Addr]struct{}
-	pending map[netip.Addr]struct{}
+	dyn      map[netip.Addr]time.Time
+	prev     map[netip.Addr]struct{}
+	pending  map[netip.Addr]struct{}
+	domains  map[string]map[netip.Addr]domainLease
+	allowTCP map[nftables.TCPEndpoint]time.Time
+	denyTCP  map[nftables.TCPEndpoint]time.Time
+	prevTCP  map[nftables.TCPEndpoint]struct{}
+	// Expired grants removed by DNS reconciliation remain activity candidates,
+	// not installed elements. Port zero denotes a whole-address candidate.
+	renewalEndpoints map[nftables.TCPEndpoint]struct{}
 }
 
 // readConntrack reads the Pod netns conntrack table. The forward hook
@@ -75,6 +84,7 @@ func parseConntrackTCPEntries(data []byte) []conntrackEntry {
 		}
 		var e conntrackEntry
 		e.state = f[5]
+		portSeen := false
 		for _, tok := range f[6:] {
 			if v, ok := strings.CutPrefix(tok, "src="); ok && !e.src.IsValid() {
 				if a, err := netip.ParseAddr(v); err == nil {
@@ -85,6 +95,12 @@ func parseConntrackTCPEntries(data []byte) []conntrackEntry {
 			if v, ok := strings.CutPrefix(tok, "dst="); ok && !e.dst.IsValid() {
 				if a, err := netip.ParseAddr(v); err == nil {
 					e.dst = a
+				}
+			}
+			if v, ok := strings.CutPrefix(tok, "dport="); ok && !portSeen {
+				portSeen = true
+				if port, err := strconv.ParseUint(v, 10, 16); err == nil {
+					e.port = uint16(port)
 				}
 			}
 		}
@@ -156,8 +172,11 @@ func (a *Applier) StartConnectionRefresh(ctx context.Context, sandboxMir func(co
 // the lock is released; a mirror failure marks the IPs pending redelivery.
 func (a *Applier) refreshTick(ctx context.Context) {
 	type subjectPlan struct {
-		s   subject.Subject
-		ips []nftables.ResolvedIP
+		s          subject.Subject
+		ips        []nftables.ResolvedIP
+		generation uint64
+		state      *refreshState
+		written    bool
 	}
 	var plans []subjectPlan
 
@@ -168,6 +187,7 @@ func (a *Applier) refreshTick(ctx context.Context) {
 		// stale "was active" state keeps leases alive beyond their expiry.
 		for _, st := range a.states {
 			st.prev = make(map[netip.Addr]struct{})
+			st.prevTCP = nil
 		}
 		a.mu.Unlock()
 		log.Warnf("fastsandboxnft: conntrack read failed, skipping refresh: %v", err)
@@ -175,22 +195,39 @@ func (a *Applier) refreshTick(ctx context.Context) {
 	}
 	srcIdx := a.buildSrcIndexLocked()
 	activeBySubject := bucketActive(entries, srcIdx)
+	activeTCP := bucketActiveTCP(entries, srcIdx)
+	now := a.now()
 	var b strings.Builder
 	for s, st := range a.states {
-		ips := st.plan(activeBySubject[s], a.now())
-		if len(ips) == 0 {
+		if a.staticUncertain[s] {
 			continue
 		}
-		plans = append(plans, subjectPlan{s: s, ips: ips})
-		writeResolvedIPsFragment(&b, s, ips)
+		next := st.clone()
+		ips := next.plan(activeBySubject[s], now)
+		inst := a.subjects[s]
+		if len(next.domains) > 0 {
+			next.renewDomains(inst.pol, ips, activeTCP[s], now)
+			// This successful activity plan supersedes every retained candidate.
+			next.renewalEndpoints = nil
+			next.classify(inst.pol, now)
+		}
+		start := b.Len()
+		if a.dirtyLeases[s] {
+			writeDynamicFlush(&b, s)
+			writeRemainingLeasesFragment(&b, s, next, now)
+		} else {
+			writeLeaseChanges(&b, s, st, next, now)
+		}
+		plans = append(plans, subjectPlan{s: s, ips: ips, generation: inst.generation, state: next, written: b.Len() > start})
 	}
 	if b.Len() > 0 {
 		if _, err := a.run(ctx, b.String()); err != nil {
-			// The lease mirror was already extended in the plan phase: mark
-			// every planned IP pending so the next tick redelivers
-			// unconditionally (self-healing, no self-lock).
+			// No lease or activity mirror is published on a failed write.
+			// Retaining the previous activity also retries the final grace.
 			for _, p := range plans {
-				a.markPendingLocked(p.s, p.ips)
+				if p.written {
+					a.markLeasesDirty(p.s)
+				}
 			}
 			a.mu.Unlock()
 			telemetry.RecordNftablesUpdateFailed(telemetry.NftOpDynamicAdd)
@@ -199,18 +236,23 @@ func (a *Applier) refreshTick(ctx context.Context) {
 		}
 		telemetry.RecordNftablesUpdate()
 	}
+	for _, p := range plans {
+		a.states[p.s] = p.state
+		delete(a.dirtyLeases, p.s)
+	}
+	mirror := a.sandboxMir
 	a.mu.Unlock()
 
 	for _, p := range plans {
-		if a.sandboxMir == nil {
+		if mirror == nil || len(p.ips) == 0 {
 			continue
 		}
-		if err := a.sandboxMir(ctx, p.s, p.ips); err != nil {
+		if err := mirror(ctx, p.s, p.ips); err != nil {
 			log.Warnf("fastsandboxnft: sandbox mirror refresh for subject %s failed: %v", p.s, err)
-			a.markPendingRedelivery(p.s, p.ips)
+			a.finishMirror(p.s, p.generation, p.state, p.ips, false)
 			continue
 		}
-		a.clearPending(p.s, p.ips)
+		a.finishMirror(p.s, p.generation, p.state, p.ips, true)
 	}
 }
 
@@ -247,42 +289,22 @@ func bucketActive(entries []conntrackEntry, srcIdx map[netip.Addr]subject.Subjec
 	return out
 }
 
-// markPendingRedelivery records IPs whose sandbox mirror delivery failed, so
-// the next tick re-adds them unconditionally.
-func (a *Applier) markPendingRedelivery(s subject.Subject, ips []nftables.ResolvedIP) {
+// finishMirror ignores deliveries from an old incarnation or superseded plan.
+func (a *Applier) finishMirror(s subject.Subject, generation uint64, planned *refreshState, ips []nftables.ResolvedIP, succeeded bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.markPendingLocked(s, ips)
-}
-
-func (a *Applier) markPendingLocked(s subject.Subject, ips []nftables.ResolvedIP) {
-	if _, ok := a.subjects[s]; !ok {
-		return // subject unloaded meanwhile: nothing to redeliver
-	}
-	st := a.states[s]
-	if st == nil {
-		st = &refreshState{}
-		a.states[s] = st
-	}
-	if st.pending == nil {
-		st.pending = make(map[netip.Addr]struct{})
-	}
-	for _, r := range ips {
-		st.pending[r.Addr.Unmap()] = struct{}{}
-	}
-}
-
-// clearPending drops IPs from the pending set after their mirror delivery
-// succeeded.
-func (a *Applier) clearPending(s subject.Subject, ips []nftables.ResolvedIP) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	st := a.states[s]
-	if st == nil || len(st.pending) == 0 {
+	if inst, ok := a.subjects[s]; !ok || inst.generation != generation || a.states[s] != planned {
 		return
 	}
-	for _, r := range ips {
-		delete(st.pending, r.Addr.Unmap())
+	if planned.pending == nil && !succeeded {
+		planned.pending = make(map[netip.Addr]struct{})
+	}
+	for _, ip := range ips {
+		if succeeded {
+			delete(planned.pending, ip.Addr.Unmap())
+		} else {
+			planned.pending[ip.Addr.Unmap()] = struct{}{}
+		}
 	}
 }
 
@@ -317,7 +339,9 @@ func (st *refreshState) plan(active map[netip.Addr]struct{}, now time.Time) []nf
 	current := make(map[netip.Addr]struct{}, len(active))
 	refresh := make(map[netip.Addr]struct{})
 	for addr := range active {
-		if _, ok := st.dyn[addr]; ok {
+		_, installed := st.dyn[addr]
+		_, retained := st.renewalEndpoints[nftables.TCPEndpoint{Addr: addr}]
+		if installed || retained {
 			current[addr] = struct{}{}
 			refresh[addr] = struct{}{}
 		}
@@ -328,7 +352,9 @@ func (st *refreshState) plan(active map[netip.Addr]struct{}, now time.Time) []nf
 		if _, stillActive := current[addr]; stillActive {
 			continue
 		}
-		if _, known := st.dyn[addr]; known {
+		_, installed := st.dyn[addr]
+		_, retained := st.renewalEndpoints[nftables.TCPEndpoint{Addr: addr}]
+		if installed || retained {
 			refresh[addr] = struct{}{}
 		}
 	}

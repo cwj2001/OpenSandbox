@@ -41,12 +41,14 @@ garbage line without fields
 	assert.Equal(t, "10.10.0.5", entries[0].src.String())
 	assert.Equal(t, "1.1.1.1", entries[0].dst.String())
 	assert.Equal(t, "ESTABLISHED", entries[0].state)
+	assert.Equal(t, uint16(443), entries[0].port, "reply dport must not replace original destination port")
 
 	assert.Equal(t, "TIME_WAIT", entries[1].state)
 
 	assert.Equal(t, "fd00::5", entries[2].src.String())
 	assert.Equal(t, "2001:db8::1", entries[2].dst.String())
 	assert.Equal(t, "SYN_SENT", entries[2].state)
+	assert.Equal(t, uint16(8080), entries[2].port)
 }
 
 func TestActiveConntrackTCPState(t *testing.T) {
@@ -122,8 +124,8 @@ func TestRefreshTickBucketsAndApplies(t *testing.T) {
 	require.NoError(t, a.ApplyPolicy(ctx, s2, pol))
 
 	// seed leases for both subjects (mirrors the dyn sets in the kernel)
-	require.NoError(t, a.AddResolvedIPs(ctx, s1, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
-	require.NoError(t, a.AddResolvedIPs(ctx, s2, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("2.2.2.2"), TTL: time.Minute}}))
+	require.NoError(t, a.AddResolvedDomain(ctx, s1, a.subjects[s1].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
+	require.NoError(t, a.AddResolvedDomain(ctx, s2, a.subjects[s2].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("2.2.2.2"), TTL: time.Minute}}))
 
 	a.conntrack = func(context.Context) ([]conntrackEntry, error) {
 		return []conntrackEntry{
@@ -175,7 +177,7 @@ func TestRefreshTickPendingRedelivery(t *testing.T) {
 	pol, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"example.com"}]}`)
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, s, pol))
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
 
 	a.conntrack = func(context.Context) ([]conntrackEntry, error) { return nil, nil }
 	mirrorFail := true
@@ -254,7 +256,7 @@ func TestRefreshTickNoActiveConnectionsSkipsSubject(t *testing.T) {
 	pol, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"example.com"}]}`)
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, s, pol))
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
 
 	a.conntrack = func(context.Context) ([]conntrackEntry, error) { return nil, nil }
 
@@ -279,14 +281,14 @@ func TestRefreshTickUsesReboundDispatchIP(t *testing.T) {
 	pol, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"example.com"}]}`)
 	require.NoError(t, err)
 	require.NoError(t, a.ApplyPolicy(ctx, s, pol))
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
 
 	// the subject's IP moved (rebind: deny-first re-registration wipes the
 	// old leases, then the sandbox re-learns its DNS after re-activation)
 	moved := testSlot("u-1", "10.0.0.7")
 	require.NoError(t, a.ApplyDenyFirst(ctx, s, moved))
 	require.NoError(t, a.ApplyPolicy(ctx, s, pol))
-	require.NoError(t, a.AddResolvedIPs(ctx, s, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
+	require.NoError(t, a.AddResolvedDomain(ctx, s, a.subjects[s].generation, "example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("1.1.1.1"), TTL: time.Minute}}))
 
 	a.conntrack = func(context.Context) ([]conntrackEntry, error) {
 		return []conntrackEntry{

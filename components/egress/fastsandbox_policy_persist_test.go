@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"sync"
@@ -33,6 +34,7 @@ import (
 	"github.com/alibaba/opensandbox/egress/pkg/actionhandler"
 	"github.com/alibaba/opensandbox/egress/pkg/constants"
 	"github.com/alibaba/opensandbox/egress/pkg/fastsandboxnft"
+	"github.com/alibaba/opensandbox/egress/pkg/nftables"
 	"github.com/alibaba/opensandbox/egress/pkg/policy"
 	"github.com/alibaba/opensandbox/egress/pkg/subject"
 )
@@ -951,71 +953,219 @@ func mustStatusBodyJSON(t *testing.T, srv *fastSandboxPolicyServer) string {
 	return rec.Body.String()
 }
 
-const unsupportedFastDomainPorts = `{"defaultAction":"deny","egress":[{"action":"allow","target":"api.example.com","ports":[443]}]}`
-
-func TestFastDomainPortsBindingRejectsBeforeEffects(t *testing.T) {
-	h := newPolicyPersistHarness(t)
-	subj := subject.FromSandboxUID(policyTestUID)
-	rec := doAction(t, h.srv, bindBody(t, policyTestUID, vaultTestIP, testFenceR, testFenceA, 1, strPtr(unsupportedFastDomainPorts)))
-	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-	require.Contains(t, rec.Body.String(), "not yet supported by Fast Sandbox")
-	_, registered := h.reg.Fence(subj)
-	require.False(t, registered)
-	require.Empty(t, h.nft.denyFirst)
-	require.Zero(t, h.nft.appliedCount())
-	require.Empty(t, h.files, "no policy or vault persistence before rejection")
-	require.NotContains(t, h.srv.policies, subj)
+func TestFastSandboxDomainPortsRejectBeforeEffects(t *testing.T) {
+	const scoped = `{"defaultAction":"deny","egress":[{"action":"allow","target":"api.example.com","ports":[443]}]}`
+	for _, profile := range []string{"chained", "missing_nft"} {
+		for _, operation := range []string{"binding", "relay", "import_before_binding", "import_active"} {
+			t.Run(profile+"/"+operation, func(t *testing.T) {
+				t.Setenv(constants.EnvUpstreamProxy, "")
+				h := newPolicyPersistHarness(t)
+				subj := subject.FromSandboxUID(policyTestUID)
+				registered := operation == "relay" || operation == "import_active"
+				if registered {
+					h.readySubject(t, policyTestUID, vaultTestIP)
+				}
+				file := h.fileFor(policyTestUID)
+				before := append([]byte(nil), file.data...)
+				beforeExists, saves, deletes := file.exists, file.saveCalls, file.deleteCalls
+				applied, denied := h.nft.appliedCount(), len(h.nft.denyFirst)
+				redirects := 0
+				h.srv.dnsRedirectApply = func(context.Context, []netip.Addr, int) error {
+					redirects++
+					return nil
+				}
+				if profile == "chained" {
+					t.Setenv(constants.EnvUpstreamProxy, "http://proxy.example:3128")
+				} else {
+					h.srv.nft = nil
+				}
+				var rec *httptest.ResponseRecorder
+				switch operation {
+				case "binding":
+					rec = doAction(t, h.srv, bindBody(t, policyTestUID, vaultTestIP, testFenceR, testFenceA, 1, strPtr(scoped)))
+				case "relay":
+					rec = doPolicy(t, h.srv, http.MethodPut, policyTestUID, policyPutDoc(scoped, 1, false, true), "")
+				default:
+					path := filepath.Join(t.TempDir(), "policy-bundle.json")
+					source := h.seedPolicyBundle(t, path, 2, scoped)
+					rec = doAction(t, h.srv, policySnapshotBody(t, policyTestUID, testFenceR, testFenceA, "POLICY_IMPORT", path, nil))
+					got, err := os.ReadFile(path)
+					require.NoError(t, err)
+					require.Equal(t, source, got)
+				}
+				require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+				require.Equal(t, before, file.data)
+				require.Equal(t, beforeExists, file.exists)
+				require.Equal(t, saves, file.saveCalls)
+				require.Equal(t, deletes, file.deleteCalls)
+				require.Equal(t, applied, h.nft.appliedCount())
+				require.Len(t, h.nft.denyFirst, denied)
+				require.Zero(t, redirects)
+				if registered {
+					require.Equal(t, policy.ActionAllow, h.reg.UserPolicy(subj).Evaluate("api.example.com"))
+					require.False(t, h.reg.UserPolicy(subj).HasDomainPorts())
+					require.Equal(t, int64(1), h.srv.policies[subj].revision)
+				} else {
+					_, exists := h.reg.Get(subj)
+					require.False(t, exists)
+					require.NotContains(t, h.srv.policies, subj)
+				}
+			})
+		}
+	}
 }
 
-func TestFastDomainPortsRelayRejectsBeforeEffects(t *testing.T) {
-	h := newPolicyPersistHarness(t)
-	subj := h.readySubject(t, policyTestUID, vaultTestIP)
-	beforePolicy := h.reg.EffectivePolicy(subj)
-	beforeWrites := h.nft.appliedCount()
-	beforeFiles := len(h.files)
-	rec := doPolicy(t, h.srv, http.MethodPut, policyTestUID, policyPutDoc(unsupportedFastDomainPorts, 1, false, true), "")
-	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-	require.Contains(t, rec.Body.String(), "not yet supported by Fast Sandbox")
-	require.Equal(t, beforeWrites, h.nft.appliedCount())
-	require.Equal(t, beforeFiles, len(h.files))
-	require.Equal(t, beforePolicy, h.reg.EffectivePolicy(subj))
-	rec = doPolicy(t, h.srv, http.MethodGet, policyTestUID, "", "")
-	revision, _ := mustPolicyRevision(t, rec)
-	require.Equal(t, int64(1), revision)
+func TestFastSandboxDomainPortsPersistedReloadCapabilities(t *testing.T) {
+	const scoped = `{"defaultAction":"deny","egress":[{"action":"allow","target":"api.example.com","ports":[443]}]}`
+	for _, chained := range []bool{false, true} {
+		t.Run(fmt.Sprintf("chained_%t", chained), func(t *testing.T) {
+			t.Setenv(constants.EnvEgressMode, constants.PolicyDnsOnly)
+			t.Setenv(constants.EnvUpstreamProxy, "")
+			h := newPolicyPersistHarness(t)
+			runner := wirePolicyPortApplier(h.srv, 0)
+			h.seedPolicyFile(t, policyTestUID, testFenceR, testFenceA, 7, scoped)
+			file := h.fileFor(policyTestUID)
+			before := append([]byte(nil), file.data...)
+			if chained {
+				t.Setenv(constants.EnvUpstreamProxy, "http://proxy.example:3128")
+			}
+			subj := h.readySubject(t, policyTestUID, vaultTestIP)
+			require.Equal(t, before, file.data, "capability rejection must keep valid durable policy")
+			require.Zero(t, file.saveCalls)
+			require.Zero(t, file.deleteCalls)
+			if chained {
+				require.Equal(t, policy.ActionDeny, h.reg.UserPolicy(subj).Evaluate("api.example.com"))
+				require.False(t, h.reg.UserPolicy(subj).HasDomainPorts())
+				require.Contains(t, h.srv.policies[subj].degraded, "capability rejected")
+			} else {
+				require.True(t, h.reg.UserPolicy(subj).HasDomainPorts())
+				require.Equal(t, int64(7), h.srv.policies[subj].revision)
+				require.Empty(t, h.srv.policies[subj].degraded)
+				assertFastDomainPortsResolution(t, h, runner)
+			}
+		})
+	}
 }
 
-func TestFastDomainPortsImportRejectsBeforeEffects(t *testing.T) {
+func TestFastSandboxDomainPortsImportSupported(t *testing.T) {
+	t.Setenv(constants.EnvEgressMode, constants.PolicyDnsOnly)
+	t.Setenv(constants.EnvUpstreamProxy, "")
+	const scoped = `{"defaultAction":"deny","egress":[{"action":"allow","target":"api.example.com","ports":[443]}]}`
+	for _, registered := range []bool{false, true} {
+		t.Run(fmt.Sprintf("registered_%t", registered), func(t *testing.T) {
+			h := newPolicyPersistHarness(t)
+			runner := wirePolicyPortApplier(h.srv, 0)
+			if registered {
+				h.readySubject(t, policyTestUID, vaultTestIP)
+			}
+			path := filepath.Join(t.TempDir(), "policy-bundle.json")
+			h.seedPolicyBundle(t, path, 8, scoped)
+			rec := doAction(t, h.srv, policySnapshotBody(t, policyTestUID, testFenceR, testFenceA, "POLICY_IMPORT", path, nil))
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			if !registered {
+				h.readySubject(t, policyTestUID, vaultTestIP)
+			}
+			subj := subject.FromSandboxUID(policyTestUID)
+			require.True(t, h.reg.UserPolicy(subj).HasDomainPorts())
+			require.Equal(t, int64(8), h.srv.policies[subj].revision)
+			_, body := decodePolicyFile(t, h.fileFor(policyTestUID))
+			assertPolicyPortBody(t, body, scoped)
+			assertFastDomainPortsResolution(t, h, runner)
+		})
+	}
+}
+
+func TestFastSandboxDNSSelectorFencesResolvedAnswers(t *testing.T) {
+	t.Setenv(constants.EnvUpstreamProxy, "")
 	h := newPolicyPersistHarness(t)
-	bundlePath := filepath.Join(t.TempDir(), "bundle", "policy.json")
-	original := h.seedPolicyBundle(t, bundlePath, 5, unsupportedFastDomainPorts)
-	rec := doAction(t, h.srv, policySnapshotBody(t, policyTestUID, snapshotResumeR, snapshotResumeA, "POLICY_IMPORT", bundlePath, nil))
-	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
-	require.Contains(t, rec.Body.String(), "not yet supported by Fast Sandbox")
-	require.Empty(t, h.files)
-	require.Empty(t, h.nft.denyFirst)
-	require.Zero(t, h.nft.appliedCount())
-	_, registered := h.reg.Fence(subject.FromSandboxUID(policyTestUID))
-	require.False(t, registered)
-	carried, err := os.ReadFile(bundlePath)
+	runner := wirePolicyPortApplier(h.srv, 0)
+	podNft := h.srv.nft.(*fastsandboxnft.Applier)
+	scoped := `{"defaultAction":"deny","egress":[{"action":"allow","target":"api.example.com","ports":[443]}]}`
+	subj := setBindingAndReady(t, h.srv, h.reg, policyTestUID, vaultTestIP, strPtr(scoped))
+	selectPolicy := fastSandboxQueryPolicySelector(context.Background(), h.reg, podNft)
+	remote := netip.MustParseAddr(vaultTestIP)
+	selected, reason := selectPolicy(remote)
+	require.Empty(t, reason)
+	require.NotNil(t, selected)
+	answer := []nftables.ResolvedIP{{Addr: netip.MustParseAddr("198.51.100.20"), TTL: time.Minute}}
+	require.NoError(t, selected.OnResolved("api.example.com", answer))
+	_, oldGeneration, ok := podNft.ResolutionPolicy(subj, remote)
+	require.True(t, ok)
+	att := testAttachment().Network
+	att.IP = remote
+	require.NoError(t, podNft.ApplyDenyFirst(context.Background(), subj, att))
+	require.NoError(t, podNft.ApplyPolicy(context.Background(), subj, h.reg.EffectivePolicy(subj)))
+	_, nextGeneration, ok := podNft.ResolutionPolicy(subj, remote)
+	require.True(t, ok)
+	require.NotEqual(t, oldGeneration, nextGeneration)
+	before := runner.count()
+	require.ErrorIs(t, selected.OnResolved("api.example.com", answer), fastsandboxnft.ErrLeaseRejected)
+	require.Equal(t, before, runner.count(), "stale DNS cannot install into a rebound subject")
+	selected, reason = selectPolicy(remote)
+	require.Empty(t, reason)
+	require.NotNil(t, selected)
+	require.NoError(t, selected.OnResolved("api.example.com", answer))
+	require.NoError(t, podNft.Remove(context.Background(), subj))
+	selected, reason = selectPolicy(remote)
+	require.Nil(t, selected)
+	require.Contains(t, reason, "no active nft generation")
+}
+
+func TestFastSandboxDNSSelectorUsesInstalledPolicySnapshot(t *testing.T) {
+	t.Setenv(constants.EnvUpstreamProxy, "")
+	h := newPolicyPersistHarness(t)
+	runner := wirePolicyPortApplier(h.srv, 0)
+	podNft := h.srv.nft.(*fastsandboxnft.Applier)
+	oldPolicy := `{"defaultAction":"deny","egress":[{"action":"allow","target":"old.example.com","ports":[443]}]}`
+	subj := setBindingAndReady(t, h.srv, h.reg, policyTestUID, vaultTestIP, strPtr(oldPolicy))
+	remote := netip.MustParseAddr(vaultTestIP)
+	selectPolicy := fastSandboxQueryPolicySelector(context.Background(), h.reg, podNft)
+	oldQuery, reason := selectPolicy(remote)
+	require.Empty(t, reason)
+	require.NotNil(t, oldQuery)
+
+	next, err := policy.ParsePolicy(`{"defaultAction":"deny","egress":[{"action":"allow","target":"new.example.com","ports":[8443]}]}`)
 	require.NoError(t, err)
-	require.Equal(t, original, carried)
+	att := testAttachment().Network
+	att.IP = remote
+	require.NoError(t, podNft.ApplyDenyFirst(context.Background(), subj, att))
+	require.NoError(t, podNft.ApplyPolicy(context.Background(), subj, next))
+	// Freeze the publication gap deterministically: nft has the new
+	// incarnation, but the registry still exposes the previous policy.
+	require.Equal(t, policy.ActionAllow, h.reg.EffectivePolicy(subj).Evaluate("old.example.com"))
+	selected, reason := selectPolicy(remote)
+	require.Empty(t, reason)
+	require.NotNil(t, selected)
+	require.Equal(t, policy.ActionDeny, selected.Policy.Evaluate("old.example.com"))
+	require.Equal(t, policy.ActionAllow, selected.Policy.Evaluate("new.example.com"))
+	require.Equal(t, []int{8443}, selected.Policy.DomainPermissions("new.example.com").AllowPorts)
+	answer := []nftables.ResolvedIP{{Addr: netip.MustParseAddr("198.51.100.20"), TTL: time.Minute}}
+	before := runner.count()
+	require.ErrorIs(t, oldQuery.OnResolved("old.example.com", answer), fastsandboxnft.ErrLeaseRejected)
+	require.Equal(t, before, runner.count(), "the old policy snapshot must retain its retired generation")
+	require.NoError(t, selected.OnResolved("new.example.com", answer))
+	require.Equal(t, before+1, runner.count())
+
+	// A registry lookup begun on the retired source must not acquire the
+	// current incarnation's policy or generation after an IP-changing rebind.
+	att.IP = netip.MustParseAddr("10.0.0.77")
+	require.NoError(t, podNft.ApplyDenyFirst(context.Background(), subj, att))
+	require.NoError(t, podNft.ApplyPolicy(context.Background(), subj, next))
+	resolved, known := h.reg.Resolve(subject.SubjectKey{SourceIP: remote})
+	require.True(t, known)
+	require.Equal(t, subj, resolved)
+	selected, reason = selectPolicy(remote)
+	require.Nil(t, selected)
+	require.Contains(t, reason, "no active nft generation")
 }
 
-func TestFastDomainPortsDurableReloadFailsClosedWithoutDiscardingFile(t *testing.T) {
-	h := newPolicyPersistHarness(t)
-	h.seedPolicyFile(t, policyTestUID, testFenceR, testFenceA, 5, unsupportedFastDomainPorts)
-	original := append([]byte(nil), h.fileFor(policyTestUID).data...)
-	rec := doAction(t, h.srv, bindBody(t, policyTestUID, vaultTestIP, testFenceR, testFenceA, 1, strPtr(policyAllow())))
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	subj := subject.FromSandboxUID(policyTestUID)
-	require.Equal(t, policy.ActionDeny, h.reg.EffectivePolicy(subj).Evaluate("api.example.com"))
-	require.Equal(t, original, h.fileFor(policyTestUID).data)
-	require.Zero(t, h.nft.appliedCount())
-	rec = doPolicy(t, h.srv, http.MethodGet, policyTestUID, "", "")
-	revision, doc := mustPolicyRevision(t, rec)
-	require.Zero(t, revision, "the unsupported durable revision must not become the live image")
-	var served policy.NetworkPolicy
-	require.NoError(t, json.Unmarshal(doc.Policy, &served))
-	require.Equal(t, policy.ActionDeny, served.DefaultAction)
-	require.Empty(t, served.Egress)
+func assertFastDomainPortsResolution(t *testing.T, h *policyPersistHarness, runner *policyPortNFTRunner) {
+	t.Helper()
+	podNft := h.srv.nft.(*fastsandboxnft.Applier)
+	selected, reason := fastSandboxQueryPolicySelector(context.Background(), h.reg, podNft)(netip.MustParseAddr(vaultTestIP))
+	require.Empty(t, reason)
+	require.NotNil(t, selected)
+	require.NoError(t, selected.OnResolved("api.example.com", []nftables.ResolvedIP{{Addr: netip.MustParseAddr("198.51.100.20")}}))
+	require.Contains(t, runner.last(t), "198.51.100.20 . 443 timeout")
+	require.NotContains(t, runner.last(t), "_dyn_v4 { 198.51.100.20")
 }

@@ -797,7 +797,15 @@ def test_delete_uses_cr_identity_when_runtime_observation_is_gone(persisted_fsb)
     assert client.delete(url).status_code == 404
 
 
-def test_upstream_proxy_config_rejects_network_policy_create(http_fsb):
+@pytest.mark.parametrize(
+    "rules",
+    [
+        [],
+        [{"action": "allow", "target": "example.com", "ports": [443]}],
+        [{"action": "deny", "target": "*.example.com", "ports": [80]}],
+    ],
+)
+def test_upstream_proxy_config_rejects_network_policy_create(http_fsb, rules):
     client, fake, service = http_fsb
     service._app_config.egress = EgressConfig(
         image="opensandbox/egress:v1.1.7",
@@ -812,7 +820,7 @@ def test_upstream_proxy_config_rejects_network_policy_create(http_fsb):
             "entrypoint": ["python"],
             "timeout": 3600,
             "resourceLimits": {"cpu": "500m", "memory": "512Mi"},
-            "networkPolicy": {"defaultAction": "deny", "egress": []},
+            "networkPolicy": {"defaultAction": "deny", "egress": rules},
         },
     )
 
@@ -1024,14 +1032,20 @@ def test_policy_rejects_invalid_input_and_other_tenant(persisted_fsb):
         set_current_tenant(previous)
 
 
-def test_http_create_port_scopes_roundtrip_through_egress_binding(http_fsb):
-    client, fake, _ = http_fsb
+@pytest.mark.parametrize("classic_mode", ["dns", "dns+nft"])
+def test_http_create_port_scopes_roundtrip_through_egress_binding(http_fsb, classic_mode):
+    client, fake, service = http_fsb
+    # Shared-Fastlet nft enforcement is independent of the classic sidecar mode.
+    service._app_config.egress = EgressConfig(image="egress:test", mode=classic_mode)
     policy = {
         "defaultAction": "deny",
         "egress": [
             {"action": "deny", "ports": [25, 587]},
             {"action": "allow", "target": "10.0.0.0/24", "ports": [443, 80]},
             {"action": "allow", "target": "Example.COM"},
+            {"action": "allow", "target": "example.com", "ports": [443]},
+            {"action": "deny", "target": "example.com", "ports": [80]},
+            {"action": "allow", "target": "*.example.com", "ports": [8443]},
         ],
     }
     response = client.post(
@@ -1074,6 +1088,9 @@ def test_policy_supports_port_scoped_rules(persisted_fsb, default_action):
             {"action": "allow", "target": "10.0.0.0/24", "ports": [8080]},
             {"action": "allow", "target": "2001:db8::5", "ports": [8443]},
             {"action": "deny", "target": "Example.COM"},
+            {"action": "allow", "target": "example.com", "ports": [443]},
+            {"action": "deny", "target": "example.com", "ports": [80]},
+            {"action": "allow", "target": "*.example.com", "ports": [8443]},
         ],
     }
     expected = deepcopy(policy)
@@ -1093,11 +1110,13 @@ def test_policy_supports_port_scoped_rules(persisted_fsb, default_action):
         {"action": "deny", "target": "", "ports": [25, 587]},
         {"action": "allow", "target": "example.com"},
         {"action": "deny", "target": "EXAMPLE.COM"},
+        {"action": "deny", "target": "example.com", "ports": [443]},
         {"action": "deny", "ports": [3306]},
     ])
     expected["egress"][0] = {"action": "allow", "target": "", "ports": [587, 25]}
     expected["egress"][3] = {"action": "allow", "target": "10.0.0.5", "ports": [80, 443]}
     expected["egress"][7] = {"action": "allow", "target": "example.com"}
+    expected["egress"][8] = {"action": "deny", "target": "example.com", "ports": [443]}
     expected["egress"].append({"action": "deny", "target": "", "ports": [3306]})
     assert patched.status_code == 200
     assert patched.json()["policy"] == expected
@@ -1132,10 +1151,8 @@ def test_policy_supports_port_scoped_rules(persisted_fsb, default_action):
         {"action": "deny", "ports": [65536]},
         {"action": "deny", "ports": [80, 80]},
         {"action": "deny", "ports": list(range(1, 258))},
-        {"action": "allow", "target": "example.com", "ports": [443]},
-        {"action": "allow", "target": "*.example.com", "ports": [443]},
     ],
-    ids=["empty", "too-low", "too-high", "duplicate", "too-many", "domain", "wildcard"],
+    ids=["empty", "too-low", "too-high", "duplicate", "too-many"],
 )
 def test_policy_invalid_ports_rejected_before_write(persisted_fsb, method, rule):
     client, fake, _, sandbox_id = persisted_fsb
@@ -1156,10 +1173,7 @@ def test_policy_invalid_ports_rejected_before_write(persisted_fsb, method, rule)
     else:
         response = client.request(method, url, json=[rule] if method == "PATCH" else {"egress": [rule]})
 
-    domain_scoped = rule.get("target") in ("example.com", "*.example.com")
-    assert response.status_code == (400 if domain_scoped else 422)
-    if domain_scoped:
-        assert "not yet supported by Fast Sandbox" in response.json()["detail"]["message"]
+    assert response.status_code == 422
     assert fake.last_create is create_before
     assert fake.last_relay is None
     assert fake.last_update is None

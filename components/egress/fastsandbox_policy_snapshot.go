@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/alibaba/opensandbox/egress/pkg/actionhandler"
+	"github.com/alibaba/opensandbox/egress/pkg/constants"
 	"github.com/alibaba/opensandbox/egress/pkg/log"
 	"github.com/alibaba/opensandbox/egress/pkg/policy"
 	"github.com/alibaba/opensandbox/egress/pkg/subject"
@@ -244,7 +245,7 @@ func (s *fastSandboxPolicyServer) applyPolicyImport(env *actionhandler.Envelope)
 	if parseErr != nil {
 		return http.StatusBadRequest, fmt.Errorf("invalid policy bundle content: %v", parseErr)
 	}
-	if err := validateFastSandboxDomainPortPolicy(pol); err != nil {
+	if err := validateDomainPortPolicy(pol, constants.PolicyDnsNft, s.nft != nil); err != nil {
 		return http.StatusBadRequest, err
 	}
 	// The authorized incarnation transfer.

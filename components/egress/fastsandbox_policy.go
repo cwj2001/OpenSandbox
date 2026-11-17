@@ -183,7 +183,7 @@ func (s *fastSandboxPolicyServer) handlePolicyRelayWrite(w http.ResponseWriter, 
 		http.Error(w, "invalid policy: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := validateFastSandboxDomainPortPolicy(pol); err != nil {
+	if err := validateDomainPortPolicy(pol, constants.PolicyDnsNft, s.nft != nil); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

@@ -34,9 +34,9 @@ If you are a cluster administrator looking to configure the platform overlays â€
 
 ### Port-scoped rules
 
-A rule's `target` may be omitted when `ports` is set, so `{"action": "deny", "ports": [25]}` blocks outbound TCP SMTP regardless of destination. IP/CIDR targets combine with TCP ports in both profiles. The classic `dns+nft` sidecar also accepts domains and wildcard domains, for example `{"action": "allow", "target": "api.example.com", "ports": [443]}`: DNS answers create bounded address-plus-port leases, not whole-address grants.
+A rule's `target` may be omitted when `ports` is set, so `{"action": "deny", "ports": [25]}` blocks outbound TCP SMTP regardless of destination. Classic `dns+nft` and Fast Sandbox combine TCP ports with IP, CIDR, domain or wildcard targets. For example, `{"action": "allow", "target": "api.example.com", "ports": [443]}` installs bounded DNS-learned address-plus-port leases, not whole-address grants.
 
-**Profile boundary.** This delivery rejects domain-plus-port rules in Fast Sandbox, DNS-only enforcement and chained upstream proxy configurations before effects. Fast Sandbox's existing IP/CIDR/targetless port rules remain supported; per-subject domain-plus-port execution is a separate delivery, not silently ignored.
+**Profile boundary.** Classic DNS-only enforcement and chained upstream proxy configurations reject domain-plus-port rules before effects. Fast Sandbox uses per-subject nft enforcement independently of the classic mode setting. DNS callbacks capture installed policy, source address and generation atomically; replacement, rebind, reset and removal cannot transfer an old subject's leases to another.
 
 Portless domain rules retain ordered DNS decisions and effective explicit name denies. Scoped allows admit DNS even when scoped TCP denies block their ports; denies are enforced at L4. A targetless port allow does not independently admit DNS under default deny. Static address denies and the platform `reachable.ports.cap` still constrain ordinary allows.
 
