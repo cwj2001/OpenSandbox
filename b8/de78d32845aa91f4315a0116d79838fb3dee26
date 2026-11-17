@@ -1,0 +1,32 @@
+components/egress/pkg/nftables/domain_ports.go
+  s_c4034f0c303ac7::t_9ab3500615aea2 344-350,352-355,357-373,376
+  s_c4034f0c303ac7::t_784ef0c1d97900 351,356,374-375,499-500,520-522,541
+components/egress/pkg/nftables/connection_tracker.go
+  s_697abf75fcf4af::t_a29097a977c88f 35-39,203
+components/egress/pkg/nftables/domain_ports_test.go
+  s_697abf75fcf4af::t_573d1c2f9caa6f 801-906
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b8de78d32845aa91f4315a0116d79838fb3dee26",
+  "prompts": {},
+  "sessions": {
+    "s_697abf75fcf4af": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e376-b48e-7363-b925-560cafac44b5",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_c4034f0c303ac7": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e74a-ca92-7430-a7df-e0979e4d7d73",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
