@@ -1,0 +1,159 @@
+components/egress/main.go
+  s_bad6628f244cb4::t_cbddd0edc4946f 87-98
+components/egress/nft.go
+  s_bad6628f244cb4::t_dc41ec749ac0a9 70,73-74,77
+components/egress/pkg/credentialvault/policy_snapshot.go
+  s_bad6628f244cb4::t_cf865dfea086e2 59-63
+components/egress/pkg/credentialvault/vault.go
+  s_bad6628f244cb4::t_faf30f68d7882b 587,1240,1248-1262
+components/egress/pkg/dnsproxy/infra_test.go
+  s_bad6628f244cb4::t_37dc323b197a24 18,20,78-92,101-102,106,146-149
+components/egress/pkg/dnsproxy/proxy.go
+  s_bad6628f244cb4::t_e83c5252ef38fd 60-61,238-241,287-288,302-310,373-374,377,404-406,408,412,414,418-419,586-588
+sdks/sandbox/javascript/src/api/egress.ts
+  s_52502af86fd360::t_05eef7941a433a 543-552,572-581,589-591
+sdks/sandbox/javascript/src/api/lifecycle.ts
+  s_52502af86fd360::t_59e5e1e58f3bd7 1981-1990,2010-2019,2027-2029
+sdks/sandbox/python/src/opensandbox/api/egress/models/network_rule.py
+  s_52502af86fd360::t_84a4e8451d78ec 35-37,49-58,66
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/network_rule.py
+  s_52502af86fd360::t_96060cb42fd550 35-37,49-58,66
+.github/workflows/egress-test.yml
+  s_df6c9ebebb6801::t_a16397ee5df676 96-104
+components/egress/fastsandbox.go
+  s_c4034f0c303ac7::t_5b0728d89e86af 270,278,281,283
+components/egress/fastsandbox_actions.go
+  s_c4034f0c303ac7::t_653ab56d3cd527 178-183,226-230,266,435-457,467
+components/egress/fastsandbox_actions_v2_test.go
+  s_c4034f0c303ac7::t_234b0e4df0ed51 330-353
+components/egress/fastsandbox_policy.go
+  s_c4034f0c303ac7::t_b9bef213477ce0 186-189
+components/egress/fastsandbox_policy_persist.go
+  s_c4034f0c303ac7::t_6b30fef13b58b3 456-461
+components/egress/fastsandbox_policy_persist_test.go
+  s_c4034f0c303ac7::t_216cf8fc15cc7e 953-1021
+components/egress/fastsandbox_policy_snapshot.go
+  s_c4034f0c303ac7::t_00d54663eddd41 247-249
+components/egress/pkg/credentialvault/domain_ports_test.go
+  s_df6c9ebebb6801::t_6fb5ab63b6a857 1-54
+components/egress/pkg/dnsproxy/proxy_test.go
+  s_c4034f0c303ac7::t_6b413d63e7677b 352,365,370,377,394,404,409,414,424-534
+components/egress/pkg/dnsproxy/selector_test.go
+  s_bad6628f244cb4::t_f2a9bb8747f890 18,59,72-80,144-149,151-154,157-165,170-190,192-195
+components/egress/pkg/nftables/connection_tracker.go
+  s_c4034f0c303ac7::t_0affb91633f2e0 30-36,47-53,105-110,120-129,139,193,198-199
+components/egress/pkg/nftables/connection_tracker_test.go
+  s_c4034f0c303ac7::t_8f30e36913c440 18,102-110
+components/egress/pkg/nftables/connections_linux.go
+  s_c4034f0c303ac7::t_094949a0e99758 26,31-33,95-100
+components/egress/pkg/nftables/connections_linux_test.go
+  s_c4034f0c303ac7::t_5190478cc9f9e6 41
+components/egress/pkg/nftables/connections_other.go
+  s_c4034f0c303ac7::t_b436c843de9bb0 25-27
+components/egress/pkg/nftables/domain_ports.go
+  s_df6c9ebebb6801::t_e7ef1c2a3b95b4 1-528
+components/egress/pkg/nftables/domain_ports_established_linux_test.go
+  s_df6c9ebebb6801::t_78dc07d298a29a 1-197
+components/egress/pkg/nftables/domain_ports_linux_test.go
+  s_df6c9ebebb6801::t_eb78e9040f8f64 1-464
+components/egress/pkg/nftables/domain_ports_test.go
+  s_df6c9ebebb6801::t_6823b0b23c008c 1-800
+components/egress/pkg/nftables/dynamic.go
+  s_c4034f0c303ac7::t_aa738f397baae3 55-58,72-74,89-91,95-96,99-100,102,105-113,115-116,119,122-130,180-183,188-190,194,280,283-303,309-314,320-322,327,332-341,408-412
+components/egress/pkg/nftables/established_drop.go
+  s_c4034f0c303ac7::t_9ad993fe8976b6 57-60,76,101-103,171,174,176-179,181,203,225-233,241-244,373-387
+components/egress/pkg/nftables/manager.go
+  s_c4034f0c303ac7::t_dd49745aef86e3 76-77,86-90,137-145,224,229-257,263,277-279,288,311-313,321-343,347,354-356,359-361,399-400,444-449,500,506-509,542-543,547-548,722-744
+components/egress/pkg/nftables/manager_test.go
+  s_c4034f0c303ac7::t_03417be89d57c6 257,263,295,363,366,370-371,382-383
+components/egress/pkg/nftables/quiescence_test.go
+  s_c4034f0c303ac7::t_c9b884b9805c1f 437-444
+components/egress/pkg/nftables/upstream.go
+  s_c4034f0c303ac7::t_933d469e292141 83-85
+components/egress/pkg/policy/coverage.go
+  s_c4034f0c303ac7::t_886d0280b9b3f1 18,39,43,74-116
+components/egress/pkg/policy/domain_index.go
+  s_c4034f0c303ac7::t_5c1c8b8541af15 29,41-44
+components/egress/pkg/policy/domain_ports.go
+  s_c4034f0c303ac7::t_bf25014d38c84e 1-103
+components/egress/pkg/policy/domain_ports_test.go
+  s_c4034f0c303ac7::t_7aa4f1fa4f7a37 1-96
+components/egress/pkg/policy/policy.go
+  s_c4034f0c303ac7::t_cb73e887ed699f 71-72,101,103-112,118-120,122,132,343
+components/egress/pkg/policy/policy_test.go
+  s_c4034f0c303ac7::t_64ac15d4226db8 147-154
+components/egress/pkg/telemetry/metrics.go
+  s_c4034f0c303ac7::t_384d5f2a00ce20 71
+components/egress/policy_server.go
+  s_c4034f0c303ac7::t_68476e86a4640d 967-970
+components/egress/policy_server_test.go
+  s_c4034f0c303ac7::t_1a632a8625cb2b 1153-1227
+components/egress/policy_utils.go
+  s_c4034f0c303ac7::t_3ccad750caa016 19,35-58
+docs/architecture/network/egress.md
+  s_df6c9ebebb6801::t_94f5e61d0a830e 37,39,41-47
+oseps/0028-domain-port-scoped-egress.md
+  s_df6c9ebebb6801::t_cdccc91bc26abf 1-117
+oseps/README.md
+  s_c4034f0c303ac7::t_e4661f576bd600 36
+server/opensandbox_server/api/schema.py
+  s_c4034f0c303ac7::t_b48335d0e59c01 202-204,238-240
+server/opensandbox_server/services/fast_sandbox/service.py
+  s_c4034f0c303ac7::t_4a7e0b20eaeea7 401,812,818,845-858
+server/opensandbox_server/services/validators.py
+  s_c4034f0c303ac7::t_c2a61518472ce0 513,526-541
+server/tests/test_fsb_service.py
+  s_c4034f0c303ac7::t_969d27709e8bd2 1159-1162
+server/tests/test_schema.py
+  s_c4034f0c303ac7::t_36e1e9ff80aa0c 992-997,1017-1019,1029,1082-1084
+server/tests/test_validators.py
+  s_df6c9ebebb6801::t_1cc2de0b84f90a 796-852
+specs/egress-api.yaml
+  s_c4034f0c303ac7::t_496b7151bd0fd1 525-534,542,545-548
+specs/sandbox-lifecycle.yml
+  s_c4034f0c303ac7::t_c6e600eb9349c9 2686-2695,2703,2706-2709
+tests/python/tests/test_sandbox_e2e.py
+  s_df6c9ebebb6801::t_7f18e151d86fbe 486-490
+tests/python/tests/test_sandbox_e2e_sync.py
+  s_df6c9ebebb6801::t_9092131f90261d 413-417
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c5b488364dc23e24792dbb8f74c77340580eaabc",
+  "prompts": {},
+  "sessions": {
+    "s_52502af86fd360": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e749-03ad-737a-be4f-577f86c8c46f",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_bad6628f244cb4": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e368-322d-7048-82b2-ff67676f4506",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_c4034f0c303ac7": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e74a-ca92-7430-a7df-e0979e4d7d73",
+        "model": "unknown"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_df6c9ebebb6801": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1d3f8-9aef-73da-b071-f0e1b0fd3c17",
+        "model": "unknown"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
