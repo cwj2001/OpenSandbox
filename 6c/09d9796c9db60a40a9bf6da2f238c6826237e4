@@ -1,0 +1,122 @@
+components/egress/pkg/fastsandboxnft/domain_test.go
+  s_47b95750037d99::t_dd7ba62eb7c6b9 1-372,374-400,404-405,407,409-415,417-423,425-431,434-436
+  s_47b95750037d99::t_2a6d2d67792905 437-478,486-487,495-496,498-527
+  s_47b95750037d99::t_856d00fa6e1ac6 416,424,432
+  s_47b95750037d99::t_b4e0773900161e 373,401-403,406,408,433,479-485,488-494,497
+  s_47b95750037d99::t_5201779197ff73 528-530
+  s_df6c9ebebb6801::t_2cb599bb7a41a4 531-535
+components/egress/pkg/fastsandboxnft/domain_linux_test.go
+  s_47b95750037d99::t_d0507d56f8ad42 426-478
+  s_47b95750037d99::t_541213398197d2 1-425
+components/egress/pkg/fastsandboxnft/domain.go
+  s_47b95750037d99::t_9e3ed581ec8c4f 1-430
+  s_47b95750037d99::t_1517e52ab11245 431-433
+  s_df6c9ebebb6801::t_9603feb974f0d6 434-494
+.github/workflows/egress-test.yml
+  s_df6c9ebebb6801::t_c166a0aee23332 113-114
+  s_df6c9ebebb6801::t_702dc3e2d6865d 110-112
+components/egress/fastsandbox.go
+  s_697abf75fcf4af::t_d1d0c7d7e8f086 258-259,481-511
+components/egress/fastsandbox_actions.go
+  s_697abf75fcf4af::t_6ab672fb1728ab 449
+components/egress/fastsandbox_actions_v2_test.go
+  s_697abf75fcf4af::t_e709c66ff35826 332-334,337-341,343
+components/egress/fastsandbox_policy.go
+  s_697abf75fcf4af::t_07350b77dde99f 186
+components/egress/fastsandbox_policy_persist.go
+  s_697abf75fcf4af::t_e40c2c6ae7b411 48,457
+components/egress/fastsandbox_policy_persist_test.go
+  s_697abf75fcf4af::t_b50a7995d29d28 24,37,956-1016,1018-1079,1081-1111,1114-1115,1117-1127,1129-1159,1162-1170
+components/egress/fastsandbox_policy_relay_test.go
+  s_697abf75fcf4af::t_e5f3503cb3ae71 610-625
+components/egress/fastsandbox_policy_snapshot.go
+  s_697abf75fcf4af::t_59c4d7f474bdd1 37,248
+components/egress/pkg/fastsandboxnft/fastsandboxnft_linux_test.go
+  s_697abf75fcf4af::t_c41077774954d4 62
+components/egress/pkg/fastsandboxnft/fastsandboxnft_test.go
+  s_ac3b2446bfcf9a::t_147be2d1dee415 137-138,170,173,182,191,194-195,202-208,217-219,223,226,236,246,255,259,261,269,328,400,523,681,1299,1331
+components/egress/pkg/fastsandboxnft/refresh_test.go
+  s_697abf75fcf4af::t_981a75a7e40943 44,51,127-128,180,259,284,291
+sdks/sandbox/javascript/src/api/egress.ts
+  s_52502af86fd360::t_2338c60b9b6c00 572,579-581
+sdks/sandbox/javascript/src/api/lifecycle.ts
+  s_52502af86fd360::t_b1b7e047837e9b 2010,2017-2019
+sdks/sandbox/python/src/opensandbox/api/egress/models/network_rule.py
+  s_52502af86fd360::t_57cad54adf0685 49,56-58
+sdks/sandbox/python/src/opensandbox/api/lifecycle/models/network_rule.py
+  s_52502af86fd360::t_471171cd558158 49,56-58
+server/opensandbox_server/api/schema.py
+  s_697abf75fcf4af::t_928337c4633805 203-204
+server/tests/test_fsb_service.py
+  s_697abf75fcf4af::t_c62c1a58edf58d 800-808,823,1035-1039,1046-1048,1091-1093,1113,1119,1155,1176
+specs/egress-api.yaml
+  s_697abf75fcf4af::t_959d21d651509f 525,532-534
+specs/sandbox-lifecycle.yml
+  s_697abf75fcf4af::t_b029731aad230d 2686,2693-2695
+tests/python/README.md
+  s_ac3b2446bfcf9a::t_67f5ddc1874f29 89
+components/egress/pkg/fastsandboxnft/fastsandboxnft.go
+  s_47b95750037d99::t_9840240a70106d 58,167-169,180,184,186-196,251,258-259,281-282,290-291,319,331-333,337-339,341-342,348-349,364-368,370,376-378,424,430-431,444-448,461-462,480-486,490,502-504,692,732-736,800,815-817,843,846,958-972,1013,1020-1053
+components/egress/pkg/fastsandboxnft/refresh.go
+  s_47b95750037d99::t_66d7c824bff938 21,41,50-59,87,100-105,175-179,190,198-199,202,205-221,225-226,228-230,239-243,247,250,252,255,292-293,296,299-307,342-344,355-357
+docs/architecture/network/egress.md
+  s_47b95750037d99::t_16c2aa100fafb9 37,39
+sdks/sandbox/csharp/README.md
+  s_47b95750037d99::t_a1e0bdaaa295dd 499-501
+sdks/sandbox/go/README.md
+  s_47b95750037d99::t_53d33427d6acf1 107
+sdks/sandbox/javascript/README.md
+  s_47b95750037d99::t_bcbe2c857a1639 464
+sdks/sandbox/kotlin/README.md
+  s_47b95750037d99::t_0f3f5743c530cc 551
+sdks/sandbox/python/README.md
+  s_47b95750037d99::t_23744f6cfd5000 622
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6c09d9796c9db60a40a9bf6da2f238c6826237e4",
+  "prompts": {},
+  "sessions": {
+    "s_47b95750037d99": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e760-2453-742a-a920-2511aa0be9fa",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_52502af86fd360": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e749-03ad-737a-be4f-577f86c8c46f",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_697abf75fcf4af": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1e376-b48e-7363-b925-560cafac44b5",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_ac3b2446bfcf9a": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e76a-12b8-7601-8d79-af7cf579e5d6",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_df6c9ebebb6801": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1d3f8-9aef-73da-b071-f0e1b0fd3c17",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
