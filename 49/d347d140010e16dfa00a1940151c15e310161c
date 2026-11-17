@@ -1,0 +1,52 @@
+sdks/sandbox/go/opensandbox_test.go
+  s_52502af86fd360::t_7889b8dc05bcc0 681
+  s_52502af86fd360::t_0697f83dcf725e 678-680
+  s_52502af86fd360::t_7b329a3b922d2a 682-684
+  s_c4034f0c303ac7::t_220aa729c047b2 672-677
+sdks/sandbox/csharp/src/OpenSandbox/Adapters/NetworkPolicyCodec.cs
+  s_52502af86fd360::t_3a5c0a0eaf81f3 58-62
+sdks/sandbox/csharp/src/OpenSandbox/Models/Sandboxes.cs
+  s_52502af86fd360::t_b8e4af5bd2e907 113-116
+sdks/sandbox/csharp/tests/OpenSandbox.Tests/EgressAdapterNetworkPolicyTests.cs
+  s_52502af86fd360::t_a6446124705466 365,367-373,375,378-401
+sdks/sandbox/go/types.go
+  s_52502af86fd360::t_11f46509a26aef 145-149
+sdks/sandbox/javascript/src/models/sandboxes.ts
+  s_52502af86fd360::t_d17ebd0b5e9bd5 68-70
+sdks/sandbox/javascript/tests/egressPortScopedRules.test.mjs
+  s_52502af86fd360::t_c386df0b7c5ded 18,96-126
+sdks/sandbox/kotlin/sandbox/src/main/kotlin/com/alibaba/opensandbox/sandbox/domain/models/sandboxes/SandboxModels.kt
+  s_52502af86fd360::t_63b5aa8030c374 268-270
+sdks/sandbox/kotlin/sandbox/src/test/kotlin/com/alibaba/opensandbox/sandbox/domain/models/NetworkRuleModelTest.kt
+  s_52502af86fd360::t_0169790eeb50cd 151,162,169-170,175
+sdks/sandbox/kotlin/sandbox/src/test/kotlin/com/alibaba/opensandbox/sandbox/infrastructure/adapters/converter/NetworkRuleReadBackTest.kt
+  s_52502af86fd360::t_37b4e9316edb85 20-21,68-94
+sdks/sandbox/python/src/opensandbox/models/sandboxes.py
+  s_52502af86fd360::t_91ab9e3315b118 136-139
+sdks/sandbox/python/tests/test_converters_and_error_handling.py
+  s_52502af86fd360::t_43668ab73127fa 706-707,725-727,738-740,754,782,784-790,1113-1114,1117-1118,1121-1123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "49d347d140010e16dfa00a1940151c15e310161c",
+  "prompts": {},
+  "sessions": {
+    "s_52502af86fd360": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e749-03ad-737a-be4f-577f86c8c46f",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    },
+    "s_c4034f0c303ac7": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e74a-ca92-7430-a7df-e0979e4d7d73",
+        "model": "unknown"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
