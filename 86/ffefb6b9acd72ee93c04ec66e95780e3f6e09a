@@ -1,0 +1,19 @@
+tests/python/README.md
+  s_ac3b2446bfcf9a::t_d7bef87b0c85fe 89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "86ffefb6b9acd72ee93c04ec66e95780e3f6e09a",
+  "prompts": {},
+  "sessions": {
+    "s_ac3b2446bfcf9a": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "01a1e76a-12b8-7601-8d79-af7cf579e5d6",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "cwj2001 <2965241316@qq.com>"
+    }
+  }
+}
