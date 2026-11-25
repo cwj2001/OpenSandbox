@@ -152,8 +152,53 @@ func (a tcpSpans) contains(port int) bool {
 	return i < len(a) && a[i].Lo <= port
 }
 
+type tcpTarget struct {
+	prefix netip.Prefix // invalid means a port-only rule
+	spans  tcpSpans
+}
+
+type tcpTargets []tcpTarget
+
 func tcpPrefix(target string) netip.Prefix {
 	return teardownSelectorFor(target).prefix
+}
+
+func tcpPolicy(p *policy.NetworkPolicy) (allow, deny tcpTargets) {
+	if p == nil {
+		return
+	}
+	for _, r := range p.Egress {
+		if p.DefaultAction == policy.ActionAllow && r.Action == policy.ActionAllow {
+			continue // The default already admits this entire scope.
+		}
+		prefix := tcpPrefix(r.Target)
+		whole := len(r.Ports)+len(r.PortRanges) == 0
+		if !prefix.IsValid() && (r.Target != "" || whole) {
+			continue
+		}
+		t := tcpTarget{prefix: prefix, spans: tcpRuleSpans(r.Ports, r.PortRanges)}
+		if r.Action == policy.ActionAllow {
+			allow = append(allow, t)
+		} else {
+			deny = append(deny, t)
+		}
+	}
+	return
+}
+
+func dropTCPPrefix(d EstablishedPortDrop) netip.Prefix {
+	if d.Addr.IsValid() {
+		return hostPrefix(d.Addr)
+	}
+	return d.Prefix
+}
+
+func compiledTCP(ports []EstablishedPortDrop) tcpTargets {
+	out := make(tcpTargets, 0, len(ports))
+	for _, d := range ports {
+		out = append(out, tcpTarget{prefix: dropTCPPrefix(d), spans: tcpRuleSpans(d.Ports, d.Ranges)})
+	}
+	return out
 }
 
 type hostSpans struct {

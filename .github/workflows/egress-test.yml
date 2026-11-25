@@ -103,8 +103,16 @@ jobs:
             TestNftQuiescenceAfterCommittedStaticError \
             TestNftStartFailurePreservesKernelAndRetry \
             TestNftRealMissingTableFallback \
+            TestNftNarrowedCIDRKeepsOnlyCoveredStreams \
+            TestNftDNSAdmissionAcrossExpiryAndExplicitDeny \
+            TestNftDNSHistoryPreservesOnlyAdmittedPorts \
+            TestNftAgedFullDNSHistoryRequiresInstalledRetirement \
+            TestNftUncertainDNSHistoryRequiresKernelEvidence \
             TestNftRemovedSingletonPortAtOptIn \
-            TestNftEstablishedDropKernelRuleOrder
+            TestNftSingletonReloadPortIntersection \
+            TestNftEstablishedDropKernelRuleOrder \
+            TestNftReloadFragmentedHostWithdrawals \
+            TestNftFirstDNSGrantAfterPlainReload
           bash scripts/ci-nft-go-test.sh ./pkg/fastsandboxnft \
             TestResolvedIPRenewalExtendsKernelExpiry
           bash scripts/ci-nft-go-test.sh ./pkg/iptables \
