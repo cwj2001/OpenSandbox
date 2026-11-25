@@ -97,6 +97,8 @@ type Manager struct {
 	// `delete table` and would otherwise reopen flows a dropEstablished commit
 	// closed (e.g. ones still retransmitting).
 	lastDrops EstablishedDrops
+	// At most one unacknowledged marker batch in the current kernel generation.
+	pendingDNSHistory map[netip.Addr]tcpSpans
 	// lastDropsAt is when the dropEstablished commit behind lastDrops was
 	// applied. Carries keep the original timestamp and stop once the conntrack
 	// established timeout has passed, so a sandbox that tightens once does not
@@ -138,6 +140,12 @@ func (m *Manager) ApplyStatic(ctx context.Context, p *policy.NetworkPolicy) erro
 	}
 	var buildDrops staticDropBuilder
 	if !m.lastDrops.Empty() && m.now().Sub(m.lastDropsAt) < establishedCarryTTL() {
+		if m.pendingDNSHistory != nil && m.quiesced.Load() {
+			return &ApplyError{Effect: ApplyUnchanged, Err: ErrQuiesced}
+		}
+		if err := m.reconcileDNSHistoryLocked(ctx); err != nil {
+			return &ApplyError{Effect: ApplyUnchanged, Err: err}
+		}
 		buildDrops = func(at time.Time, leases map[netip.Addr]time.Time) (EstablishedDrops, time.Time) {
 			learned, expiry := m.liveLearnedAddrsLocked(at)
 			drops := m.lastDrops.stillRelevant(p, learned, leases)
@@ -439,6 +447,7 @@ func (m *Manager) retainedDomainLeasesLocked(p *policy.NetworkPolicy, now time.T
 }
 
 func (m *Manager) setLastDropsLocked(drops EstablishedDrops, committedAt time.Time) {
+	m.pendingDNSHistory = nil // A confirmed replacement/reset starts a new generation.
 	m.lastDrops = drops
 	if drops.Empty() {
 		m.lastDropsAt = time.Time{}
@@ -488,6 +497,9 @@ func (m *Manager) addResolvedDeadlinesLocked(ctx context.Context, deadlines map[
 	if len(deadlines) == 0 {
 		return nil
 	}
+	if err := m.reconcileDNSHistoryLocked(ctx); err != nil {
+		return err
+	}
 	var b strings.Builder
 	// Stage new, affected subjects before submitting the grant. Only an ACK
 	// publishes their history. Reuse the installed plan's compiled verdict.
@@ -514,7 +526,7 @@ func (m *Manager) addResolvedDeadlinesLocked(ctx context.Context, deadlines map[
 		if len(old) == 0 {
 			if slots >= maxDNSExceptions {
 				if m.now().Sub(m.lastDropsAt) >= establishedCarryTTL() {
-					continue // The next reload cannot inherit this plan.
+					continue // Timed grant only: this plan cannot be carried again.
 				}
 				return errTCPHistoryCapacity
 			}
@@ -525,26 +537,23 @@ func (m *Manager) addResolvedDeadlinesLocked(ctx context.Context, deadlines map[
 		}
 		changes[addr] = keep
 	}
+	writeDNSHistoryElements(&b, changes)
 	script := b.String()
 	log.Debugf("nftables: adding %d resolved IP(s) to dynamic allow sets with script statement %s", len(deadlines), script)
 	_, err := m.run(ctx, script)
 	if err != nil {
-		// The policy allows these destinations but the kernel does not know it yet, so
-		// the chain's final rule drops them. Indistinguishable from a policy denial
-		// inside the sandbox, hence its own counter.
+		if len(changes) != 0 && ApplyEffectOf(err) != ApplyUnchanged {
+			m.pendingDNSHistory = changes
+		}
+		// A lost ACK may mean the transaction landed. Do not publish a
+		// domain lease or use unconfirmed history to plan a later write.
 		telemetry.RecordNftablesUpdateFailed(telemetry.NftOpDynamicAdd)
 		return err
 	}
 	for addr, expiry := range deadlines {
 		m.tracker.dynamicIPs[addr] = expiry
 	}
-	if m.lastDrops.dnsKeeps == nil {
-		m.lastDrops.dnsKeeps = changes
-	} else {
-		for a, keep := range changes {
-			m.lastDrops.dnsKeeps[a] = keep
-		}
-	}
+	m.commitDNSHistory(changes)
 	telemetry.RecordNftablesUpdate()
 	return nil
 }
@@ -683,9 +692,9 @@ func buildRuleset(p *policy.NetworkPolicy, opts Options, drops EstablishedDrops)
 	if ep := opts.Telemetry; ep != nil {
 		b.WriteString(buildTelemetryStatic(tableName, ep))
 	}
-	// Explicit denies come before the DNS-learned accepts, mirroring the
-	// new-connection path: an allowed domain that re-resolves to an explicitly
-	// denied IP (shared CDN) must not resurrect a flow the caller asked to kill.
+	// An opt-in starts a fresh withdrawal: explicit denies precede DNS.
+	// A plain reload must first preserve confirmed *established-only* exceptions
+	// from the previous effective verdict; it cannot initiate a new teardown.
 	if drops.carried {
 		var exemptions tcpRules
 		for a, keep := range drops.dnsKeeps {
@@ -697,6 +706,7 @@ func buildRuleset(p *policy.NetworkPolicy, opts Options, drops EstablishedDrops)
 	} else {
 		writeEstablishedTargets(&b, drops.DenyAddrs, drops.DenyPrefixes, drops.DenyPortDrops, "drop")
 	}
+	writeDNSHistory(&b, drops)
 	fmt.Fprintf(&b, "add rule inet %s %s ip daddr @%s ct state established,related accept\n", tableName, chainName, dynAllowV4Set)
 	fmt.Fprintf(&b, "add rule inet %s %s ip6 daddr @%s ct state established,related accept\n", tableName, chainName, dynAllowV6Set)
 	if drops.carried {

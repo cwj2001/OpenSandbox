@@ -291,7 +291,9 @@ func TestDNSWithdrawalCapacityAppliesOnlyToAffectedACKs(t *testing.T) {
 	optInFromAllowAll(t, ctx, m, first)
 	input := withdrawalDNSPool(maxResolvedDomains * maxDomainAddresses)
 	run := m.run
-	m.run = func(context.Context, string) ([]byte, error) { return nil, context.Canceled }
+	m.run = func(context.Context, string) ([]byte, error) {
+		return nil, &ApplyError{Effect: ApplyUnchanged, Err: context.Canceled}
+	}
 	extra := ResolvedIP{Addr: input[len(input)-1].Addr.Next(), TTL: time.Minute}
 	require.Error(t, m.AddResolvedIPs(ctx, []ResolvedIP{extra}))
 	m.run = run

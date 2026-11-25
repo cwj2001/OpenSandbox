@@ -605,43 +605,20 @@ func removedPrefixParts(ipPolicy portlessIPPolicy, oldPfx netip.Prefix) []netip.
 	if ipPolicy.defaultAllow {
 		return nil
 	}
-	if prefixFullyAllowedPortless(ipPolicy, oldPfx) {
-		return nil
-	}
-	keepers := overlappingPortlessAllows(ipPolicy, oldPfx)
-	if len(keepers) == 0 {
-		return []netip.Prefix{oldPfx}
+	// Separate allows can cover both endpoints without covering the middle.
+	// Subtract their actual coverage, clipping a containing allow to oldPfx.
+	var keepers []netip.Prefix
+	for _, allow := range ipPolicy.allow {
+		if !allow.Overlaps(oldPfx) {
+			continue
+		}
+		if allow.Bits() <= oldPfx.Bits() {
+			keepers = prefixDiff(oldPfx, ipPolicy.deny)
+			break
+		}
+		keepers = append(keepers, prefixDiff(allow, ipPolicy.deny)...)
 	}
 	return prefixDiff(oldPfx, keepers)
-}
-
-func prefixFullyAllowedPortless(ipPolicy portlessIPPolicy, pfx netip.Prefix) bool {
-	if !pfx.IsValid() || !ipPolicy.allows(pfx.Addr()) {
-		return false
-	}
-	for _, deny := range ipPolicy.deny {
-		if deny.Overlaps(pfx) {
-			return false
-		}
-	}
-	last := lastAddr(pfx)
-	if last.IsValid() && last != pfx.Addr() && !ipPolicy.allows(last) {
-		return false
-	}
-	return true
-}
-
-// overlappingPortlessAllows returns newPol's portless allows inside/overlapping
-// oldPfx, minus newPol's portless denies (a deny inside a retained allow is not
-// retained).
-func overlappingPortlessAllows(ipPolicy portlessIPPolicy, oldPfx netip.Prefix) []netip.Prefix {
-	var allows []netip.Prefix
-	for _, prefix := range ipPolicy.allow {
-		if prefix.Overlaps(oldPfx) {
-			allows = append(allows, prefixDiff(prefix, ipPolicy.deny)...)
-		}
-	}
-	return allows
 }
 
 // prefixDiff returns the parts of whole not covered by any keeper.

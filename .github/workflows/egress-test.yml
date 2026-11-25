@@ -103,6 +103,9 @@ jobs:
             TestNftQuiescenceAfterCommittedStaticError \
             TestNftStartFailurePreservesKernelAndRetry \
             TestNftRealMissingTableFallback \
+            TestNftNarrowedCIDRKeepsOnlyCoveredStreams \
+            TestNftDNSAdmissionAcrossExpiryAndExplicitDeny \
+            TestNftUncertainDNSHistoryRequiresKernelEvidence \
             TestNftRemovedSingletonPortAtOptIn \
             TestNftSingletonReloadPortIntersection \
             TestNftEstablishedDropKernelRuleOrder \
