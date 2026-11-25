@@ -229,6 +229,7 @@ func computeEstablishedDrops(oldPol, newPol *policy.NetworkPolicy, priorDomains,
 	var out EstablishedDrops
 	removedAddrs := newAddrSet()
 	removedPrefixes := newPrefixSet()
+	var coverage prefixPortCoverage
 
 	// Removed-domain candidates, excluding shared CDN IPs that a surviving
 	// lease or an explicit IP/CIDR allow still permits.
@@ -283,7 +284,17 @@ func computeEstablishedDrops(oldPol, newPol *policy.NetworkPolicy, priorDomains,
 				continue
 			}
 			if hasPorts {
-				if !portFilter.portsFullyAllowedOnPrefix(prefix, r.Ports, r.PortRanges) {
+				// Under default allow, only explicit denies can withdraw a
+				// port; they are already emitted before every keep. Under
+				// default deny the late prefix rule is masked by all new
+				// address/port keeps, including partial covers.
+				if newPol.DefaultAction == policy.ActionAllow {
+					continue
+				}
+				if coverage == nil {
+					coverage = compilePrefixPortCoverage(oldPol.Egress, ipPolicy.allow, portFilter.rawAllow)
+				}
+				if !coverage.covers(prefix, tcpRuleSpans(r.Ports, r.PortRanges)) {
 					out.PortDrops = append(out.PortDrops, EstablishedPortDrop{
 						Prefix: prefix,
 						Ports:  append([]int(nil), r.Ports...),
@@ -746,67 +757,4 @@ func (f *teardownPortFilter) portsNoLongerAllowed(addr netip.Addr, ports []int, 
 		}
 	}
 	return outPorts, outRanges
-}
-
-func (f *teardownPortFilter) portsFullyAllowedOnPrefix(pfx netip.Prefix, ports []int, ranges []policy.PortRange) bool {
-	// Sample the network and last address plus every rule target inside the
-	// prefix (where the verdict can differ); if all still allow every listed
-	// port, treat the port-scoped allow as retained for the whole prefix.
-	pfx = pfx.Masked()
-	samples := []netip.Addr{pfx.Addr()}
-	if last := lastAddr(pfx); last.IsValid() && last != pfx.Addr() {
-		samples = append(samples, last)
-	}
-	if f.policy != nil {
-		for _, r := range f.policy.Egress {
-			t := tcpPrefix(r.Target)
-			if t.IsValid() && t.Overlaps(pfx) {
-				if pfx.Contains(t.Addr()) {
-					samples = append(samples, t.Addr())
-				}
-				if l := lastAddr(t); pfx.Contains(l) {
-					samples = append(samples, l)
-				}
-			}
-		}
-	}
-	for _, addr := range samples {
-		leftPorts, leftRanges := f.portsNoLongerAllowed(addr, ports, ranges)
-		if len(leftPorts) > 0 || len(leftRanges) > 0 {
-			return false
-		}
-	}
-	return true
-}
-
-func lastAddr(pfx netip.Prefix) netip.Addr {
-	if !pfx.IsValid() {
-		return netip.Addr{}
-	}
-	addr := pfx.Addr()
-	bits := pfx.Bits()
-	if addr.Is4() {
-		var b [4]byte
-		copy(b[:], addr.AsSlice())
-		hostBits := 32 - bits
-		if hostBits <= 0 {
-			return addr
-		}
-		mask := uint32((1 << hostBits) - 1)
-		v := uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
-		v |= mask
-		return netip.AddrFrom4([4]byte{byte(v >> 24), byte(v >> 16), byte(v >> 8), byte(v)})
-	}
-	var b [16]byte
-	copy(b[:], addr.AsSlice())
-	hostBits := 128 - bits
-	for i := 15; hostBits > 0; i-- {
-		take := hostBits
-		if take > 8 {
-			take = 8
-		}
-		b[i] |= byte((1 << take) - 1)
-		hostBits -= take
-	}
-	return netip.AddrFrom16(b)
 }

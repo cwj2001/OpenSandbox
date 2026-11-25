@@ -310,6 +310,19 @@ func TestDNSWithdrawalCapacityAppliesOnlyToAffectedACKs(t *testing.T) {
 	require.ErrorIs(t, m.ApplyStatic(ctx, mustPolicy(t, `{"egress":[`+masked+`]}`)), errTCPHistoryCapacity)
 	require.Equal(t, writes, len(*scripts), "over-capacity replacement must not touch the installed rules")
 	require.True(t, m.lastDrops.MatchesFlow(b.Addr, 443))
+	// An aged plan is still installed until a replacement is acknowledged.
+	m.now = func() time.Time { return m.lastDropsAt.Add(establishedCarryTTL() + time.Second) }
+	require.ErrorIs(t, m.AddResolvedDomain(ctx, "masked.example", []ResolvedIP{extra}), errTCPHistoryCapacity)
+	require.Equal(t, writes, len(*scripts), "no timed-only grant without an available history slot")
+	require.NoError(t, m.AddResolvedIPs(ctx, input[:1]), "existing admissions still renew at capacity")
+	m.run = func(context.Context, string) ([]byte, error) {
+		return nil, &ApplyError{Effect: ApplyUnchanged, Err: context.Canceled}
+	}
+	require.Error(t, m.ApplyStatic(ctx, first))
+	m.run = run
+	require.ErrorIs(t, m.AddResolvedIPs(ctx, []ResolvedIP{extra}), errTCPHistoryCapacity)
+	require.NoError(t, m.ApplyStatic(ctx, first))
+	require.NoError(t, m.AddResolvedDomain(ctx, "masked.example", []ResolvedIP{extra}), "actual retirement freed capacity")
 	require.NoError(t, m.ApplyStatic(ctx, mustPolicy(t, `{"defaultAction":"allow"}`)))
 	require.NoError(t, m.AddResolvedIPs(ctx, []ResolvedIP{extra}), "no history needed after full reallow")
 }

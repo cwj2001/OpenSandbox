@@ -42,9 +42,10 @@ func writeDNSHistoryElements(b *strings.Builder, keeps map[netip.Addr]tcpSpans) 
 	writeElements(b, dnsTCPv6, v6)
 }
 
-// Only a live DNS grant can retire a late drop. Remember that admission for
-// established TCP until the next table replacement. The early phase has
-// already run here; new connections never consult these sets.
+// A live DNS lease is address-wide, so it admits ALL late ports for this
+// generation, never a subset of them. The address-only marker is evaluated
+// after early drops and only on established TCP. On plain replacement the
+// sets start empty: carried (possibly partial) history is rendered per port.
 func writeDNSHistory(b *strings.Builder, drops EstablishedDrops) {
 	if drops.tcp == nil || len(drops.tcp.late.rules) == 0 {
 		return

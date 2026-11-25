@@ -99,9 +99,14 @@ func TestNftUncertainDNSHistoryRequiresKernelEvidence(t *testing.T) {
 		return
 	}
 	for _, tc := range []struct {
-		name   string
-		landed bool
-	}{{"lost-ACK", true}, {"not-installed", false}} {
+		name                           string
+		landed, tableGone, lostRebuild bool
+	}{
+		{"lost-ACK", true, false, false},
+		{"not-installed", false, false, false},
+		{"generation-gone", true, true, false},
+		{"generation-gone-and-rebuild-ACK-lost", true, true, true},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := NewManagerWithOptions(Options{})
 			old := mustPolicy(t, `{"defaultAction":"allow"}`)
@@ -109,6 +114,10 @@ func TestNftUncertainDNSHistoryRequiresKernelEvidence(t *testing.T) {
 			require.NoError(t, m.ApplyStatic(ctx, old))
 			_, err := m.ApplyStaticComputingEstablishedDrops(ctx, old, p)
 			require.NoError(t, err)
+			confirmed := []ResolvedIP{{Addr: netip.MustParseAddr("192.0.2.7"), TTL: time.Minute}, {Addr: netip.MustParseAddr("2001:db8::7"), TTL: time.Minute}}
+			if tc.tableGone {
+				require.NoError(t, m.AddResolvedDomain(ctx, "a.example", confirmed))
+			}
 			require.NoError(t, m.ApplyStatic(ctx, p))
 			run := m.run
 			m.run = func(ctx context.Context, script string) ([]byte, error) {
@@ -120,23 +129,59 @@ func TestNftUncertainDNSHistoryRequiresKernelEvidence(t *testing.T) {
 			}
 			ips := []ResolvedIP{{Addr: netip.MustParseAddr("192.0.2.10")}, {Addr: netip.MustParseAddr("2001:db8::10")}}
 			require.Error(t, m.AddResolvedDomain(ctx, "a.example", ips))
-			require.Empty(t, m.tracker.dynamicIPs)
-			require.Empty(t, m.domains)
+			for _, ip := range ips {
+				require.NotContains(t, m.tracker.dynamicIPs, ip.Addr)
+			}
 			require.True(t, m.lastDrops.MatchesFlow(ips[0].Addr, 8443))
 			m.run = func(_ context.Context, script string) ([]byte, error) {
-				require.True(t, strings.HasPrefix(script, "get element ") || strings.HasPrefix(script, "create element "), "must not submit a new grant or rebuild on unknown state")
+				require.True(t, strings.HasPrefix(script, "get element ") || strings.HasPrefix(script, "create element ") || script == "create table inet "+tableName+"\ndelete table inet "+tableName+"\n", "must not rebuild on unknown state")
 				return nil, context.DeadlineExceeded
 			}
 			require.Error(t, m.ApplyStatic(ctx, p))
 			require.Error(t, m.AddResolvedDomain(ctx, "a.example", ips))
 			m.run = run
+			if tc.tableGone {
+				if !tc.lostRebuild {
+					// An existing table without the witness set is not an
+					// absent table. Do not destroy it to resolve ambiguity.
+					out, err := run(ctx, "delete table inet "+tableName+"\nadd table inet "+tableName+"\nadd chain inet "+tableName+" sentinel\n")
+					require.NoError(t, err, "%s", out)
+					require.Error(t, m.ApplyStatic(ctx, p))
+					out, err = run(ctx, "list chain inet "+tableName+" sentinel\n")
+					require.NoError(t, err, "%s", out)
+				}
+				out, err := run(ctx, "delete table inet "+tableName+"\n")
+				require.NoError(t, err, "%s", out)
+				if tc.lostRebuild {
+					m.run = func(ctx context.Context, script string) ([]byte, error) {
+						data, err := run(ctx, script)
+						if err == nil && strings.HasPrefix(script, "create table inet "+tableName+"\nadd set ") {
+							return nil, context.DeadlineExceeded
+						}
+						return data, err
+					}
+					require.Error(t, m.ApplyStatic(ctx, p))
+					require.Error(t, m.AddResolvedDomain(ctx, "a.example", ips), "unknown static state cannot admit a grant")
+					m.run = run
+				}
+			}
 			require.NoError(t, m.ApplyStatic(ctx, p))
 			for _, ip := range ips {
 				require.True(t, m.lastDrops.MatchesFlow(ip.Addr, 443))
-				require.Equal(t, !tc.landed, m.lastDrops.MatchesFlow(ip.Addr, 8443))
+				require.Equal(t, !tc.landed || tc.tableGone, m.lastDrops.MatchesFlow(ip.Addr, 8443))
 			}
-			require.Empty(t, readKernelLeaseExpiry(t, ctx), "history cannot publish an unacknowledged DNS lease")
-			require.Empty(t, m.domains)
+			sets := readKernelAddressSets(t, ctx, dynAllowV4Set, dynAllowV6Set)
+			if tc.tableGone {
+				for _, ip := range confirmed {
+					require.Contains(t, sets[resolvedIPSet(ip.Addr)], ip.Addr.String(), "rebuild preserves the acknowledged lease in its family")
+					require.False(t, m.lastDrops.MatchesFlow(ip.Addr, 8443))
+				}
+			} else {
+				require.Empty(t, m.domains)
+			}
+			for _, ip := range ips {
+				require.NotContains(t, sets[resolvedIPSet(ip.Addr)], ip.Addr.String(), "history cannot publish an unacknowledged DNS lease")
+			}
 		})
 	}
 }

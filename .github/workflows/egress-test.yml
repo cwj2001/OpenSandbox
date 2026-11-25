@@ -105,6 +105,8 @@ jobs:
             TestNftRealMissingTableFallback \
             TestNftNarrowedCIDRKeepsOnlyCoveredStreams \
             TestNftDNSAdmissionAcrossExpiryAndExplicitDeny \
+            TestNftDNSHistoryPreservesOnlyAdmittedPorts \
+            TestNftAgedFullDNSHistoryRequiresInstalledRetirement \
             TestNftUncertainDNSHistoryRequiresKernelEvidence \
             TestNftRemovedSingletonPortAtOptIn \
             TestNftSingletonReloadPortIntersection \
