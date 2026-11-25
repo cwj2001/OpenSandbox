@@ -29,8 +29,8 @@ import (
 )
 
 func TestHandleDelete_DropEstablishedPreservesAllowedSingletonPort(t *testing.T) {
-	for _, target := range []string{"192.0.2.7", "2001:db8::7"} {
-		addr := netip.MustParseAddr(target)
+	for _, target := range []string{"192.0.2.7", "2001:db8::7", "::ffff:192.0.2.7", "192.0.2.7/32", "2001:db8::7/128", "::ffff:192.0.2.7/128"} {
+		addr := tcpTestTargetAddr(t, target)
 		subnet := netip.PrefixFrom(addr, addr.BitLen()-1).Masked().String()
 		t.Run(target, func(t *testing.T) {
 			initial, err := policy.ParsePolicy(`{"defaultAction":"allow","egress":[{"action":"allow","target":"` + target + `","ports":[443,8443]},{"action":"deny","target":"` + subnet + `","ports":[443]}]}`)
@@ -63,6 +63,14 @@ func TestHandleDelete_DropEstablishedPreservesAllowedSingletonPort(t *testing.T)
 			}
 		})
 	}
+}
+
+func tcpTestTargetAddr(t *testing.T, target string) netip.Addr {
+	t.Helper()
+	if p, err := netip.ParsePrefix(target); err == nil {
+		return p.Addr()
+	}
+	return netip.MustParseAddr(target)
 }
 
 func TestHandleDelete_DropEstablishedQueryPassesLearnedIPs(t *testing.T) {

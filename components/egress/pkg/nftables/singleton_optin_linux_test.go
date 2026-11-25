@@ -33,7 +33,13 @@ func TestNftRemovedSingletonPortAtOptIn(t *testing.T) {
 		requireWithdrawalDrop(t, ctx, cut, 2)
 		require.NoError(t, withdrawalEcho(sibling, 2))
 	})
-	const target = "198.18.0.2"
+	for _, target := range []string{"198.18.0.2", "198.18.0.2/32"} {
+		t.Run(target, func(t *testing.T) { checkRemovedHostPorts(t, ctx, target) })
+	}
+}
+
+func checkRemovedHostPorts(t *testing.T, ctx context.Context, target string) {
+	t.Helper()
 	m := NewManagerWithOptions(Options{})
 	allowAll := mustPolicy(t, `{"defaultAction":"allow"}`)
 	require.NoError(t, m.ApplyStatic(ctx, allowAll))

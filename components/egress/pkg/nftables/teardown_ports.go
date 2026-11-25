@@ -23,7 +23,7 @@ func teardownSelectorFor(target string) teardownSelector {
 		return teardownSelector{}
 	}
 	if ip, err := netip.ParseAddr(target); err == nil {
-		ip = ip.Unmap()
+		ip = ip.WithZone("")
 		return teardownSelector{literal: ip, prefix: netip.PrefixFrom(ip, ip.BitLen())}
 	}
 	prefix, _ := netip.ParsePrefix(target)
@@ -162,7 +162,6 @@ func (f *teardownPortFilter) deniedWindow(addr netip.Addr, window tcpSpans) tcpS
 	if f.policy == nil || !addr.IsValid() || f.ips.denies(addr) {
 		return window
 	}
-	addr = addr.Unmap()
 	var buf [maxDirectWindow]int
 	first := f.directPortsLeft == directPortBudget
 	points := f.directPoints(window, buf[:0])
